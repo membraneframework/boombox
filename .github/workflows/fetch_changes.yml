@@ -1,0 +1,54 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Fetch changes
+
+# Controls when the workflow will run
+on:
+  # Trigger thrice a day
+  schedule:
+    - cron:  '0 4,8,12 * * *'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: '0'
+      
+      - name: webfactory/ssh-agent
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Runs a set of commands using the runners shell
+      - name: Add remote
+        run: |        
+          git remote add source git@github.com:membraneframework/membrane_template_plugin.git
+          git remote update
+          
+          echo "CURRENT_BRANCH=$(git branch --show-current)" >> $GITHUB_ENV
+          
+      - name: Check changes
+        run: |
+          echo ${{env.CURRENT_BRANCH}}
+          echo "LOG_SIZE=$(git log origin/${{ env.CURRENT_BRANCH }}..source/${{ env.CURRENT_BRANCH }} | wc -l)"
+  
+          echo "LOG_SIZE=$(git log origin/${{ env.CURRENT_BRANCH }}..source/${{ env.CURRENT_BRANCH }} | wc -l)" >> $GITHUB_ENV
+          
+      - if: ${{ env.LOG_SIZE != '0'}}
+        name: Merge changes
+        run: |   
+          git config --global user.email "admin@membraneframework.com"
+          git config --global user.name "MembraneFramework"
+          
+          git merge source/master
+          git push origin master

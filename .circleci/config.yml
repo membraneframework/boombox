@@ -1,0 +1,30 @@
+version: 2.1
+orbs:
+  elixir: membraneframework/elixir@1
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - elixir/build_test:
+          filters: &filters
+            tags:
+              only: /v.*/
+      - elixir/test:
+          filters:
+            <<: *filters
+      - elixir/lint:
+          filters:
+            <<: *filters
+      - elixir/hex_publish:
+          requires:
+            - elixir/build_test
+            - elixir/test
+            - elixir/lint
+          context:
+            - Deployment
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v.*/
