@@ -1,4 +1,4 @@
-defmodule Membrane.Template.Mixfile do
+defmodule Boombox.Mixfile do
   use Mix.Project
 
   @version "0.1.0"
@@ -6,7 +6,7 @@ defmodule Membrane.Template.Mixfile do
 
   def project do
     [
-      app: :membrane_template_plugin,
+      app: :boombox,
       version: @version,
       elixir: "~> 1.13",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -37,6 +37,19 @@ defmodule Membrane.Template.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.0"},
+      {:membrane_webrtc_plugin, github: "membraneframework-labs/membrane_webrtc_plugin"},
+      {:membrane_opus_plugin, ">= 0.0.0"},
+      {:membrane_aac_plugin, ">= 0.0.0"},
+      {:membrane_aac_fdk_plugin, ">= 0.0.0"},
+      {:membrane_h26x_plugin, ">= 0.0.0"},
+      {:membrane_h264_ffmpeg_plugin, ">= 0.0.0"},
+      # {:membrane_mp4_plugin, ">= 0.0.0"},
+      {:membrane_mp4_plugin, path: "../membrane_mp4_plugin"},
+      {:membrane_realtimer_plugin, ">= 0.0.0"},
+      {:membrane_rtmp_plugin, ">= 0.0.0"},
+      {:membrane_ffmpeg_swresample_plugin,
+       github: "membraneframework/membrane_ffmpeg_swresample_plugin",
+       branch: "invalid_match_bug_fix"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false}
