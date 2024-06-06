@@ -8,7 +8,8 @@ defmodule Boombox.Pipeline do
       input: opts[:input],
       output: opts[:output],
       spec: [],
-      rtmp_tcp_server: nil
+      rtmp_tcp_server: nil,
+      end_of_streams: []
     }
 
     try_proceed(ctx, state)
@@ -45,6 +46,16 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_child_notification({:end_of_stream, _id}, :webrtc_output, _ctx, state) do
+    if :webrtc_output in state.end_of_streams do
+      Process.sleep(500)
+      {[terminate: :normal], state}
+    else
+      {[], %{state | end_of_streams: [:webrtc_output | state.end_of_streams]}}
+    end
+  end
+
+  @impl true
   def handle_child_notification(_notification, _child, _ctx, state) do
     {[], state}
   end
@@ -71,6 +82,16 @@ defmodule Boombox.Pipeline do
     }
 
     proceed({:ready, spec, builders}, ctx, %{state | rtmp_tcp_server: server_pid})
+  end
+
+  @impl true
+  def handle_element_end_of_stream(:mp4_file_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
+  def handle_element_end_of_stream(_element, _pad, _ctx, state) do
+    {[], state}
   end
 
   defp proceed(result, ctx, %{status: :awaiting_input} = state) do
@@ -106,13 +127,21 @@ defmodule Boombox.Pipeline do
     {[spec: spec_acc ++ [spec]], %{state | spec: [], status: status}}
   end
 
-  defp create_input([:webrtc, uri], _ctx) do
-    uri = URI.new!(uri)
-    {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
+  defp create_input([:webrtc, signaling], _ctx) do
+    signaling =
+      case signaling do
+        %Membrane.WebRTC.SignalingChannel{} = signaling ->
+          signaling
+
+        uri when is_binary(uri) ->
+          uri = URI.new!(uri)
+          {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
+          {:websocket, ip: ip, port: uri.port}
+      end
 
     spec = [
       child(:webrtc_input, %Membrane.WebRTC.Source{
-        signaling: {:websocket, ip: ip, port: uri.port},
+        signaling: signaling,
         video_codec: :h264
       }),
       get_child(:webrtc_input)
@@ -166,13 +195,21 @@ defmodule Boombox.Pipeline do
     {:wait, []}
   end
 
-  defp create_output([:webrtc, uri], builders, _ctx) do
-    uri = URI.new!(uri)
-    {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
+  defp create_output([:webrtc, signaling], builders, _ctx) do
+    signaling =
+      case signaling do
+        %Membrane.WebRTC.SignalingChannel{} = signaling ->
+          signaling
+
+        uri when is_binary(uri) ->
+          uri = URI.new!(uri)
+          {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
+          {:websocket, ip: ip, port: uri.port}
+      end
 
     spec = [
       child(:webrtc_output, %Membrane.WebRTC.Sink{
-        signaling: {:websocket, ip: ip, port: uri.port},
+        signaling: signaling,
         video_codec: :h264
       }),
       builders.video
@@ -201,7 +238,7 @@ defmodule Boombox.Pipeline do
     spec =
       [
         child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
-        |> child(%Membrane.File.Sink{location: name}),
+        |> child(:mp4_file_sink, %Membrane.File.Sink{location: name}),
         builders.audio
         |> child(Membrane.AAC.FDK.Encoder)
         |> child(%Membrane.AAC.Parser{out_encapsulation: :none, output_config: :esds})

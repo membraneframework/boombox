@@ -47,9 +47,7 @@ defmodule Boombox.Mixfile do
       {:membrane_mp4_plugin, path: "../membrane_mp4_plugin"},
       {:membrane_realtimer_plugin, ">= 0.0.0"},
       {:membrane_rtmp_plugin, ">= 0.0.0"},
-      {:membrane_ffmpeg_swresample_plugin,
-       github: "membraneframework/membrane_ffmpeg_swresample_plugin",
-       branch: "invalid_match_bug_fix"},
+      {:membrane_ffmpeg_swresample_plugin, ">= 0.0.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false}
