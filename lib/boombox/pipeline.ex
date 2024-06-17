@@ -66,42 +66,40 @@ defmodule Boombox.Pipeline do
   end
 
   defp proceed_result(result, ctx, %{status: :awaiting_input} = state) do
-    case result do
-      {:ready, spec, builders} -> do_proceed({:input_ready, builders}, spec, ctx, state)
-      {:wait, spec} -> dont_proceed(:awaiting_input, spec, state)
-    end
+    do_proceed(result, :input_ready, :awaiting_input, ctx, state)
   end
 
-  defp proceed_result(result, _ctx, %{status: :running} = state) do
-    case result do
-      {:wait, spec} -> dont_proceed(:running, spec, state)
-    end
+  defp proceed_result(result, ctx, %{status: :running} = state) do
+    do_proceed(result, nil, :running, ctx, state)
   end
 
   defp proceed(ctx, %{status: :init, input: input} = state) do
-    case create_input(input, ctx) do
-      {:ready, spec, builders} -> do_proceed({:input_ready, builders}, spec, ctx, state)
-      {:wait, spec} -> dont_proceed(:awaiting_input, spec, state)
-    end
+    create_input(input, ctx)
+    |> do_proceed(:input_ready, :awaiting_input, ctx, state)
   end
 
   defp proceed(ctx, %{status: {:input_ready, builders}, output: output} = state) do
-    case create_output(output, builders, ctx) do
-      {:ready, spec} -> do_proceed(:output_ready, spec, ctx, state)
-      {:wait, spec} -> dont_proceed(:awaiting_output, spec, state)
+    create_output(output, builders, ctx)
+    |> do_proceed(:output_ready, :awaiting_output, ctx, state)
+  end
+
+  defp proceed(ctx, %{status: :output_ready} = state) do
+    do_proceed({:wait, []}, nil, :running, ctx, state)
+  end
+
+  defp do_proceed(result, ready_status, wait_status, ctx, state) do
+    %{spec: spec_acc} = state
+
+    case result do
+      {:ready, spec} when ready_status != nil ->
+        proceed(ctx, %{state | status: ready_status, spec: spec_acc ++ [spec]})
+
+      {:ready, spec, value} when ready_status != nil ->
+        proceed(ctx, %{state | status: {ready_status, value}, spec: spec_acc ++ [spec]})
+
+      {:wait, spec} when wait_status != nil ->
+        {[spec: spec_acc ++ [spec]], %{state | spec: [], status: wait_status}}
     end
-  end
-
-  defp proceed(_ctx, %{status: :output_ready} = state) do
-    dont_proceed(:running, [], state)
-  end
-
-  defp do_proceed(status, spec, ctx, %{spec: spec_acc} = state) do
-    proceed(ctx, %{state | status: status, spec: spec_acc ++ [spec]})
-  end
-
-  defp dont_proceed(status, spec, %{spec: spec_acc} = state) do
-    {[spec: spec_acc ++ [spec]], %{state | spec: [], status: status}}
   end
 
   defp create_input([:webrtc, signaling], _ctx) do
