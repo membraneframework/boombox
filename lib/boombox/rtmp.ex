@@ -2,6 +2,7 @@ defmodule Boombox.RTMP do
   @moduledoc false
 
   import Membrane.ChildrenSpec
+  alias Boombox.Pipeline.{Ready, Wait}
 
   def create_input(uri, utility_supervisor) do
     uri = URI.new!(uri)
@@ -28,7 +29,7 @@ defmodule Boombox.RTMP do
         {Membrane.RTMP.Source.TcpServer, server_options}
       )
 
-    {:wait, []}
+    %Wait{}
   end
 
   def handle_connection(server_pid, socket, _state = nil) do
@@ -39,21 +40,21 @@ defmodule Boombox.RTMP do
       |> child(:aac_decoder, Membrane.AAC.FDK.Decoder)
     ]
 
-    builders = %{
+    track_builders = %{
       audio: get_child(:aac_decoder),
       video: get_child(:rtmp_source) |> via_out(:video)
     }
 
-    {{:ready, spec, builders}, %{server_pid: server_pid}}
+    {%Ready{spec_builder: spec, track_builders: track_builders}, %{server_pid: server_pid}}
   end
 
   def handle_connection(_server_pid, _socket, state) do
     send(state.server_pid, :rtmp_already_connected)
-    {{:wait, []}, state}
+    {%Wait{}, state}
   end
 
   def handle_socket_control(source_pid, state) do
     send(state.server_pid, {:rtmp_source_pid, source_pid})
-    {:wait, []}
+    %Wait{}
   end
 end

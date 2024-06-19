@@ -27,7 +27,8 @@ defmodule Support.Compare do
     end
   end
 
-  def compare(subject, reference) do
+  def compare(subject, reference, kinds \\ [:audio, :video]) do
+    kinds = Bunch.listify(kinds)
     p = Testing.Pipeline.start_link_supervised!()
 
     Testing.Pipeline.execute_actions(p,
@@ -44,7 +45,7 @@ defmodule Support.Compare do
     [{audio_id, %Membrane.AAC{}}, {video_id, %Membrane.H264{}}] =
       Enum.sort_by(tracks, fn {_id, %format{}} -> format end)
 
-    spec =
+    ref_spec =
       [
         get_child(:ref_demuxer)
         |> via_out(Pad.ref(:output, video_id))
@@ -58,42 +59,52 @@ defmodule Support.Compare do
 
     assert_pipeline_notified(p, :sub_demuxer, {:new_tracks, tracks})
 
-    [{audio_id, %Membrane.AAC{}}, {video_id, %Membrane.H264{}}] =
-      Enum.sort_by(tracks, fn {_id, %format{}} -> format end)
+    assert length(tracks) == length(kinds)
 
-    spec =
-      spec ++
-        [
+    sub_spec =
+      Enum.map(tracks, fn
+        {id, %Membrane.AAC{}} ->
+          assert :audio in kinds
+
           get_child(:sub_demuxer)
-          |> via_out(Pad.ref(:output, video_id))
-          |> child(:sub_video_bufs, GetBuffers),
-          get_child(:sub_demuxer)
-          |> via_out(Pad.ref(:output, audio_id))
+          |> via_out(Pad.ref(:output, id))
           |> child(Membrane.AAC.Parser)
           |> child(Membrane.AAC.FDK.Decoder)
           |> child(:sub_audio_bufs, GetBuffers)
-        ]
 
-    Testing.Pipeline.execute_actions(p, spec: spec)
+        {id, %Membrane.H264{}} ->
+          assert :video in kinds
 
-    assert_pipeline_notified(p, :sub_video_bufs, {:buffers, sub_video_bufs})
-    assert_pipeline_notified(p, :ref_video_bufs, {:buffers, ref_video_bufs})
-    assert_pipeline_notified(p, :sub_audio_bufs, {:buffers, sub_audio_bufs})
-    assert_pipeline_notified(p, :ref_audio_bufs, {:buffers, ref_audio_bufs})
+          get_child(:sub_demuxer)
+          |> via_out(Pad.ref(:output, id))
+          |> child(:sub_video_bufs, GetBuffers)
+      end)
 
-    assert length(ref_video_bufs) == length(sub_video_bufs)
+    Testing.Pipeline.execute_actions(p, spec: [ref_spec, sub_spec])
 
-    Enum.zip(sub_video_bufs, ref_video_bufs)
-    |> Enum.each(fn {sub, ref} ->
-      assert sub.payload == ref.payload
-    end)
+    if :video in kinds do
+      assert_pipeline_notified(p, :sub_video_bufs, {:buffers, sub_video_bufs})
+      assert_pipeline_notified(p, :ref_video_bufs, {:buffers, ref_video_bufs})
 
-    assert length(ref_audio_bufs) == length(sub_audio_bufs)
+      assert length(ref_video_bufs) == length(sub_video_bufs)
 
-    Enum.zip(sub_audio_bufs, ref_audio_bufs)
-    |> Enum.each(fn {sub, ref} ->
-      assert sub.payload == ref.payload
-    end)
+      Enum.zip(sub_video_bufs, ref_video_bufs)
+      |> Enum.each(fn {sub, ref} ->
+        assert sub.payload == ref.payload
+      end)
+    end
+
+    if :audio in kinds do
+      assert_pipeline_notified(p, :sub_audio_bufs, {:buffers, sub_audio_bufs})
+      assert_pipeline_notified(p, :ref_audio_bufs, {:buffers, ref_audio_bufs})
+
+      assert length(ref_audio_bufs) == length(sub_audio_bufs)
+
+      Enum.zip(sub_audio_bufs, ref_audio_bufs)
+      |> Enum.each(fn {sub, ref} ->
+        assert sub.payload == ref.payload
+      end)
+    end
 
     Testing.Pipeline.terminate(p)
   end

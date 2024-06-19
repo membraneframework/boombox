@@ -15,6 +15,8 @@ defmodule BoomboxTest do
   @module BoomboxTest
 
   @bbb_mp4 "test/fixtures/bun10s.mp4"
+  @bbb_mp4_a "test/fixtures/bun10s_a.mp4"
+  @bbb_mp4_v "test/fixtures/bun10s_v.mp4"
 
   @moduletag :tmp_dir
 
@@ -22,6 +24,18 @@ defmodule BoomboxTest do
   async_test "mp4 -> mp4", %{tmp_dir: tmp} do
     Boombox.run(input: [:file, :mp4, @bbb_mp4], output: [:file, :mp4, "#{tmp}/output.mp4"])
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  @tag :mp4_audio
+  async_test "mp4 -> mp4 audio", %{tmp_dir: tmp} do
+    Boombox.run(input: [:file, :mp4, @bbb_mp4_a], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :audio)
+  end
+
+  @tag :mp4_video
+  async_test "mp4 -> mp4 audio", %{tmp_dir: tmp} do
+    Boombox.run(input: [:file, :mp4, @bbb_mp4_v], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :video)
   end
 
   @tag :webrtc
@@ -36,6 +50,34 @@ defmodule BoomboxTest do
     Boombox.run(input: [:webrtc, signaling], output: [:file, :mp4, "#{tmp}/output.mp4"])
     Task.await(t)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4")
+  end
+
+  @tag :webrtc_audio
+  async_test "mp4 -> webrtc -> mp4 audio", %{tmp_dir: tmp} do
+    signaling = Membrane.WebRTC.SignalingChannel.new()
+
+    t =
+      Task.async(fn ->
+        Boombox.run(input: [:file, :mp4, @bbb_mp4_a], output: [:webrtc, signaling])
+      end)
+
+    Boombox.run(input: [:webrtc, signaling], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Task.await(t)
+    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :audio)
+  end
+
+  @tag :webrtc_video
+  async_test "mp4 -> webrtc -> mp4 video", %{tmp_dir: tmp} do
+    signaling = Membrane.WebRTC.SignalingChannel.new()
+
+    t =
+      Task.async(fn ->
+        Boombox.run(input: [:file, :mp4, @bbb_mp4_v], output: [:webrtc, signaling])
+      end)
+
+    Boombox.run(input: [:webrtc, signaling], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Task.await(t)
+    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :video)
   end
 
   @tag :webrtc2

@@ -37,7 +37,11 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.0"},
-      {:membrane_webrtc_plugin, github: "membraneframework-labs/membrane_webrtc_plugin"},
+      {:membrane_webrtc_plugin, "~> 0.20.0"},
+      {:membrane_rtp_h264_plugin,
+       github: "membraneframework/membrane_rtp_h264_plugin",
+       branch: "fix_stap_a_marker_bit",
+       override: true},
       {:membrane_opus_plugin, ">= 0.0.0"},
       {:membrane_aac_plugin, ">= 0.0.0"},
       {:membrane_aac_fdk_plugin, ">= 0.0.0"},

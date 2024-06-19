@@ -3,58 +3,93 @@ defmodule Boombox.WebRTC do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
+  alias Boombox.Pipeline.{Ready, Wait}
 
   def create_input(signaling) do
     signaling = resolve_signaling(signaling)
 
-    spec = [
+    spec =
       child(:webrtc_input, %Membrane.WebRTC.Source{
         signaling: signaling,
         video_codec: :h264
-      }),
-      get_child(:webrtc_input)
-      |> via_out(:output, options: [kind: :audio])
-      |> child(:opus_decoder, Membrane.Opus.Decoder)
-    ]
+      })
 
-    builders = %{
-      audio: get_child(:opus_decoder),
-      video:
-        get_child(:webrtc_input)
-        |> via_out(:output, options: [kind: :video])
-    }
-
-    {:ready, spec, builders}
+    %Wait{actions: [spec: spec]}
   end
 
-  def create_output(signaling, builders) do
+  def handle_input_tracks(tracks) do
+    track_builders =
+      Map.new(tracks, fn
+        %{kind: :audio, id: id} ->
+          spec =
+            get_child(:webrtc_input)
+            |> via_out(Pad.ref(:output, id))
+            |> child(:opus_decoder, Membrane.Opus.Decoder)
+
+          {:audio, spec}
+
+        %{kind: :video, id: id} ->
+          spec =
+            get_child(:webrtc_input)
+            |> via_out(Pad.ref(:output, id))
+
+          {:video, spec}
+      end)
+
+    %Ready{track_builders: track_builders}
+  end
+
+  def create_output(signaling) do
     signaling = resolve_signaling(signaling)
 
-    spec = [
+    spec =
       child(:webrtc_output, %Membrane.WebRTC.Sink{
         signaling: signaling,
+        tracks: [],
         video_codec: :h264
-      }),
-      builders.video
-      |> child(Membrane.Realtimer)
-      |> child(%Membrane.H264.Parser{output_stream_structure: :annexb, output_alignment: :nalu})
-      |> via_in(Pad.ref(:input, :video_track), options: [kind: :video])
-      |> get_child(:webrtc_output),
-      builders.audio
-      |> child(%Membrane.FFmpeg.SWResample.Converter{
-        output_stream_format: %Membrane.RawAudio{
-          sample_format: :s16le,
-          sample_rate: 48_000,
-          channels: 2
-        }
       })
-      |> child(Membrane.Opus.Encoder)
-      |> child(Membrane.Realtimer)
-      |> via_in(Pad.ref(:input, :audio_track), options: [kind: :audio])
-      |> get_child(:webrtc_output)
+
+    %Ready{actions: [spec: spec]}
+  end
+
+  def link_output(track_builders) do
+    tracks = Bunch.KVEnum.keys(track_builders)
+    %Wait{actions: [notify_child: {:webrtc_output, {:add_tracks, tracks}}]}
+  end
+
+  def handle_output_tracks_negotiated(track_builders, spec_builder, tracks) do
+    tracks = Map.new(tracks, &{&1.kind, &1.id})
+
+    spec = [
+      spec_builder,
+      Enum.map(track_builders, fn
+        {:audio, builder} ->
+          builder
+          |> child(%Membrane.FFmpeg.SWResample.Converter{
+            output_stream_format: %Membrane.RawAudio{
+              sample_format: :s16le,
+              sample_rate: 48_000,
+              channels: 2
+            }
+          })
+          |> child(Membrane.Opus.Encoder)
+          |> child(Membrane.Realtimer)
+          |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
+          |> get_child(:webrtc_output)
+
+        {:video, builder} ->
+          builder
+          |> child(Membrane.Realtimer)
+          |> child(%Membrane.H264.Parser{
+            output_stream_structure: :annexb,
+            output_alignment: :nalu
+          })
+          |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
+          |> get_child(:webrtc_output)
+      end)
     ]
 
-    {:ready, spec}
+    %Ready{actions: [spec: spec], eos_info: Map.values(tracks)}
   end
 
   defp resolve_signaling(%Membrane.WebRTC.SignalingChannel{} = signaling) do

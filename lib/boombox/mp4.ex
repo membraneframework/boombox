@@ -3,47 +3,58 @@ defmodule Boombox.MP4 do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
+  alias Boombox.Pipeline.{Ready, Wait}
 
   def create_input(location) do
     spec =
       child(%Membrane.File.Source{location: location, seekable?: true})
       |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
 
-    {:wait, spec}
+    %Wait{actions: [spec: spec]}
   end
 
   def handle_input_tracks(tracks) do
-    [{audio_id, %Membrane.AAC{}}, {video_id, %Membrane.H264{}}] =
-      Enum.sort_by(tracks, fn {_id, %format{}} -> format end)
+    track_builders =
+      Map.new(tracks, fn
+        {id, %Membrane.AAC{}} ->
+          spec =
+            get_child(:mp4_demuxer)
+            |> via_out(Pad.ref(:output, id))
+            |> child(Membrane.AAC.Parser)
+            |> child(:aac_decoder, Membrane.AAC.FDK.Decoder)
 
-    spec =
-      get_child(:mp4_demuxer)
-      |> via_out(Pad.ref(:output, audio_id))
-      |> child(Membrane.AAC.Parser)
-      |> child(:aac_decoder, Membrane.AAC.FDK.Decoder)
+          {:audio, spec}
 
-    builders = %{
-      audio: get_child(:aac_decoder),
-      video: get_child(:mp4_demuxer) |> via_out(Pad.ref(:output, video_id))
-    }
+        {id, %Membrane.H264{}} ->
+          spec = get_child(:mp4_demuxer) |> via_out(Pad.ref(:output, id))
+          {:video, spec}
+      end)
 
-    {:ready, spec, builders}
+    %Ready{track_builders: track_builders}
   end
 
-  def create_output(location, builders) do
+  def link_output(location, track_builders, spec_builder) do
     spec =
       [
+        spec_builder,
         child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
         |> child(:mp4_file_sink, %Membrane.File.Sink{location: location}),
-        builders.audio
-        |> child(Membrane.AAC.FDK.Encoder)
-        |> child(%Membrane.AAC.Parser{out_encapsulation: :none, output_config: :esds})
-        |> get_child(:mp4_muxer),
-        builders.video
-        |> child(%Membrane.H264.Parser{output_stream_structure: :avc3})
-        |> get_child(:mp4_muxer)
+        Enum.map(track_builders, fn
+          {:audio, builder} ->
+            builder
+            |> child(Membrane.AAC.FDK.Encoder)
+            |> child(%Membrane.AAC.Parser{out_encapsulation: :none, output_config: :esds})
+            |> via_in(Pad.ref(:input, :audio))
+            |> get_child(:mp4_muxer)
+
+          {:video, builder} ->
+            builder
+            |> child(%Membrane.H264.Parser{output_stream_structure: :avc3})
+            |> via_in(Pad.ref(:input, :video))
+            |> get_child(:mp4_muxer)
+        end)
       ]
 
-    {:ready, spec}
+    %Ready{actions: [spec: spec]}
   end
 end

@@ -1,15 +1,26 @@
 defmodule Boombox.Pipeline do
   use Membrane.Pipeline
 
+  defmodule Ready do
+    defstruct actions: [], track_builders: nil, spec_builder: [], eos_info: nil
+  end
+
+  defmodule Wait do
+    defstruct actions: []
+  end
+
   @impl true
   def handle_init(ctx, opts) do
     state = %{
       status: :init,
       input: opts[:input],
       output: opts[:output],
-      spec: [],
-      rtmp_input_state: nil,
-      end_of_streams: []
+      actions_acc: [],
+      track_builders: nil,
+      spec_builder: [],
+      last_result: nil,
+      eos_info: nil,
+      rtmp_input_state: nil
     }
 
     proceed(ctx, state)
@@ -18,6 +29,12 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do
     Boombox.MP4.handle_input_tracks(tracks)
+    |> proceed_result(ctx, state)
+  end
+
+  @impl true
+  def handle_child_notification({:new_tracks, tracks}, :webrtc_input, ctx, state) do
+    Boombox.WebRTC.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
   end
 
@@ -33,12 +50,28 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_child_notification({:end_of_stream, _id}, :webrtc_output, _ctx, state) do
-    if :webrtc_output in state.end_of_streams do
+  def handle_child_notification({:new_tracks, tracks}, :webrtc_output, ctx, state) do
+    %{status: :awaiting_output_link} = state
+
+    Boombox.WebRTC.handle_output_tracks_negotiated(
+      state.track_builders,
+      state.spec_builder,
+      tracks
+    )
+    |> proceed_result(ctx, state)
+  end
+
+  @impl true
+  def handle_child_notification({:end_of_stream, id}, :webrtc_output, _ctx, state) do
+    %{eos_info: track_ids} = state
+    track_ids = List.delete(track_ids, id)
+    state = %{state | eos_info: track_ids}
+
+    if track_ids == [] do
       wait_before_closing()
       {[terminate: :normal], state}
     else
-      {[], %{state | end_of_streams: [:webrtc_output | state.end_of_streams]}}
+      {[], state}
     end
   end
 
@@ -69,36 +102,68 @@ defmodule Boombox.Pipeline do
     do_proceed(result, :input_ready, :awaiting_input, ctx, state)
   end
 
+  defp proceed_result(result, ctx, %{status: :awaiting_output_link} = state) do
+    do_proceed(result, :output_linked, :awaiting_output_link, ctx, state)
+  end
+
   defp proceed_result(result, ctx, %{status: :running} = state) do
     do_proceed(result, nil, :running, ctx, state)
   end
 
-  defp proceed(ctx, %{status: :init, input: input} = state) do
-    create_input(input, ctx)
-    |> do_proceed(:input_ready, :awaiting_input, ctx, state)
+  defp proceed_result(_result, _ctx, state) do
+    raise """
+    Boombox got into invalid internal state. Status: #{inspect(state.status)}.
+    """
   end
 
-  defp proceed(ctx, %{status: {:input_ready, builders}, output: output} = state) do
-    create_output(output, builders, ctx)
+  defp proceed(ctx, %{status: :init} = state) do
+    create_output(state.output, ctx)
     |> do_proceed(:output_ready, :awaiting_output, ctx, state)
   end
 
   defp proceed(ctx, %{status: :output_ready} = state) do
-    do_proceed({:wait, []}, nil, :running, ctx, state)
+    create_input(state.input, ctx)
+    |> do_proceed(:input_ready, :awaiting_input, ctx, state)
+  end
+
+  defp proceed(
+         ctx,
+         %{
+           status: :input_ready,
+           last_result: %Ready{track_builders: track_builders, spec_builder: spec_builder}
+         } = state
+       )
+       when track_builders != nil do
+    state = %{state | track_builders: track_builders, spec_builder: spec_builder}
+
+    link_output(state.output, track_builders, spec_builder, ctx)
+    |> do_proceed(:output_linked, :awaiting_output_link, ctx, state)
+  end
+
+  defp proceed(ctx, %{status: :output_linked} = state) do
+    do_proceed(%Wait{}, nil, :running, ctx, %{state | eos_info: state.last_result.eos_info})
+  end
+
+  defp proceed(_ctx, state) do
+    raise """
+    Boombox got into invalid internal state. Status: #{inspect(state.status)}.
+    """
   end
 
   defp do_proceed(result, ready_status, wait_status, ctx, state) do
-    %{spec: spec_acc} = state
+    %{actions_acc: actions_acc} = state
 
     case result do
-      {:ready, spec} when ready_status != nil ->
-        proceed(ctx, %{state | status: ready_status, spec: spec_acc ++ [spec]})
+      %Ready{actions: actions} = result when ready_status != nil ->
+        proceed(ctx, %{
+          state
+          | status: ready_status,
+            last_result: result,
+            actions_acc: actions_acc ++ actions
+        })
 
-      {:ready, spec, value} when ready_status != nil ->
-        proceed(ctx, %{state | status: {ready_status, value}, spec: spec_acc ++ [spec]})
-
-      {:wait, spec} when wait_status != nil ->
-        {[spec: spec_acc ++ [spec]], %{state | spec: [], status: wait_status}}
+      %Wait{actions: actions} when wait_status != nil ->
+        {actions_acc ++ actions, %{state | actions_acc: [], status: wait_status}}
     end
   end
 
@@ -114,12 +179,20 @@ defmodule Boombox.Pipeline do
     Boombox.RTMP.create_input(uri, ctx.utility_supervisor)
   end
 
-  defp create_output([:webrtc, signaling], builders, _ctx) do
-    Boombox.WebRTC.create_output(signaling, builders)
+  defp create_output([:webrtc, signaling], _ctx) do
+    Boombox.WebRTC.create_output(signaling)
   end
 
-  defp create_output([:file, :mp4, location], builders, _ctx) do
-    Boombox.MP4.create_output(location, builders)
+  defp create_output(_output, _ctx) do
+    %Ready{}
+  end
+
+  defp link_output([:webrtc, _signaling], track_builders, _spec_builder, _ctx) do
+    Boombox.WebRTC.link_output(track_builders)
+  end
+
+  defp link_output([:file, :mp4, location], track_builders, spec_builder, _ctx) do
+    Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 
   # Wait between sending the last packet
