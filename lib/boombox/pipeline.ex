@@ -68,8 +68,8 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_init(ctx, opts) do
     state = %State{
-      input: opts[:input],
-      output: opts[:output],
+      input: opts |> Keyword.fetch!(:input) |> parse_input(),
+      output: opts |> Keyword.fetch!(:output) |> parse_output(),
       status: :init
     }
 
@@ -265,6 +265,39 @@ defmodule Boombox.Pipeline do
 
   defp link_output([:file, :mp4, location], track_builders, spec_builder, _ctx) do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
+  end
+
+  defp parse_input(input) when is_binary(input) do
+    uri = URI.new!(input)
+
+    cond do
+      uri.scheme == nil and Path.extname(uri.path) == ".mp4" ->
+        [:file, :mp4, uri.path]
+
+      uri.scheme == "rtmp" ->
+        [:rtmp, input]
+
+      true ->
+        raise "Couldn't parse URI: #{input}"
+    end
+  end
+
+  defp parse_input(input) when is_list(input) do
+    input
+  end
+
+  defp parse_output(output) when is_binary(output) do
+    uri = URI.new!(output)
+
+    if uri.scheme == nil and Path.extname(uri.path) == ".mp4" do
+      [:file, :mp4, uri.path]
+    else
+      raise "Couldn't parse URI: #{output}"
+    end
+  end
+
+  defp parse_output(input) when is_list(input) do
+    input
   end
 
   # Wait between sending the last packet

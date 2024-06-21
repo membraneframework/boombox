@@ -23,32 +23,27 @@ defmodule BoomboxTest do
 
   @tag :mp4
   async_test "mp4 -> mp4", %{tmp_dir: tmp} do
-    Boombox.run(input: [:file, :mp4, @bbb_mp4], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Boombox.run(input: @bbb_mp4, output: "#{tmp}/output.mp4")
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   @tag :mp4_audio
   async_test "mp4 -> mp4 audio", %{tmp_dir: tmp} do
-    Boombox.run(input: [:file, :mp4, @bbb_mp4_a], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Boombox.run(input: @bbb_mp4_a, output: "#{tmp}/output.mp4")
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :audio)
   end
 
   @tag :mp4_video
   async_test "mp4 -> mp4 audio", %{tmp_dir: tmp} do
-    Boombox.run(input: [:file, :mp4, @bbb_mp4_v], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Boombox.run(input: @bbb_mp4_v, output: "#{tmp}/output.mp4")
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :video)
   end
 
   @tag :webrtc
   async_test "mp4 -> webrtc -> mp4", %{tmp_dir: tmp} do
     signaling = Membrane.WebRTC.SignalingChannel.new()
-
-    t =
-      Task.async(fn ->
-        Boombox.run(input: [:file, :mp4, @bbb_mp4], output: [:webrtc, signaling])
-      end)
-
-    Boombox.run(input: [:webrtc, signaling], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    t = Task.async(fn -> Boombox.run(input: @bbb_mp4, output: [:webrtc, signaling]) end)
+    Boombox.run(input: [:webrtc, signaling], output: "#{tmp}/output.mp4")
     Task.await(t)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
@@ -58,11 +53,9 @@ defmodule BoomboxTest do
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t =
-      Task.async(fn ->
-        Boombox.run(input: [:file, :mp4, @bbb_mp4_a], output: [:webrtc, signaling])
-      end)
+      Task.async(fn -> Boombox.run(input: @bbb_mp4_a, output: [:webrtc, signaling]) end)
 
-    Boombox.run(input: [:webrtc, signaling], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Boombox.run(input: [:webrtc, signaling], output: "#{tmp}/output.mp4")
     Task.await(t)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :audio)
   end
@@ -72,11 +65,9 @@ defmodule BoomboxTest do
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t =
-      Task.async(fn ->
-        Boombox.run(input: [:file, :mp4, @bbb_mp4_v], output: [:webrtc, signaling])
-      end)
+      Task.async(fn -> Boombox.run(input: @bbb_mp4_v, output: [:webrtc, signaling]) end)
 
-    Boombox.run(input: [:webrtc, signaling], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Boombox.run(input: [:webrtc, signaling], output: "#{tmp}/output.mp4")
     Task.await(t)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :video)
   end
@@ -87,16 +78,14 @@ defmodule BoomboxTest do
     signaling2 = Membrane.WebRTC.SignalingChannel.new()
 
     t1 =
-      Task.async(fn ->
-        Boombox.run(input: [:file, :mp4, @bbb_mp4], output: [:webrtc, signaling1])
-      end)
+      Task.async(fn -> Boombox.run(input: @bbb_mp4, output: [:webrtc, signaling1]) end)
 
     t2 =
       Task.async(fn ->
         Boombox.run(input: [:webrtc, signaling1], output: [:webrtc, signaling2])
       end)
 
-    Boombox.run(input: [:webrtc, signaling2], output: [:file, :mp4, "#{tmp}/output.mp4"])
+    Boombox.run(input: [:webrtc, signaling2], output: "#{tmp}/output.mp4")
     Task.await(t1)
     Task.await(t2)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus2_aac.mp4")
@@ -105,11 +94,7 @@ defmodule BoomboxTest do
   @tag :rtmp
   async_test "rtmp -> mp4", %{tmp_dir: tmp} do
     url = "rtmp://localhost:5000"
-
-    t =
-      Task.async(fn ->
-        Boombox.run(input: [:rtmp, url], output: [:file, :mp4, "#{tmp}/output.mp4"])
-      end)
+    t = Task.async(fn -> Boombox.run(input: url, output: "#{tmp}/output.mp4") end)
 
     # Wait for boombox to be ready
     Process.sleep(200)
@@ -125,14 +110,10 @@ defmodule BoomboxTest do
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t1 =
-      Task.async(fn ->
-        Boombox.run(input: [:rtmp, url], output: [:webrtc, signaling])
-      end)
+      Task.async(fn -> Boombox.run(input: url, output: [:webrtc, signaling]) end)
 
     t2 =
-      Task.async(fn ->
-        Boombox.run(input: [:webrtc, signaling], output: [:file, :mp4, "#{tmp}/output.mp4"])
-      end)
+      Task.async(fn -> Boombox.run(input: [:webrtc, signaling], output: "#{tmp}/output.mp4") end)
 
     # Wait for boombox to be ready
     Process.sleep(200)
