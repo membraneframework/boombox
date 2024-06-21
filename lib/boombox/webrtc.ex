@@ -5,6 +5,7 @@ defmodule Boombox.WebRTC do
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
 
+  @spec create_input(Boombox.webrtc_opts()) :: Wait.t()
   def create_input(signaling) do
     signaling = resolve_signaling(signaling)
 
@@ -17,6 +18,7 @@ defmodule Boombox.WebRTC do
     %Wait{actions: [spec: spec]}
   end
 
+  @spec handle_input_tracks(Membrane.WebRTC.Source.new_tracks()) :: Ready.t()
   def handle_input_tracks(tracks) do
     track_builders =
       Map.new(tracks, fn
@@ -39,6 +41,7 @@ defmodule Boombox.WebRTC do
     %Ready{track_builders: track_builders}
   end
 
+  @spec create_output(Boombox.webrtc_opts()) :: Ready.t()
   def create_output(signaling) do
     signaling = resolve_signaling(signaling)
 
@@ -52,11 +55,17 @@ defmodule Boombox.WebRTC do
     %Ready{actions: [spec: spec]}
   end
 
+  @spec link_output(Boombox.Pipeline.track_builders()) :: Wait.t()
   def link_output(track_builders) do
     tracks = Bunch.KVEnum.keys(track_builders)
     %Wait{actions: [notify_child: {:webrtc_output, {:add_tracks, tracks}}]}
   end
 
+  @spec handle_output_tracks_negotiated(
+          Boombox.Pipeline.track_builders(),
+          Membrane.ChildrenSpec.t(),
+          Membrane.WebRTC.Sink.new_tracks()
+        ) :: Ready.t()
   def handle_output_tracks_negotiated(track_builders, spec_builder, tracks) do
     tracks = Map.new(tracks, &{&1.kind, &1.id})
 

@@ -1,17 +1,21 @@
 defmodule Boombox do
+  @moduledoc """
+  Boombox is a tool for audio and video streaming.
+
+  See `t:input/0` and `t:output/0` for supported protocols.
+  """
+  @type webrtc_opts :: Membrane.WebRTC.SignalingChannel.t() | URI.t()
+
+  @type input :: [:file | :mp4 | Path.t()] | [:webrtc | webrtc_opts()] | {:rtmp | URI.t()}
+  @type output :: [:file | :mp4 | Path.t()] | [:webrtc | webrtc_opts()]
+
+  @spec run(input: input, output: output) :: :ok
   def run(opts) do
     {:ok, supervisor, _pipeline} = Membrane.Pipeline.start_link(Boombox.Pipeline, opts)
     Process.monitor(supervisor)
 
-    exit_reason =
-      receive do
-        {:DOWN, _monitor, :process, ^supervisor, reason} -> reason
-      end
-
-    if exit_reason == :normal do
-      :ok
-    else
-      raise "Boombox pipeline crashed with reason: #{inspect(exit_reason)}"
+    receive do
+      {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
     end
   end
 end

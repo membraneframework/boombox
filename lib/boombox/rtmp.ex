@@ -4,6 +4,9 @@ defmodule Boombox.RTMP do
   import Membrane.ChildrenSpec
   alias Boombox.Pipeline.{Ready, Wait}
 
+  @type state :: %{server_pid: pid()} | nil
+
+  @spec create_input(URI.t(), pid()) :: Wait.t()
   def create_input(uri, utility_supervisor) do
     uri = URI.new!(uri)
     {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
@@ -32,7 +35,9 @@ defmodule Boombox.RTMP do
     %Wait{}
   end
 
-  def handle_connection(server_pid, socket, _state = nil) do
+  @spec handle_connection(pid(), :gen_tcp.socket() | :ssl.sslsocket(), state()) ::
+          {Ready.t(), state()}
+  def handle_connection(server_pid, socket, nil = _state) do
     spec = [
       child(:rtmp_source, %Membrane.RTMP.SourceBin{socket: socket})
       |> via_out(:audio)
@@ -53,6 +58,7 @@ defmodule Boombox.RTMP do
     {%Wait{}, state}
   end
 
+  @spec handle_socket_control(pid(), state()) :: Wait.t()
   def handle_socket_control(source_pid, state) do
     send(state.server_pid, {:rtmp_source_pid, source_pid})
     %Wait{}

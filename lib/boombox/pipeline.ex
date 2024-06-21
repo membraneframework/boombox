@@ -1,26 +1,76 @@
 defmodule Boombox.Pipeline do
+  @moduledoc false
   use Membrane.Pipeline
 
+  @type track_builders :: %{
+          optional(:audio) => Membrane.ChildrenSpec.t(),
+          optional(:video) => Membrane.ChildrenSpec.t()
+        }
+
   defmodule Ready do
+    @moduledoc false
+
+    @type t :: %__MODULE__{
+            actions: [Membrane.Pipeline.Action.t()],
+            track_builders: Boombox.Pipeline.track_builders() | nil,
+            spec_builder: Membrane.ChildrenSpec.t() | nil,
+            eos_info: term
+          }
+
     defstruct actions: [], track_builders: nil, spec_builder: [], eos_info: nil
   end
 
   defmodule Wait do
+    @moduledoc false
+
+    @type t :: %__MODULE__{actions: [Membrane.Pipeline.Action.t()]}
     defstruct actions: []
+  end
+
+  defmodule State do
+    @moduledoc false
+
+    @enforce_keys [:status, :input, :output]
+
+    defstruct @enforce_keys ++
+                [
+                  actions_acc: [],
+                  spec_builder: [],
+                  track_builders: nil,
+                  last_result: nil,
+                  eos_info: nil,
+                  rtmp_input_state: nil
+                ]
+
+    @type status ::
+            :init
+            | :awaiting_output
+            | :output_ready
+            | :awaiting_input
+            | :input_ready
+            | :awaiting_output_link
+            | :output_linked
+            | :running
+
+    @type t :: %__MODULE__{
+            status: status(),
+            input: Boombox.input(),
+            output: Boombox.output(),
+            actions_acc: [Membrane.Pipeline.Action.t()],
+            spec_builder: Membrane.ChildrenSpec.t(),
+            track_builders: Boombox.Pipeline.track_builders() | nil,
+            last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
+            eos_info: term,
+            rtmp_input_state: Boombox.RTMP.state()
+          }
   end
 
   @impl true
   def handle_init(ctx, opts) do
-    state = %{
-      status: :init,
+    state = %State{
       input: opts[:input],
       output: opts[:output],
-      actions_acc: [],
-      track_builders: nil,
-      spec_builder: [],
-      last_result: nil,
-      eos_info: nil,
-      rtmp_input_state: nil
+      status: :init
     }
 
     proceed(ctx, state)
@@ -98,6 +148,8 @@ defmodule Boombox.Pipeline do
     {[], state}
   end
 
+  @spec proceed_result(Ready.t() | Wait.t(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
+          Membrane.Pipeline.callback_return()
   defp proceed_result(result, ctx, %{status: :awaiting_input} = state) do
     do_proceed(result, :input_ready, :awaiting_input, ctx, state)
   end
@@ -116,6 +168,8 @@ defmodule Boombox.Pipeline do
     """
   end
 
+  @spec proceed(Membrane.Pipeline.CallbackContext.t(), State.t()) ::
+          Membrane.Pipeline.callback_return()
   defp proceed(ctx, %{status: :init} = state) do
     create_output(state.output, ctx)
     |> do_proceed(:output_ready, :awaiting_output, ctx, state)
@@ -150,6 +204,13 @@ defmodule Boombox.Pipeline do
     """
   end
 
+  @spec do_proceed(
+          Ready.t() | Wait.t(),
+          State.status() | nil,
+          State.status() | nil,
+          Membrane.Pipeline.CallbackContext.t(),
+          State.t()
+        ) :: Membrane.Pipeline.callback_return()
   defp do_proceed(result, ready_status, wait_status, ctx, state) do
     %{actions_acc: actions_acc} = state
 
@@ -167,6 +228,8 @@ defmodule Boombox.Pipeline do
     end
   end
 
+  @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t()) ::
+          Ready.t() | Wait.t()
   defp create_input([:webrtc, signaling], _ctx) do
     Boombox.WebRTC.create_input(signaling)
   end
@@ -179,6 +242,8 @@ defmodule Boombox.Pipeline do
     Boombox.RTMP.create_input(uri, ctx.utility_supervisor)
   end
 
+  @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t()) ::
+          Ready.t() | Wait.t()
   defp create_output([:webrtc, signaling], _ctx) do
     Boombox.WebRTC.create_output(signaling)
   end
@@ -187,6 +252,13 @@ defmodule Boombox.Pipeline do
     %Ready{}
   end
 
+  @spec link_output(
+          Boombox.output(),
+          track_builders(),
+          Membrane.ChildrenSpec.t(),
+          Membrane.Pipeline.CallbackContext.t()
+        ) ::
+          Ready.t() | Wait.t()
   defp link_output([:webrtc, _signaling], track_builders, _spec_builder, _ctx) do
     Boombox.WebRTC.link_output(track_builders)
   end

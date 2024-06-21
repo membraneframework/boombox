@@ -1,12 +1,15 @@
 defmodule Support.Compare do
-  alias Membrane.Testing
-
-  require Membrane.Pad, as: Pad
+  @moduledoc false
 
   import Membrane.ChildrenSpec
   import Membrane.Testing.Assertions
 
+  require Membrane.Pad, as: Pad
+
+  alias Membrane.Testing
+
   defmodule GetBuffers do
+    @moduledoc false
     use Membrane.Sink
 
     def_input_pad :input, accepted_format: _any
@@ -27,6 +30,7 @@ defmodule Support.Compare do
     end
   end
 
+  @spec compare(Path.t(), Path.t(), [:audio | :video]) :: :ok
   def compare(subject, reference, kinds \\ [:audio, :video]) do
     kinds = Bunch.listify(kinds)
     p = Testing.Pipeline.start_link_supervised!()

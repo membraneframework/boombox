@@ -1,4 +1,5 @@
 defmodule BoomboxTest do
+  # credo:disable-for-this-file Credo.Check.Readability.Specs
   use ExUnit.Case, async: true
 
   import Membrane.ChildrenSpec

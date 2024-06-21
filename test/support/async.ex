@@ -1,4 +1,5 @@
 defmodule Support.Async do
+  @moduledoc false
   # Helper for creating asynchronous tests
   # Doesn't support calling private functions (yet)
 
@@ -63,8 +64,9 @@ defmodule Support.Async do
           end)
 
         Module.attributes_in(unquote(caller))
-        |> Enum.reject(&(&1 in Map.keys(Module.reserved_attributes())))
-        |> Enum.reject(&(&1 in Module.attributes_in(__MODULE__)))
+        |> Enum.reject(
+          &(&1 in (Map.keys(Module.reserved_attributes()) ++ Module.attributes_in(__MODULE__)))
+        )
         |> Enum.map(&{&1, Module.get_attribute(unquote(caller), &1)})
         |> Enum.concat(tags_attrs)
         |> Enum.each(fn {name, value} -> Module.put_attribute(__MODULE__, name, value) end)

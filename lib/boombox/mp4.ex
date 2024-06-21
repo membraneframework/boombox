@@ -5,6 +5,7 @@ defmodule Boombox.MP4 do
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
 
+  @spec create_input(String.t()) :: Wait.t()
   def create_input(location) do
     spec =
       child(%Membrane.File.Source{location: location, seekable?: true})
@@ -13,6 +14,7 @@ defmodule Boombox.MP4 do
     %Wait{actions: [spec: spec]}
   end
 
+  @spec handle_input_tracks(Membrane.MP4.Demuxer.ISOM.new_tracks_t()) :: Ready.t()
   def handle_input_tracks(tracks) do
     track_builders =
       Map.new(tracks, fn
@@ -33,6 +35,11 @@ defmodule Boombox.MP4 do
     %Ready{track_builders: track_builders}
   end
 
+  @spec link_output(
+          String.t(),
+          Boombox.Pipeline.track_builders(),
+          Membrane.ChildrenSpec.t()
+        ) :: Ready.t()
   def link_output(location, track_builders, spec_builder) do
     spec =
       [
