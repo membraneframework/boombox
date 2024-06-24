@@ -1,5 +1,4 @@
 defmodule BoomboxTest do
-  # credo:disable-for-this-file Credo.Check.Readability.Specs
   use ExUnit.Case, async: true
 
   import Membrane.ChildrenSpec
@@ -11,9 +10,6 @@ defmodule BoomboxTest do
 
   alias Membrane.Testing
   alias Support.Compare
-
-  # async_test doesn't support private functions
-  @module BoomboxTest
 
   @bbb_mp4 "test/fixtures/bun10s.mp4"
   @bbb_mp4_a "test/fixtures/bun10s_a.mp4"
@@ -98,7 +94,7 @@ defmodule BoomboxTest do
 
     # Wait for boombox to be ready
     Process.sleep(200)
-    p = @module.send_rtmp(url)
+    p = send_rtmp(url)
     Task.await(t, 30_000)
     Testing.Pipeline.terminate(p)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
@@ -117,14 +113,14 @@ defmodule BoomboxTest do
 
     # Wait for boombox to be ready
     Process.sleep(200)
-    p = @module.send_rtmp(url)
+    p = send_rtmp(url)
     Task.await(t1, 30_000)
     Task.await(t2)
     Testing.Pipeline.terminate(p)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
 
-  def send_rtmp(url) do
+  defp send_rtmp(url) do
     p = Testing.Pipeline.start_link_supervised!()
 
     Testing.Pipeline.execute_actions(p,
