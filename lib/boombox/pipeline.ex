@@ -1,5 +1,25 @@
 defmodule Boombox.Pipeline do
   @moduledoc false
+  # The pipeline that spawns all the Boombox children.
+  # Support for each endpoint is handled via create_output, create_input
+  # and link_output functions. Each of them should return one of:
+  # - `t:Ready.t/0` - Returns the control to Boombox.
+  # - `t:Wait.t/0 - Waits for some endpoint-specific action to happen.
+  #   When it does, `proceed_result` needs to be called with `Ready`
+  #   or another `Wait`.
+  #
+  # The purpose of each function is the following:
+  # - create_output - Called at the beginning, initializes the output.
+  #   Needed only when the output needs initialization before tracks
+  #   are known.
+  # - create_input - Initializes the input. Called after the output finishes
+  #   initialization. Should return `t:track_builders/0` in `Ready`.
+  #   If there's any spec that needs to be returned with the track builders,
+  #   it can be set in the `spec_builder` field of `Ready`.
+  # - link_output - Gets the track builders and spec builder. It should
+  #   link the track builders to appropriate inputs and return the spec
+  #   builder in the same spec.
+
   use Membrane.Pipeline
 
   @type track_builders :: %{
@@ -42,6 +62,13 @@ defmodule Boombox.Pipeline do
                   rtmp_input_state: nil
                 ]
 
+    @typedoc """
+    Statuses of the Boombox pipeline in the order of occurence.
+
+    Statuses starting with `awaiting_` occur only if
+    the `proceed` function returns `t:Wait.t/0` when in the
+    preceeding status.
+    """
     @type status ::
             :init
             | :awaiting_output
