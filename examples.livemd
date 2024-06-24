@@ -12,9 +12,6 @@ Mix.install([{:boombox, path: __DIR__}, :kino])
 ## Boombox
 
 ```elixir
-bbb_mp4 = "#{__DIR__}/test/fixtures/bun10s.mp4"
-out_dir = "#{__DIR__}/examples_outputs"
-
 :ok = :inets.start()
 
 {:ok, _server} =
@@ -25,8 +22,11 @@ out_dir = "#{__DIR__}/examples_outputs"
     server_name: ~c"assets_server",
     server_root: "/tmp"
   )
+```
 
-out_dir
+```elixir
+bbb_mp4 = "#{__DIR__}/test/fixtures/bun10s.mp4"
+out_dir = "#{__DIR__}/examples_outputs"
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->

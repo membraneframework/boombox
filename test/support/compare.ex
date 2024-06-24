@@ -1,6 +1,7 @@
 defmodule Support.Compare do
   @moduledoc false
 
+  import ExUnit.Assertions
   import Membrane.ChildrenSpec
   import Membrane.Testing.Assertions
 
@@ -106,10 +107,24 @@ defmodule Support.Compare do
 
       Enum.zip(sub_audio_bufs, ref_audio_bufs)
       |> Enum.each(fn {sub, ref} ->
-        assert sub.payload == ref.payload
+        # The results differ between operating systems
+        # and subsequent runs due to transcoding.
+        # The threshold here is obtained empirically and may need
+        # to be adjusted, or a better metric should be used.
+        assert samples_min_square_error(sub.payload, ref.payload) < 30_000
       end)
     end
 
     Testing.Pipeline.terminate(p)
+  end
+
+  defp samples_min_square_error(bin1, bin2) do
+    assert byte_size(bin1) == byte_size(bin2)
+
+    Enum.zip(for(<<b::16 <- bin1>>, do: b), for(<<b::16 <- bin2>>, do: b))
+    |> Enum.map(fn {b1, b2} ->
+      (b1 - b2) ** 2
+    end)
+    |> then(&:math.sqrt(Enum.sum(&1) / length(&1)))
   end
 end
