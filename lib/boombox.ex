@@ -6,13 +6,22 @@ defmodule Boombox do
   """
   @type webrtc_opts :: Membrane.WebRTC.SignalingChannel.t() | URI.t()
 
+  @type file_extension :: :mp4
+
   @type input ::
           URI.t()
           | Path.t()
-          | [:file | :mp4 | Path.t()]
+          | [:file | file_extension() | Path.t()]
+          | [:http | file_extension() | URI.t()]
           | [:webrtc | webrtc_opts()]
-          | {:rtmp | URI.t()}
-  @type output :: URI.t() | Path.t() | [:file | :mp4 | Path.t()] | [:webrtc | webrtc_opts()]
+          | [:rtmp | URI.t()]
+
+  @type output ::
+          URI.t()
+          | Path.t()
+          | [:file | file_extension() | Path.t()]
+          | [:http | file_extension() | URI.t()]
+          | [:webrtc | webrtc_opts()]
 
   @spec run(input: input, output: output) :: :ok
   def run(opts) do

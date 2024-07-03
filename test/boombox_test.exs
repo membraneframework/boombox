@@ -11,28 +11,35 @@ defmodule BoomboxTest do
   alias Membrane.Testing
   alias Support.Compare
 
+  @bbb_mp4_url "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s.mp4"
   @bbb_mp4 "test/fixtures/bun10s.mp4"
   @bbb_mp4_a "test/fixtures/bun10s_a.mp4"
   @bbb_mp4_v "test/fixtures/bun10s_v.mp4"
 
   @moduletag :tmp_dir
 
-  @tag :mp4
-  async_test "mp4 -> mp4", %{tmp_dir: tmp} do
+  @tag :file_file_mp4
+  async_test "mp4 file -> mp4 file", %{tmp_dir: tmp} do
     Boombox.run(input: @bbb_mp4, output: "#{tmp}/output.mp4")
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  @tag :mp4_audio
-  async_test "mp4 -> mp4 audio", %{tmp_dir: tmp} do
+  @tag :file_file_mp4_audio
+  async_test "mp4 file -> mp4 file audio", %{tmp_dir: tmp} do
     Boombox.run(input: @bbb_mp4_a, output: "#{tmp}/output.mp4")
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :audio)
   end
 
-  @tag :mp4_video
-  async_test "mp4 -> mp4 audio", %{tmp_dir: tmp} do
+  @tag :file_file_mp4_video
+  async_test "mp4 file -> mp4 file video", %{tmp_dir: tmp} do
     Boombox.run(input: @bbb_mp4_v, output: "#{tmp}/output.mp4")
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :video)
+  end
+
+  @tag :http_file_mp4
+  async_test "http mp4 -> mp4 file", %{tmp_dir: tmp} do
+    Boombox.run(input: @bbb_mp4_url, output: "#{tmp}/output.mp4")
+    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   @tag :webrtc
