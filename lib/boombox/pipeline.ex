@@ -322,10 +322,15 @@ defmodule Boombox.Pipeline do
   defp parse_output(output) when is_binary(output) do
     uri = URI.new!(output)
 
-    if uri.scheme == nil and Path.extname(uri.path) == ".mp4" do
-      [:file, :mp4, uri.path]
-    else
-      raise "Couldn't parse URI: #{output}"
+    case uri do
+      %URI{scheme: nil, path: path} ->
+        [:file, parse_file_extension(path), path]
+
+      %URI{scheme: scheme, path: path} when scheme in ["http", "https"] ->
+        [:http, parse_file_extension(path), output]
+
+      _other ->
+        raise "Couldn't parse URI: #{output}"
     end
   end
 
