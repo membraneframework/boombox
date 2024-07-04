@@ -170,6 +170,17 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_element_end_of_stream({:eos_notifier, track}, _pad, _ctx, state) do
+    state = %{state | eos_info: List.delete(state.eos_info, track)}
+
+    if state.eos_info == [] do
+      {[terminate: :normal], state}
+    else
+      {[], state}
+    end
+  end
+
+  @impl true
   def handle_element_end_of_stream(_element, _pad, _ctx, state) do
     {[], state}
   end
@@ -291,6 +302,10 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:file, :mp4, location}, track_builders, spec_builder, _ctx) do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output([:hls, location], track_builders, spec_builder, _ctx) do
+    Boombox.HLS.link_output(location, track_builders, spec_builder)
   end
 
   defp parse_input(input) when is_binary(input) do
