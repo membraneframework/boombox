@@ -87,7 +87,7 @@ defmodule Boombox.Pipeline do
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
-            eos_info: term,
+            eos_info: term(),
             rtmp_input_state: Boombox.RTMP.state()
           }
   end

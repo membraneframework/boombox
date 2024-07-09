@@ -2,7 +2,7 @@ defmodule Support.Async do
   @moduledoc false
   # Helper for creating asynchronous tests
   # - creates a public function instead of a test
-  # - creates a module with a single test that calls said funciton
+  # - creates a module with a single test that calls said function
   # - copies all @tags to the newly created module
   # - setup and setup_all won't work (yet)
 

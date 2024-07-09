@@ -20,7 +20,8 @@ Mix.install([{:boombox, path: __DIR__}, :kino])
     port: 1234,
     document_root: ~c"#{__DIR__}/examples_assets/",
     server_name: ~c"assets_server",
-    server_root: "/tmp"
+    server_root: "/tmp",
+    erl_script_nocache: true
   )
 ```
 

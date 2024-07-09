@@ -19,8 +19,9 @@ defmodule BoomboxTest do
 
   @tag :mp4
   async_test "mp4 -> mp4", %{tmp_dir: tmp} do
-    Boombox.run(input: @bbb_mp4, output: "#{tmp}/output.mp4")
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: @bbb_mp4, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   @tag :mp4_audio
@@ -30,7 +31,7 @@ defmodule BoomboxTest do
   end
 
   @tag :mp4_video
-  async_test "mp4 -> mp4 audio", %{tmp_dir: tmp} do
+  async_test "mp4 -> mp4 video", %{tmp_dir: tmp} do
     Boombox.run(input: @bbb_mp4_v, output: "#{tmp}/output.mp4")
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :video)
   end
@@ -121,14 +122,13 @@ defmodule BoomboxTest do
   end
 
   defp send_rtmp(url) do
-    p = Testing.Pipeline.start_link_supervised!()
-
-    Testing.Pipeline.execute_actions(p,
-      spec: [
-        child(%Membrane.File.Source{location: @bbb_mp4, seekable?: true})
-        |> child(:demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
-      ]
-    )
+    p =
+      Testing.Pipeline.start_link_supervised!(
+        spec: [
+          child(%Membrane.File.Source{location: @bbb_mp4, seekable?: true})
+          |> child(:demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
+        ]
+      )
 
     assert_pipeline_notified(p, :demuxer, {:new_tracks, tracks})
 
