@@ -166,6 +166,14 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_info({:rtmp_client_ref, client_ref, app, stream_key}, ctx, state) do
+    {result, rtmp_input_state} =
+      Boombox.RTMP.handle_connection(client_ref, state)
+
+    proceed_result(result, ctx, %{state | rtmp_input_state: rtmp_input_state})
+  end
+
+  @impl true
   def handle_element_end_of_stream(:mp4_file_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
   end
