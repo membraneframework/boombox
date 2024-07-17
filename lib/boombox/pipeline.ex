@@ -158,19 +158,9 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_info({:rtmp_tcp_server, server_pid, socket}, ctx, state) do
-    {result, rtmp_input_state} =
-      Boombox.RTMP.handle_connection(server_pid, socket, state.rtmp_input_state)
-
-    proceed_result(result, ctx, %{state | rtmp_input_state: rtmp_input_state})
-  end
-
-  @impl true
-  def handle_info({:rtmp_client_ref, client_ref, app, stream_key}, ctx, state) do
-    {result, rtmp_input_state} =
-      Boombox.RTMP.handle_connection(client_ref, state)
-
-    proceed_result(result, ctx, %{state | rtmp_input_state: rtmp_input_state})
+  def handle_info({:rtmp_client_ref, client_ref}, ctx, state) do
+    Boombox.RTMP.handle_connection(client_ref)
+    |> proceed_result(ctx, state)
   end
 
   @impl true
@@ -273,8 +263,8 @@ defmodule Boombox.Pipeline do
     Boombox.MP4.create_input(location)
   end
 
-  defp create_input([:rtmp, uri], ctx) do
-    Boombox.RTMP.create_input(uri, ctx.utility_supervisor)
+  defp create_input([:rtmp, uri], _ctx) do
+    Boombox.RTMP.create_input(uri)
   end
 
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t()) ::
