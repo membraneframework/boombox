@@ -116,17 +116,6 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_child_notification(
-        {:socket_control_needed, _socket, source_pid},
-        :rtmp_source,
-        ctx,
-        state
-      ) do
-    Boombox.RTMP.handle_socket_control(source_pid, state.rtmp_input_state)
-    |> proceed_result(ctx, state)
-  end
-
-  @impl true
   def handle_child_notification({:new_tracks, tracks}, :webrtc_output, ctx, state) do
     %{status: :awaiting_output_link} = state
 

@@ -103,7 +103,8 @@ defmodule BoomboxTest do
 
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
-    url = "rtmp://localhost:5002"
+    url = "rtmp://localhost:5002/app/stream_key"
+
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t1 =
