@@ -110,6 +110,12 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_child_notification({:new_track, ssrc, track}, :rtsp_source, ctx, state) do
+    Boombox.RTSP.handle_input_tracks(ssrc, track)
+    |> proceed_result(ctx, state)
+  end
+
+  @impl true
   def handle_child_notification({:new_tracks, tracks}, :webrtc_input, ctx, state) do
     Boombox.WebRTC.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
@@ -154,6 +160,7 @@ defmodule Boombox.Pipeline do
 
   @impl true
   def handle_child_notification(_notification, _child, _ctx, state) do
+
     {[], state}
   end
 
@@ -198,11 +205,14 @@ defmodule Boombox.Pipeline do
   @spec proceed(Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Membrane.Pipeline.callback_return()
   defp proceed(ctx, %{status: :init} = state) do
+    IO.inspect("proceed 1")
     create_output(state.output, ctx)
     |> do_proceed(:output_ready, :awaiting_output, ctx, state)
   end
 
   defp proceed(ctx, %{status: :output_ready} = state) do
+    IO.inspect("proceed 2")
+
     create_input(state.input, ctx)
     |> do_proceed(:input_ready, :awaiting_input, ctx, state)
   end
@@ -215,6 +225,8 @@ defmodule Boombox.Pipeline do
          } = state
        )
        when track_builders != nil do
+    IO.inspect("proceed 3")
+
     state = %{state | track_builders: track_builders, spec_builder: spec_builder}
 
     link_output(state.output, track_builders, spec_builder, ctx)
@@ -222,6 +234,8 @@ defmodule Boombox.Pipeline do
   end
 
   defp proceed(ctx, %{status: :output_linked} = state) do
+    IO.inspect("proceed 4")
+
     do_proceed(%Wait{}, nil, :running, ctx, %{state | eos_info: state.last_result.eos_info})
   end
 
@@ -269,6 +283,10 @@ defmodule Boombox.Pipeline do
     Boombox.RTMP.create_input(uri, ctx.utility_supervisor)
   end
 
+  defp create_input([:rtsp, uri], _ctx) do
+    Boombox.RTSP.create_input(uri)
+  end
+
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t()) ::
           Ready.t() | Wait.t()
   defp create_output([:webrtc, signaling], _ctx) do
@@ -303,6 +321,9 @@ defmodule Boombox.Pipeline do
 
       uri.scheme == "rtmp" ->
         [:rtmp, input]
+
+      uri.scheme == "rtsp" ->
+        [:rtsp, input]
 
       true ->
         raise "Couldn't parse URI: #{input}"

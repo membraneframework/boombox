@@ -12,6 +12,7 @@ defmodule Boombox do
           | [:file | :mp4 | Path.t()]
           | [:webrtc | webrtc_opts()]
           | [:rtmp | URI.t()]
+          | [:rtsp | URI.t()]
   @type output :: URI.t() | Path.t() | [:file | :mp4 | Path.t()] | [:webrtc | webrtc_opts()]
 
   @spec run(input: input, output: output) :: :ok

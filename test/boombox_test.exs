@@ -101,6 +101,13 @@ defmodule BoomboxTest do
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
   end
 
+  @tag :rtsp
+  async_test "rtsp -> mp4", %{tmp_dir: tmp} do
+    url = "rtsp://localhost:8554/livestream"
+    Boombox.run(input: url, output: "#{tmp}/output.mp4")
+    # Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
     url = "rtmp://localhost:5002"
