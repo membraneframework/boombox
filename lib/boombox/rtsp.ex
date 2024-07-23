@@ -21,32 +21,33 @@ defmodule Boombox.RTSP do
   end
 
   def handle_input_tracks(ssrc, track) do
-    {spss, ppss} =
-      case track.fmtp.sprop_parameter_sets do
-        nil -> {[], []}
-        parameter_sets -> {parameter_sets.sps, parameter_sets.pps}
-      end
+    # {spss, ppss} =
+    #   case track.fmtp.sprop_parameter_sets do
+    #     nil -> {[], []}
+    #     parameter_sets -> {parameter_sets.sps, parameter_sets.pps}
+    #   end
 
-    spec = [
-      get_child(:rtsp_source)
-      |> via_out(Membrane.Pad.ref(:output, ssrc))
-      |> child(
-        :rtsp_h264_parser,
-        %Membrane.H264.Parser{
-          spss: spss,
-          ppss: ppss,
-          generate_best_effort_timestamps: %{framerate: {60, 1}}
-        }
-      )
-    ]
+    # spec = [
+    #   get_child(:rtsp_source)
+    #   |> via_out(Membrane.Pad.ref(:output, ssrc))
+    #   |> child(
+    #     :rtsp_h264_parser,
+    #     %Membrane.H264.Parser{
+    #       spss: spss,
+    #       ppss: ppss,
+    #       generate_best_effort_timestamps: %{framerate: {60, 1}}
+    #     }
+    #   )
+    # ]
 
     track_builders = %{
       # audio: get_child(:aac_decoder),
-      video: get_child(:rtsp_h264_parser)
+      # video: get_child(:rtsp_h264_parser)
+      video: get_child(:rtsp_source) |> via_out(Membrane.Pad.ref(:output, ssrc))
     }
 
     %Ready{
-      spec_builder: spec,
+      # spec_builder: spec,
       track_builders: track_builders
     }
 
