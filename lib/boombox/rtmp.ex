@@ -8,7 +8,7 @@ defmodule Boombox.RTMP do
 
   @type state :: %{server_pid: pid()} | nil
 
-  @spec create_input(URI.t(), pid()) :: Wait.t()
+  @spec create_input(String.t(), pid()) :: Wait.t()
   def create_input(uri, utility_supervisor) do
     {use_ssl?, port, target_app, target_stream_key} = Utils.parse_url(uri)
 
