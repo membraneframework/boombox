@@ -8,8 +8,8 @@ defmodule Boombox.RTMP do
 
   @type state :: %{server_pid: pid()} | nil
 
-  @spec create_input(URI.t()) :: Wait.t()
-  def create_input(uri) do
+  @spec create_input(URI.t(), pid()) :: Wait.t()
+  def create_input(uri, utility_supervisor) do
     {use_ssl?, port, target_app, target_stream_key} = Utils.parse_url(uri)
 
     boombox = self()
@@ -22,14 +22,18 @@ defmodule Boombox.RTMP do
       end
     end
 
-    # Run the standalone server
+    server_options = %{
+      handler: %Membrane.RTMP.Source.ClientHandler{controlling_process: self()},
+      port: port,
+      use_ssl?: use_ssl?,
+      new_client_callback: new_client_callback,
+      client_timeout: 1_000
+    }
+
     {:ok, _server} =
-      Membrane.RTMP.Server.start_link(
-        handler: %Membrane.RTMP.Source.ClientHandler{controlling_process: self()},
-        port: port,
-        use_ssl?: use_ssl?,
-        new_client_callback: new_client_callback,
-        client_timeout: 1_000
+      Membrane.UtilitySupervisor.start_link_child(
+        utility_supervisor,
+        {Membrane.RTMP.Server, server_options}
       )
 
     %Wait{}
@@ -50,15 +54,5 @@ defmodule Boombox.RTMP do
     }
 
     %Ready{spec_builder: spec, track_builders: track_builders}
-  end
-
-  defp get_app_stream_key_from_path(path) do
-    case String.split(path, "/", trim: true) do
-      [app | [stream_key]] ->
-        {app, stream_key}
-
-      _error ->
-        raise "Invalid RTMP URI path #{inspect(path)}, expected /{app}/{stream_key}"
-    end
   end
 end

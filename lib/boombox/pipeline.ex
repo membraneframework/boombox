@@ -252,8 +252,8 @@ defmodule Boombox.Pipeline do
     Boombox.MP4.create_input(location)
   end
 
-  defp create_input([:rtmp, uri], _ctx) do
-    Boombox.RTMP.create_input(uri)
+  defp create_input([:rtmp, uri], ctx) do
+    Boombox.RTMP.create_input(uri, ctx.utility_supervisor)
   end
 
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t()) ::
