@@ -147,6 +147,21 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
 
+  @tag :file_hls
+  async_test "mp4 file -> hls output", %{tmp_dir: tmp} do
+    Boombox.run(input: @bbb_mp4, output: [:hls, tmp])
+    ref_path = "test/fixtures/ref_bun10s_hls"
+
+    Enum.zip(
+      File.ls!(tmp) |> Enum.sort(),
+      File.ls!(ref_path) |> Enum.sort()
+    )
+    |> Enum.each(fn {output_file, ref_file} ->
+      assert Path.join(tmp, output_file) |> File.read!() ==
+               Path.join(ref_path, ref_file) |> File.read!()
+    end)
+  end
+
   defp send_rtmp(url) do
     p =
       Testing.Pipeline.start_link_supervised!(
