@@ -9,10 +9,10 @@ defmodule Boombox do
   @type input ::
           URI.t()
           | Path.t()
-          | [:file | :mp4 | Path.t()]
-          | [:webrtc | webrtc_opts()]
-          | [:rtmp | URI.t()]
-  @type output :: URI.t() | Path.t() | [:file | :mp4 | Path.t()] | [:webrtc | webrtc_opts()]
+          | {:file, :mp4, Path.t()}
+          | {:webrtc, webrtc_opts()}
+          | {:rtmp, URI.t()}
+  @type output :: URI.t() | Path.t() | {:file, :mp4, Path.t()} | {:webrtc, webrtc_opts()}
 
   @spec run(input: input, output: output) :: :ok
   def run(opts) do
