@@ -2,44 +2,45 @@ defmodule Boombox.RTMP do
   @moduledoc false
 
   import Membrane.ChildrenSpec
+  require Membrane.Logger
   alias Boombox.Pipeline.{Ready, Wait}
+  alias Membrane.RTMP
 
-  @type state :: %{server_pid: pid()} | nil
-
-  @spec create_input(URI.t(), pid()) :: Wait.t()
+  @spec create_input(String.t(), pid()) :: Wait.t()
   def create_input(uri, utility_supervisor) do
-    uri = URI.new!(uri)
-    {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
+    {use_ssl?, port, target_app, target_stream_key} = RTMP.Utils.parse_url(uri)
 
     boombox = self()
 
-    server_options = %Membrane.RTMP.Source.TcpServer{
-      port: uri.port,
-      listen_options: [:binary, packet: :raw, active: false, ip: ip],
-      socket_handler: fn socket ->
-        send(boombox, {:rtmp_tcp_server, self(), socket})
-
-        receive do
-          {:rtmp_source_pid, pid} -> {:ok, pid}
-          :rtmp_already_connected -> {:error, :rtmp_already_connected}
-        end
+    new_client_callback = fn client_ref, app, stream_key ->
+      if app == target_app and stream_key == target_stream_key do
+        send(boombox, {:rtmp_client_ref, client_ref})
+      else
+        Membrane.Logger.warning("Unexpected client connected on /#{app}/#{stream_key}")
       end
+    end
+
+    server_options = %{
+      handler: %Membrane.RTMP.Source.ClientHandler{controlling_process: self()},
+      port: port,
+      use_ssl?: use_ssl?,
+      new_client_callback: new_client_callback,
+      client_timeout: 1_000
     }
 
-    {:ok, _pid} =
+    {:ok, _server} =
       Membrane.UtilitySupervisor.start_link_child(
         utility_supervisor,
-        {Membrane.RTMP.Source.TcpServer, server_options}
+        {Membrane.RTMP.Server, server_options}
       )
 
     %Wait{}
   end
 
-  @spec handle_connection(pid(), :gen_tcp.socket() | :ssl.sslsocket(), state()) ::
-          {Ready.t(), state()}
-  def handle_connection(server_pid, socket, nil = _state) do
+  @spec handle_connection(pid()) :: Ready.t()
+  def handle_connection(client_ref) do
     spec = [
-      child(:rtmp_source, %Membrane.RTMP.SourceBin{socket: socket})
+      child(:rtmp_source, %Membrane.RTMP.SourceBin{client_ref: client_ref})
       |> via_out(:audio)
       |> child(Membrane.AAC.Parser)
       |> child(:aac_decoder, Membrane.AAC.FDK.Decoder)
@@ -50,17 +51,6 @@ defmodule Boombox.RTMP do
       video: get_child(:rtmp_source) |> via_out(:video)
     }
 
-    {%Ready{spec_builder: spec, track_builders: track_builders}, %{server_pid: server_pid}}
-  end
-
-  def handle_connection(_server_pid, _socket, state) do
-    send(state.server_pid, :rtmp_already_connected)
-    {%Wait{}, state}
-  end
-
-  @spec handle_socket_control(pid(), state()) :: Wait.t()
-  def handle_socket_control(source_pid, state) do
-    send(state.server_pid, {:rtmp_source_pid, source_pid})
-    %Wait{}
+    %Ready{spec_builder: spec, track_builders: track_builders}
   end
 end

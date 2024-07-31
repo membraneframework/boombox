@@ -58,8 +58,7 @@ defmodule Boombox.Pipeline do
                   spec_builder: [],
                   track_builders: nil,
                   last_result: nil,
-                  eos_info: nil,
-                  rtmp_input_state: nil
+                  eos_info: nil
                 ]
 
     @typedoc """
@@ -87,8 +86,7 @@ defmodule Boombox.Pipeline do
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
-            eos_info: term(),
-            rtmp_input_state: Boombox.RTMP.state()
+            eos_info: term()
           }
   end
 
@@ -112,17 +110,6 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :webrtc_input, ctx, state) do
     Boombox.WebRTC.handle_input_tracks(tracks)
-    |> proceed_result(ctx, state)
-  end
-
-  @impl true
-  def handle_child_notification(
-        {:socket_control_needed, _socket, source_pid},
-        :rtmp_source,
-        ctx,
-        state
-      ) do
-    Boombox.RTMP.handle_socket_control(source_pid, state.rtmp_input_state)
     |> proceed_result(ctx, state)
   end
 
@@ -158,11 +145,9 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_info({:rtmp_tcp_server, server_pid, socket}, ctx, state) do
-    {result, rtmp_input_state} =
-      Boombox.RTMP.handle_connection(server_pid, socket, state.rtmp_input_state)
-
-    proceed_result(result, ctx, %{state | rtmp_input_state: rtmp_input_state})
+  def handle_info({:rtmp_client_ref, client_ref}, ctx, state) do
+    Boombox.RTMP.handle_connection(client_ref)
+    |> proceed_result(ctx, state)
   end
 
   @impl true

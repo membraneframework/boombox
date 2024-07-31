@@ -90,7 +90,7 @@ defmodule BoomboxTest do
 
   @tag :rtmp
   async_test "rtmp -> mp4", %{tmp_dir: tmp} do
-    url = "rtmp://localhost:5000"
+    url = "rtmp://localhost:5000/app/stream_key"
     t = Task.async(fn -> Boombox.run(input: url, output: "#{tmp}/output.mp4") end)
 
     # Wait for boombox to be ready
@@ -103,7 +103,8 @@ defmodule BoomboxTest do
 
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
-    url = "rtmp://localhost:5002"
+    url = "rtmp://localhost:5002/app/stream_key"
+
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t1 =
