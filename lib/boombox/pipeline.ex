@@ -293,8 +293,8 @@ defmodule Boombox.Pipeline do
     Boombox.WebRTC.link_output(track_builders)
   end
 
-  defp link_output([storage_type, :mp4, location], track_builders, spec_builder, _ctx) do
-    Boombox.MP4.link_output(storage_type, location, track_builders, spec_builder)
+  defp link_output([:file, :mp4, location], track_builders, spec_builder, _ctx) do
+    Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 
   defp parse_input(input) when is_binary(input) do
@@ -323,11 +323,8 @@ defmodule Boombox.Pipeline do
     uri = URI.new!(output)
 
     case uri do
-      %URI{scheme: nil, path: path} ->
+      %URI{scheme: nil, path: path} when path != nil ->
         [:file, parse_file_extension(path), path]
-
-      %URI{scheme: scheme, path: path} when scheme in ["http", "https"] ->
-        [:http, parse_file_extension(path), output]
 
       _other ->
         raise "Couldn't parse URI: #{output}"

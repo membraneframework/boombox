@@ -46,26 +46,16 @@ defmodule Boombox.MP4 do
   end
 
   @spec link_output(
-          Boombox.Pipeline.storage_type(),
           String.t(),
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(storage_type, location, track_builders, spec_builder) do
-    sink =
-      case storage_type do
-        :file ->
-          &child(&1, :mp4_file_sink, %Membrane.File.Sink{location: location})
-
-        :http ->
-          &child(&1, :mp4_http_sink, %Membrane.Hackney.Sink{location: location})
-      end
-
+  def link_output(location, track_builders, spec_builder) do
     spec =
       [
         spec_builder,
         child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
-        |> sink.(),
+        |> child(:mp4_file_sink, %Membrane.File.Sink{location: location}),
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
