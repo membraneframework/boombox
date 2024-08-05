@@ -43,6 +43,6 @@ defmodule Boombox.HLS do
         end)
       ]
 
-    %Ready{actions: [spec: spec], eos_info: [:audio, :video]}
+    %Ready{actions: [spec: spec]}
   end
 end

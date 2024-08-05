@@ -153,12 +153,11 @@ defmodule BoomboxTest do
     ref_path = "test/fixtures/ref_bun10s_hls"
 
     Enum.zip(
-      File.ls!(tmp) |> Enum.sort(),
-      File.ls!(ref_path) |> Enum.sort()
+      Path.join(tmp, "*.{mp4,m3u8}") |> Path.wildcard(),
+      Path.join(ref_path, "*.{mp4,m3u8}") |> Path.wildcard()
     )
     |> Enum.each(fn {output_file, ref_file} ->
-      assert Path.join(tmp, output_file) |> File.read!() ==
-               Path.join(ref_path, ref_file) |> File.read!()
+      assert File.read!(output_file) == File.read!(ref_file)
     end)
   end
 
