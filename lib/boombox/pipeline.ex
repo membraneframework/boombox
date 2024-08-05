@@ -158,6 +158,10 @@ defmodule Boombox.Pipeline do
     {[], state}
   end
 
+  def handle_child_notification(:end_of_stream, :hls_sink_bin, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
   @impl true
   def handle_info({:rtmp_client_ref, client_ref}, ctx, state) do
     Boombox.RTMP.handle_connection(client_ref)
@@ -167,17 +171,6 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_element_end_of_stream(:mp4_file_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
-  end
-
-  @impl true
-  def handle_element_end_of_stream({:eos_notifier, track}, _pad, _ctx, state) do
-    state = %{state | eos_info: List.delete(state.eos_info, track)}
-
-    if state.eos_info == [] do
-      {[terminate: :normal], state}
-    else
-      {[], state}
-    end
   end
 
   @impl true

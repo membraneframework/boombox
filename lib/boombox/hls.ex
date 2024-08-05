@@ -29,7 +29,6 @@ defmodule Boombox.HLS do
           {:audio, builder} ->
             builder
             |> child(Membrane.AAC.FDK.Encoder)
-            |> child({:eos_notifier, :audio}, Membrane.Debug.Filter)
             |> via_in(Pad.ref(:input, :audio),
               options: [encoding: :AAC, segment_duration: Time.milliseconds(2000)]
             )
@@ -37,7 +36,6 @@ defmodule Boombox.HLS do
 
           {:video, builder} ->
             builder
-            |> child({:eos_notifier, :video}, Membrane.Debug.Filter)
             |> via_in(Pad.ref(:input, :video),
               options: [encoding: :H264, segment_duration: Time.milliseconds(2000)]
             )
