@@ -41,21 +41,24 @@ defmodule BoomboxTest do
 
   @tag :http_file_mp4
   async_test "http mp4 -> mp4 file", %{tmp_dir: tmp} do
-    Boombox.run(input: @bbb_mp4_url, output: "#{tmp}/output.mp4")
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: @bbb_mp4_url, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   @tag :webrtc
   async_test "mp4 -> webrtc -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.SignalingChannel.new()
     t = Task.async(fn -> Boombox.run(input: @bbb_mp4, output: {:webrtc, signaling}) end)
-    Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling}, output: output)
     Task.await(t)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
 
   @tag :webrtc_audio
   async_test "mp4 -> webrtc -> mp4 audio", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t =
@@ -63,23 +66,25 @@ defmodule BoomboxTest do
 
     Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
     Task.await(t)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :audio)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", :audio)
   end
 
   @tag :webrtc_video
   async_test "mp4 -> webrtc -> mp4 video", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t =
       Task.async(fn -> Boombox.run(input: @bbb_mp4_v, output: {:webrtc, signaling}) end)
 
-    Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling}, output: output)
     Task.await(t)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :video)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", :video)
   end
 
   @tag :webrtc2
   async_test "mp4 -> webrtc -> webrtc -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     signaling1 = Membrane.WebRTC.SignalingChannel.new()
     signaling2 = Membrane.WebRTC.SignalingChannel.new()
 
@@ -91,36 +96,37 @@ defmodule BoomboxTest do
         Boombox.run(input: {:webrtc, signaling1}, output: {:webrtc, signaling2})
       end)
 
-    Boombox.run(input: {:webrtc, signaling2}, output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling2}, output: output)
     Task.await(t1)
     Task.await(t2)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus2_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus2_aac.mp4")
   end
 
   @tag :rtmp
   async_test "rtmp -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     url = "rtmp://localhost:5000/app/stream_key"
-    t = Task.async(fn -> Boombox.run(input: url, output: "#{tmp}/output.mp4") end)
+    t = Task.async(fn -> Boombox.run(input: url, output: output) end)
 
     # Wait for boombox to be ready
     Process.sleep(200)
     p = send_rtmp(url)
     Task.await(t, 30_000)
     Testing.Pipeline.terminate(p)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     url = "rtmp://localhost:5002/app/stream_key"
-
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t1 =
       Task.async(fn -> Boombox.run(input: url, output: {:webrtc, signaling}) end)
 
     t2 =
-      Task.async(fn -> Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4") end)
+      Task.async(fn -> Boombox.run(input: {:webrtc, signaling}, output: output) end)
 
     # Wait for boombox to be ready
     Process.sleep(200)
@@ -128,7 +134,7 @@ defmodule BoomboxTest do
     Task.await(t1, 30_000)
     Task.await(t2)
     Testing.Pipeline.terminate(p)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
 
   defp send_rtmp(url) do
