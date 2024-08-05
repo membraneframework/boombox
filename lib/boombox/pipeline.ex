@@ -304,7 +304,7 @@ defmodule Boombox.Pipeline do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 
-  defp link_output([:hls, location], track_builders, spec_builder, _ctx) do
+  defp link_output({:hls, location}, track_builders, spec_builder, _ctx) do
     Boombox.HLS.link_output(location, track_builders, spec_builder)
   end
 

@@ -149,7 +149,7 @@ defmodule BoomboxTest do
 
   @tag :file_hls
   async_test "mp4 file -> hls output", %{tmp_dir: tmp} do
-    Boombox.run(input: @bbb_mp4, output: [:hls, tmp])
+    Boombox.run(input: @bbb_mp4, output: {:hls, tmp})
     ref_path = "test/fixtures/ref_bun10s_hls"
 
     Enum.zip(
