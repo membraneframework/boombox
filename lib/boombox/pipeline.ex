@@ -61,8 +61,7 @@ defmodule Boombox.Pipeline do
                   spec_builder: [],
                   track_builders: nil,
                   last_result: nil,
-                  eos_info: nil,
-                  rtmp_input_state: nil
+                  eos_info: nil
                 ]
 
     @typedoc """
@@ -90,8 +89,7 @@ defmodule Boombox.Pipeline do
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
-            eos_info: term,
-            rtmp_input_state: Boombox.RTMP.state()
+            eos_info: term()
           }
   end
 
@@ -115,17 +113,6 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :webrtc_input, ctx, state) do
     Boombox.WebRTC.handle_input_tracks(tracks)
-    |> proceed_result(ctx, state)
-  end
-
-  @impl true
-  def handle_child_notification(
-        {:socket_control_needed, _socket, source_pid},
-        :rtmp_source,
-        ctx,
-        state
-      ) do
-    Boombox.RTMP.handle_socket_control(source_pid, state.rtmp_input_state)
     |> proceed_result(ctx, state)
   end
 
@@ -161,11 +148,9 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_info({:rtmp_tcp_server, server_pid, socket}, ctx, state) do
-    {result, rtmp_input_state} =
-      Boombox.RTMP.handle_connection(server_pid, socket, state.rtmp_input_state)
-
-    proceed_result(result, ctx, %{state | rtmp_input_state: rtmp_input_state})
+  def handle_info({:rtmp_client_ref, client_ref}, ctx, state) do
+    Boombox.RTMP.handle_connection(client_ref)
+    |> proceed_result(ctx, state)
   end
 
   @impl true
@@ -260,21 +245,21 @@ defmodule Boombox.Pipeline do
 
   @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t()) ::
           Ready.t() | Wait.t()
-  defp create_input([:webrtc, signaling], _ctx) do
+  defp create_input({:webrtc, signaling}, _ctx) do
     Boombox.WebRTC.create_input(signaling)
   end
 
-  defp create_input([storage_type, :mp4, location], _ctx) do
+  defp create_input({storage_type, :mp4, location}, _ctx) do
     Boombox.MP4.create_input(storage_type, location)
   end
 
-  defp create_input([:rtmp, uri], ctx) do
+  defp create_input({:rtmp, uri}, ctx) do
     Boombox.RTMP.create_input(uri, ctx.utility_supervisor)
   end
 
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t()) ::
           Ready.t() | Wait.t()
-  defp create_output([:webrtc, signaling], _ctx) do
+  defp create_output({:webrtc, signaling}, _ctx) do
     Boombox.WebRTC.create_output(signaling)
   end
 
@@ -289,11 +274,11 @@ defmodule Boombox.Pipeline do
           Membrane.Pipeline.CallbackContext.t()
         ) ::
           Ready.t() | Wait.t()
-  defp link_output([:webrtc, _signaling], track_builders, _spec_builder, _ctx) do
+  defp link_output({:webrtc, _signaling}, track_builders, _spec_builder, _ctx) do
     Boombox.WebRTC.link_output(track_builders)
   end
 
-  defp link_output([:file, :mp4, location], track_builders, spec_builder, _ctx) do
+  defp link_output({:file, :mp4, location}, track_builders, spec_builder, _ctx) do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 
@@ -302,20 +287,20 @@ defmodule Boombox.Pipeline do
 
     case uri do
       %URI{scheme: nil, path: path} ->
-        [:file, parse_file_extension(path), path]
+        {:file, parse_file_extension(path), path}
 
-      %URI{scheme: scheme, path: path} when scheme in ["http", "https"] ->
-        [:http, parse_file_extension(path), input]
+      %URI{scheme: scheme, path: path} when scheme in ["http", "https"] and path != nil ->
+        {:http, parse_file_extension(path), input}
 
       %URI{scheme: "rtmp"} ->
-        [:rtmp, input]
+        {:rtmp, input}
 
       _other ->
         raise "Couldn't parse URI: #{input}"
     end
   end
 
-  defp parse_input(input) when is_list(input) do
+  defp parse_input(input) when is_tuple(input) do
     input
   end
 
@@ -324,15 +309,15 @@ defmodule Boombox.Pipeline do
 
     case uri do
       %URI{scheme: nil, path: path} when path != nil ->
-        [:file, parse_file_extension(path), path]
+        {:file, parse_file_extension(path), path}
 
       _other ->
         raise "Couldn't parse URI: #{output}"
     end
   end
 
-  defp parse_output(input) when is_list(input) do
-    input
+  defp parse_output(output) when is_tuple(output) do
+    output
   end
 
   @spec parse_file_extension(Path.t()) :: Boombox.file_extension()

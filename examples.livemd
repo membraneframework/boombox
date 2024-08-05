@@ -20,7 +20,8 @@ Mix.install([{:boombox, path: __DIR__}, :kino])
     port: 1234,
     document_root: ~c"#{__DIR__}/examples_assets/",
     server_name: ~c"assets_server",
-    server_root: "/tmp"
+    server_root: "/tmp",
+    erl_script_nocache: true
   )
 ```
 
@@ -36,7 +37,7 @@ out_dir = "#{__DIR__}/examples_outputs"
 To receive the stream, visit http://localhost:1234/stream_to_browser/index.html after running the cell below
 
 ```elixir
-Boombox.run(input: bbb_mp4, output: [:webrtc, "ws://localhost:8830"])
+Boombox.run(input: bbb_mp4, output: {:webrtc, "ws://localhost:8830"})
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -46,7 +47,7 @@ Boombox.run(input: bbb_mp4, output: [:webrtc, "ws://localhost:8830"])
 To send the stream, visit http://localhost:1234/stream_from_browser/index.html
 
 ```elixir
-Boombox.run(input: [:webrtc, "ws://localhost:8829"], output: "#{out_dir}/webrtc_to_mp4.mp4")
+Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
 ```
 
 ```elixir
@@ -60,7 +61,7 @@ System.shell("ffplay #{out_dir}/webrtc_to_mp4.mp4")
 Visit http://localhost:1234/stream_from_browser/index.html to send the stream and http://localhost:1234/stream_to_browser/index.html to receive it
 
 ```elixir
-Boombox.run(input: [:webrtc, "ws://localhost:8829"], output: [:webrtc, "ws://localhost:8830"])
+Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://localhost:8830"})
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -95,7 +96,7 @@ uri = "rtmp://localhost:5432"
 
 t =
   Task.async(fn ->
-    Boombox.run(input: uri, output: [:webrtc, "ws://localhost:8830"])
+    Boombox.run(input: uri, output: {:webrtc, "ws://localhost:8830"})
   end)
 
 {_output, 0} = System.shell("ffmpeg -re -i #{bbb_mp4} -c copy -f flv #{uri}")
@@ -112,10 +113,10 @@ signaling = Membrane.WebRTC.SignalingChannel.new()
 
 t =
   Task.async(fn ->
-    Boombox.run(input: bbb_mp4, output: [:webrtc, signaling])
+    Boombox.run(input: bbb_mp4, output: {:webrtc, signaling})
   end)
 
-Boombox.run(input: [:webrtc, signaling], output: "#{out_dir}/mp4_webrtc_mp4.mp4")
+Boombox.run(input: {:webrtc, signaling}, output: "#{out_dir}/mp4_webrtc_mp4.mp4")
 
 Task.await(t)
 ```

@@ -7,16 +7,20 @@ workflows:
   build:
     jobs:
       - elixir/build_test:
+          cache-version: 3
           filters: &filters
             tags:
               only: /v.*/
       - elixir/test:
+          cache-version: 3
           filters:
             <<: *filters
       - elixir/lint:
+          cache-version: 3
           filters:
             <<: *filters
       - elixir/hex_publish:
+          cache-version: 3
           requires:
             - elixir/build_test
             - elixir/test

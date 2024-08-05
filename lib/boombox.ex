@@ -11,17 +11,15 @@ defmodule Boombox do
   @type input ::
           URI.t()
           | Path.t()
-          | [:file | file_extension() | Path.t()]
-          | [:http | file_extension() | URI.t()]
-          | [:webrtc | webrtc_opts()]
-          | [:rtmp | URI.t()]
-
+          | {:file, file_extension(), Path.t()}
+          | {:http, file_extension(), URI.t()}
+          | {:webrtc, webrtc_opts()}
+          | {:rtmp, URI.t()}
   @type output ::
           URI.t()
           | Path.t()
-          | [:file | file_extension() | Path.t()]
-          | [:http | file_extension() | URI.t()]
-          | [:webrtc | webrtc_opts()]
+          | {:file, file_extension(), Path.t()}
+          | {:webrtc, webrtc_opts()}
 
   @spec run(input: input, output: output) :: :ok
   def run(opts) do

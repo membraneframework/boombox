@@ -2,7 +2,7 @@ defmodule Boombox.Mixfile do
   use Mix.Project
 
   @version "0.1.0"
-  @github_url "https://github.com/membraneframework/membrane_template_plugin"
+  @github_url "https://github.com/membraneframework/boombox"
 
   def project do
     [
@@ -15,11 +15,11 @@ defmodule Boombox.Mixfile do
       dialyzer: dialyzer(),
 
       # hex
-      description: "Template Plugin for Membrane Framework",
+      description: "Boombox",
       package: package(),
 
       # docs
-      name: "Membrane Template plugin",
+      name: "Boombox",
       source_url: @github_url,
       docs: docs()
     ]
@@ -43,11 +43,11 @@ defmodule Boombox.Mixfile do
       {:membrane_aac_fdk_plugin, ">= 0.0.0"},
       {:membrane_h26x_plugin, ">= 0.0.0"},
       {:membrane_h264_ffmpeg_plugin, ">= 0.0.0"},
-      {:membrane_mp4_plugin,
-       github: "membraneframework/membrane_mp4_plugin", branch: "isom-avc3"},
+      {:membrane_mp4_plugin, github: "membraneframework/membrane_mp4_plugin", branch: "wip-avc3"},
       {:membrane_realtimer_plugin, ">= 0.0.0"},
-      {:membrane_rtmp_plugin, ">= 0.0.0"},
       {:membrane_hackney_plugin, ">= 0.0.0"},
+      # {:membrane_rtmp_plugin, ">= 0.0.0"},
+      {:membrane_rtmp_plugin, github: "membraneframework/membrane_rtmp_plugin"},
       {:membrane_ffmpeg_swresample_plugin, ">= 0.0.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
@@ -85,7 +85,7 @@ defmodule Boombox.Mixfile do
       extras: ["README.md", "LICENSE"],
       formatters: ["html"],
       source_ref: "v#{@version}",
-      nest_modules_by_prefix: [Membrane.Template]
+      nest_modules_by_prefix: [Boombox]
     ]
   end
 end
