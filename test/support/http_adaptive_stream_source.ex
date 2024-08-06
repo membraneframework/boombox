@@ -18,9 +18,9 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
     demand_unit: :buffers
 
   @impl true
-  def handle_playing(_ctx, state) do
+  def handle_init(_ctx, opts) do
     {parsed_video_header, ""} =
-      get_prefixed_files(state.directory, "video_header")
+      get_prefixed_files(opts.directory, "video_header")
       |> List.first()
       |> File.read!()
       |> MP4.Container.parse!()
@@ -28,10 +28,10 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
     %MP4.Track{stream_format: video_stream_format} =
       TrackBox.unpack(parsed_video_header[:moov].children[:trak])
 
-    video_segments_filenames = get_prefixed_files(state.directory, "video_segment") |> Enum.sort()
+    video_segments_filenames = get_prefixed_files(opts.directory, "video_segment") |> Enum.sort()
 
     {parsed_audio_header, ""} =
-      get_prefixed_files(state.directory, "audio_header")
+      get_prefixed_files(opts.directory, "audio_header")
       |> List.first()
       |> File.read!()
       |> MP4.Container.parse!()
@@ -39,7 +39,7 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
     %MP4.Track{stream_format: audio_stream_format} =
       TrackBox.unpack(parsed_audio_header[:moov].children[:trak])
 
-    audio_segment_filenames = get_prefixed_files(state.directory, "audio_segment") |> Enum.sort()
+    audio_segment_filenames = get_prefixed_files(opts.directory, "audio_segment") |> Enum.sort()
 
     state =
       %{
@@ -115,18 +115,20 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
       container[:moof].children[:traf].children[:trun].fields.samples
       |> Enum.map(& &1.sample_size)
 
-    raw_data = container[:mdat].content
+    samples_binary = container[:mdat].content
 
-    split_samples(raw_data, sample_lengths)
+    split_samples(samples_binary, sample_lengths)
   end
 
+  @spec split_samples(samples_binary :: binary(), samples_lengths :: [pos_integer()]) ::
+          split_samples :: [binary()]
   defp split_samples(<<>>, []) do
     []
   end
 
-  defp split_samples(raw_data, [current_length | rest_lengths]) do
-    <<current_sample::binary-size(current_length), rest_data::binary>> = raw_data
-    [current_sample | split_samples(rest_data, rest_lengths)]
+  defp split_samples(samples_binary, [current_length | rest_lengths]) do
+    <<current_sample::binary-size(current_length), samples_rest::binary>> = samples_binary
+    [current_sample | split_samples(samples_rest, rest_lengths)]
   end
 
   @spec get_prefixed_files(Path.t(), String.t()) :: [Path.t()]
