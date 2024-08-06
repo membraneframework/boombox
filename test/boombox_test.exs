@@ -39,8 +39,8 @@ defmodule BoomboxTest do
   @tag :webrtc
   async_test "mp4 -> webrtc -> mp4", %{tmp_dir: tmp} do
     signaling = Membrane.WebRTC.SignalingChannel.new()
-    t = Task.async(fn -> Boombox.run(input: @bbb_mp4, output: [:webrtc, signaling]) end)
-    Boombox.run(input: [:webrtc, signaling], output: "#{tmp}/output.mp4")
+    t = Task.async(fn -> Boombox.run(input: @bbb_mp4, output: {:webrtc, signaling}) end)
+    Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
     Task.await(t)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
@@ -50,9 +50,9 @@ defmodule BoomboxTest do
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t =
-      Task.async(fn -> Boombox.run(input: @bbb_mp4_a, output: [:webrtc, signaling]) end)
+      Task.async(fn -> Boombox.run(input: @bbb_mp4_a, output: {:webrtc, signaling}) end)
 
-    Boombox.run(input: [:webrtc, signaling], output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
     Task.await(t)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :audio)
   end
@@ -62,9 +62,9 @@ defmodule BoomboxTest do
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t =
-      Task.async(fn -> Boombox.run(input: @bbb_mp4_v, output: [:webrtc, signaling]) end)
+      Task.async(fn -> Boombox.run(input: @bbb_mp4_v, output: {:webrtc, signaling}) end)
 
-    Boombox.run(input: [:webrtc, signaling], output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
     Task.await(t)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :video)
   end
@@ -75,14 +75,14 @@ defmodule BoomboxTest do
     signaling2 = Membrane.WebRTC.SignalingChannel.new()
 
     t1 =
-      Task.async(fn -> Boombox.run(input: @bbb_mp4, output: [:webrtc, signaling1]) end)
+      Task.async(fn -> Boombox.run(input: @bbb_mp4, output: {:webrtc, signaling1}) end)
 
     t2 =
       Task.async(fn ->
-        Boombox.run(input: [:webrtc, signaling1], output: [:webrtc, signaling2])
+        Boombox.run(input: {:webrtc, signaling1}, output: {:webrtc, signaling2})
       end)
 
-    Boombox.run(input: [:webrtc, signaling2], output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling2}, output: "#{tmp}/output.mp4")
     Task.await(t1)
     Task.await(t2)
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus2_aac.mp4")
@@ -90,7 +90,7 @@ defmodule BoomboxTest do
 
   @tag :rtmp
   async_test "rtmp -> mp4", %{tmp_dir: tmp} do
-    url = "rtmp://localhost:5000"
+    url = "rtmp://localhost:5000/app/stream_key"
     t = Task.async(fn -> Boombox.run(input: url, output: "#{tmp}/output.mp4") end)
 
     # Wait for boombox to be ready
@@ -110,14 +110,15 @@ defmodule BoomboxTest do
 
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
-    url = "rtmp://localhost:5002"
+    url = "rtmp://localhost:5002/app/stream_key"
+
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t1 =
-      Task.async(fn -> Boombox.run(input: url, output: [:webrtc, signaling]) end)
+      Task.async(fn -> Boombox.run(input: url, output: {:webrtc, signaling}) end)
 
     t2 =
-      Task.async(fn -> Boombox.run(input: [:webrtc, signaling], output: "#{tmp}/output.mp4") end)
+      Task.async(fn -> Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4") end)
 
     # Wait for boombox to be ready
     Process.sleep(200)

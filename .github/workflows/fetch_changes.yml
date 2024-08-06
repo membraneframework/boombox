@@ -32,7 +32,7 @@ jobs:
       # Runs a set of commands using the runners shell
       - name: Add remote
         run: |        
-          git remote add source git@github.com:membraneframework/membrane_template_plugin.git
+          git remote add source git@github.com:membraneframework/boombox.git
           git remote update
           
           echo "CURRENT_BRANCH=$(git branch --show-current)" >> $GITHUB_ENV
