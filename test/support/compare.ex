@@ -31,19 +31,29 @@ defmodule Support.Compare do
     end
   end
 
-  @spec compare(Path.t(), Path.t(), [:audio | :video]) :: :ok
-  def compare(subject, reference, kinds \\ [:audio, :video]) do
+  @spec compare(Path.t(), Path.t(), :mp4 | :hls, [:audio | :video]) :: :ok
+  def compare(subject, reference, format \\ :mp4, kinds \\ [:audio, :video]) do
     kinds = Bunch.listify(kinds)
     p = Testing.Pipeline.start_link_supervised!()
 
-    Testing.Pipeline.execute_actions(p,
-      spec: [
-        child(%Membrane.File.Source{location: subject, seekable?: true})
-        |> child(:sub_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true}),
-        child(%Membrane.File.Source{location: reference, seekable?: true})
-        |> child(:ref_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
-      ]
-    )
+    head_spec =
+      case format do
+        :mp4 ->
+          [
+            child(%Membrane.File.Source{location: subject, seekable?: true})
+            |> child(:sub_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true}),
+            child(%Membrane.File.Source{location: reference, seekable?: true})
+            |> child(:ref_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
+          ]
+
+        :hls ->
+          [
+            child(:sub_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: subject}),
+            child(:ref_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: reference})
+          ]
+      end
+
+    Testing.Pipeline.execute_actions(p, spec: head_spec)
 
     assert_pipeline_notified(p, :ref_demuxer, {:new_tracks, tracks})
 

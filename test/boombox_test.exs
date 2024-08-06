@@ -151,14 +151,31 @@ defmodule BoomboxTest do
   async_test "mp4 file -> hls output", %{tmp_dir: tmp} do
     Boombox.run(input: @bbb_mp4, output: {:hls, tmp})
     ref_path = "test/fixtures/ref_bun10s_hls"
+    Compare.compare(tmp, ref_path, :hls)
 
-    Enum.zip(
-      Path.join(tmp, "*.{mp4,m3u8}") |> Path.wildcard(),
-      Path.join(ref_path, "*.{mp4,m3u8}") |> Path.wildcard()
-    )
-    |> Enum.each(fn {output_file, ref_file} ->
-      assert File.read!(output_file) == File.read!(ref_file)
-    end)
+    # pipeline =
+    # Membrane.Testing.Pipeline.start_link_supervised!(
+    # spec: [
+    # child(:source, %Membrane.HTTPAdaptiveStream.Source{directory: ref_path}),
+    # get_child(:source)
+    # |> via_out(:audio_output)
+    # |> child(:audio_sink, Membrane.Testing.Sink),
+    # get_child(:source)
+    # |> via_out(:video_output)
+    # |> child(:video_sink, Membrane.Testing.Sink)
+    # ]
+    # )
+
+    # assert_end_of_stream(pipeline, :video_sink)
+    # assert_end_of_stream(pipeline, :audio_sink)
+
+    # Enum.zip(
+    # Path.join(tmp, "*.{mp4,m3u8}") |> Path.wildcard(),
+    # Path.join(ref_path, "*.{mp4,m3u8}") |> Path.wildcard()
+    # )
+    # |> Enum.each(fn {output_file, ref_file} ->
+    # assert File.read!(output_file) == File.read!(ref_file)
+    # end)
   end
 
   defp send_rtmp(url) do
