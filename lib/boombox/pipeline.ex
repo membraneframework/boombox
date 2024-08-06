@@ -55,7 +55,7 @@ defmodule Boombox.Pipeline do
   defmodule State do
     @moduledoc false
 
-    @enforce_keys [:status, :input, :output]
+    @enforce_keys [:status, :input, :output, :parent]
 
     defstruct @enforce_keys ++
                 [
@@ -91,15 +91,17 @@ defmodule Boombox.Pipeline do
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
-            eos_info: term()
+            eos_info: term(),
+            parent: pid()
           }
   end
 
   @impl true
   def handle_init(ctx, opts) do
     state = %State{
-      input: opts |> Keyword.fetch!(:input) |> parse_input(),
-      output: opts |> Keyword.fetch!(:output) |> parse_output(),
+      input: parse_input(opts.input),
+      output: parse_output(opts.output),
+      parent: opts.parent,
       status: :init
     }
 
@@ -175,6 +177,11 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_element_end_of_stream(:elixir_stream_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
   def handle_element_end_of_stream(_element, _pad, _ctx, state) do
     {[], state}
   end
@@ -202,12 +209,12 @@ defmodule Boombox.Pipeline do
   @spec proceed(Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Membrane.Pipeline.callback_return()
   defp proceed(ctx, %{status: :init} = state) do
-    create_output(state.output, ctx)
+    create_output(state.output, ctx, state)
     |> do_proceed(:output_ready, :awaiting_output, ctx, state)
   end
 
   defp proceed(ctx, %{status: :output_ready} = state) do
-    create_input(state.input, ctx)
+    create_input(state.input, ctx, state)
     |> do_proceed(:input_ready, :awaiting_input, ctx, state)
   end
 
@@ -221,7 +228,7 @@ defmodule Boombox.Pipeline do
        when track_builders != nil do
     state = %{state | track_builders: track_builders, spec_builder: spec_builder}
 
-    link_output(state.output, track_builders, spec_builder, ctx)
+    link_output(state.output, track_builders, spec_builder, ctx, state)
     |> do_proceed(:output_linked, :awaiting_output_link, ctx, state)
   end
 
@@ -259,27 +266,31 @@ defmodule Boombox.Pipeline do
     end
   end
 
-  @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t()) ::
+  @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
-  defp create_input({:webrtc, signaling}, _ctx) do
+  defp create_input({:webrtc, signaling}, _ctx, _state) do
     Boombox.WebRTC.create_input(signaling)
   end
 
-  defp create_input({storage_type, :mp4, location}, _ctx) do
+  defp create_input({storage_type, :mp4, location}, _ctx, _state) do
     Boombox.MP4.create_input(storage_type, location)
   end
 
-  defp create_input({:rtmp, src}, ctx) do
+  defp create_input({:rtmp, src}, ctx, _state) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
 
-  @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t()) ::
+  defp create_input({:stream, _params}, _ctx, state) do
+    Boombox.ElixirStream.create_input(state.parent)
+  end
+
+  @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
-  defp create_output({:webrtc, signaling}, _ctx) do
+  defp create_output({:webrtc, signaling}, _ctx, _state) do
     Boombox.WebRTC.create_output(signaling)
   end
 
-  defp create_output(_output, _ctx) do
+  defp create_output(_output, _ctx, _state) do
     %Ready{}
   end
 
@@ -287,19 +298,24 @@ defmodule Boombox.Pipeline do
           Boombox.output(),
           track_builders(),
           Membrane.ChildrenSpec.t(),
-          Membrane.Pipeline.CallbackContext.t()
+          Membrane.Pipeline.CallbackContext.t(),
+          State.t()
         ) ::
           Ready.t() | Wait.t()
-  defp link_output({:webrtc, _signaling}, track_builders, _spec_builder, _ctx) do
+  defp link_output({:webrtc, _signaling}, track_builders, _spec_builder, _ctx, _state) do
     Boombox.WebRTC.link_output(track_builders)
   end
 
-  defp link_output({:file, :mp4, location}, track_builders, spec_builder, _ctx) do
+  defp link_output({:file, :mp4, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 
-  defp link_output({:hls, location}, track_builders, spec_builder, _ctx) do
+  defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.HLS.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:stream, _opts}, track_builders, spec_builder, _ctx, state) do
+    Boombox.ElixirStream.link_output(state.parent, track_builders, spec_builder)
   end
 
   defp parse_input(input) when is_binary(input) do
