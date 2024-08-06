@@ -1,4 +1,6 @@
 defmodule Membrane.HTTPAdaptiveStream.Source do
+  @moduledoc false
+
   use Membrane.Source
 
   alias Membrane.{Buffer, MP4}

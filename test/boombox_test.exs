@@ -151,7 +151,7 @@ defmodule BoomboxTest do
   async_test "mp4 file -> hls output", %{tmp_dir: tmp} do
     Boombox.run(input: @bbb_mp4, output: {:hls, tmp})
     ref_path = "test/fixtures/ref_bun10s_hls"
-    Compare.compare(tmp, ref_path, :hls)
+    Compare.compare(tmp, ref_path, [:audio, :video], :hls)
 
     # pipeline =
     # Membrane.Testing.Pipeline.start_link_supervised!(

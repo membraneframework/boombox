@@ -31,8 +31,8 @@ defmodule Support.Compare do
     end
   end
 
-  @spec compare(Path.t(), Path.t(), :mp4 | :hls, [:audio | :video]) :: :ok
-  def compare(subject, reference, format \\ :mp4, kinds \\ [:audio, :video]) do
+  @spec compare(Path.t(), Path.t(), [:audio | :video], :mp4 | :hls) :: :ok
+  def compare(subject, reference, kinds \\ [:audio, :video], format \\ :mp4) do
     kinds = Bunch.listify(kinds)
     p = Testing.Pipeline.start_link_supervised!()
 
