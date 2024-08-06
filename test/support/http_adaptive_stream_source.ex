@@ -89,7 +89,7 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
   end
 
   @spec get_next_sample_actions(Membrane.Pad.ref(), [binary()], [Path.t()]) ::
-          {Membrane.Element.Action.t(), [binary()], [Path.t()]}
+          {[Membrane.Element.Action.t()], [binary()], [Path.t()]}
   def get_next_sample_actions(pad, [], []) do
     {[end_of_stream: pad], [], []}
   end
