@@ -22,6 +22,8 @@ defmodule Boombox.Pipeline do
 
   use Membrane.Pipeline
 
+  require Membrane.Logger
+
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
@@ -114,6 +116,7 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+
   def handle_child_notification({:new_tracks, tracks}, :webrtc_input, ctx, state) do
     Boombox.WebRTC.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
@@ -121,7 +124,12 @@ defmodule Boombox.Pipeline do
 
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :webrtc_output, ctx, state) do
-    %{status: :awaiting_output_link} = state
+    unless state.status == :awaiting_output_link do
+      raise """
+      Invalid status: #{inspect(state.status)}, expected :awaiting_output_link. \
+      This is probably a bug in Boombox.
+      """
+    end
 
     Boombox.WebRTC.handle_output_tracks_negotiated(
       state.track_builders,
@@ -146,7 +154,11 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_child_notification(_notification, _child, _ctx, state) do
+
+  def handle_child_notification(notification, child, _ctx, state) do
+    Membrane.Logger.debug_verbose(
+      "Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
+    )
 
     {[], state}
   end
@@ -190,14 +202,11 @@ defmodule Boombox.Pipeline do
   @spec proceed(Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Membrane.Pipeline.callback_return()
   defp proceed(ctx, %{status: :init} = state) do
-    IO.inspect("proceed 1")
     create_output(state.output, ctx)
     |> do_proceed(:output_ready, :awaiting_output, ctx, state)
   end
 
   defp proceed(ctx, %{status: :output_ready} = state) do
-    IO.inspect("proceed 2")
-
     create_input(state.input, ctx)
     |> do_proceed(:input_ready, :awaiting_input, ctx, state)
   end
@@ -210,8 +219,6 @@ defmodule Boombox.Pipeline do
          } = state
        )
        when track_builders != nil do
-    IO.inspect("proceed 3")
-
     state = %{state | track_builders: track_builders, spec_builder: spec_builder}
 
     link_output(state.output, track_builders, spec_builder, ctx)
@@ -219,8 +226,6 @@ defmodule Boombox.Pipeline do
   end
 
   defp proceed(ctx, %{status: :output_linked} = state) do
-    IO.inspect("proceed 4")
-
     do_proceed(%Wait{}, nil, :running, ctx, %{state | eos_info: state.last_result.eos_info})
   end
 

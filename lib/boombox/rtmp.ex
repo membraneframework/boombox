@@ -39,15 +39,14 @@ defmodule Boombox.RTMP do
 
   @spec handle_connection(pid()) :: Ready.t()
   def handle_connection(client_ref) do
-    spec = [
+    spec =
       child(:rtmp_source, %Membrane.RTMP.SourceBin{client_ref: client_ref})
       |> via_out(:audio)
-      |> child(Membrane.AAC.Parser)
-      |> child(:aac_decoder, Membrane.AAC.FDK.Decoder)
-    ]
+      |> child(:rtmp_in_aac_parser, Membrane.AAC.Parser)
+      |> child(:rtmp_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
     track_builders = %{
-      audio: get_child(:aac_decoder),
+      audio: get_child(:rtmp_in_aac_decoder),
       video: get_child(:rtmp_source) |> via_out(:video)
     }
 

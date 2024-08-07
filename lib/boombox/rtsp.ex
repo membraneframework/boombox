@@ -8,14 +8,12 @@ defmodule Boombox.RTSP do
 
   @spec create_input(URI.t()) :: Wait.t()
   def create_input(uri) do
-
-    spec = [
+    spec =
       child(:rtsp_source, %Membrane.RTSP.Source{
         transport: {:udp, 20000, 20005},
         allowed_media_types: [:video],
         stream_uri: uri
-      }),
-    ]
+      })
 
     %Wait{actions: [spec: spec]}
   end
@@ -50,7 +48,5 @@ defmodule Boombox.RTSP do
       # spec_builder: spec,
       track_builders: track_builders
     }
-
   end
-
 end
