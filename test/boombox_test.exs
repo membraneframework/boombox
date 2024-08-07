@@ -103,6 +103,7 @@ defmodule BoomboxTest do
 
   @tag :rtsp
   async_test "rtsp -> mp4", %{tmp_dir: tmp} do
+    # run server.exs from membrane_demo/rtsp_to_hls before running this test
     url = "rtsp://localhost:8554/mystream"
     t = Task.async(fn -> Boombox.run(input: url, output: "#{tmp}/output.mp4") end)
     # Wait for boombox to be ready
