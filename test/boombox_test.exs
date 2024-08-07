@@ -103,8 +103,11 @@ defmodule BoomboxTest do
 
   @tag :rtsp
   async_test "rtsp -> mp4", %{tmp_dir: tmp} do
-    url = "rtsp://localhost:8554/livestream"
-    Boombox.run(input: url, output: "#{tmp}/output.mp4")
+    url = "rtsp://localhost:8554/mystream"
+    t = Task.async(fn -> Boombox.run(input: url, output: "#{tmp}/output.mp4") end)
+    # Wait for boombox to be ready
+    Process.sleep(200)
+    Task.await(t, 30_000)
     # Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
   end
 

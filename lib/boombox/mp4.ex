@@ -44,7 +44,7 @@ defmodule Boombox.MP4 do
     spec =
       [
         spec_builder,
-        child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
+        child(:mp4_muxer, %Membrane.MP4.Muxer.ISOM{fast_start: true})
         |> child(:mp4_file_sink, %Membrane.File.Sink{location: location}),
         Enum.map(track_builders, fn
           {:audio, builder} ->
