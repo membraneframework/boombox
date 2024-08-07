@@ -23,6 +23,7 @@ defmodule Boombox.Pipeline do
   use Membrane.Pipeline
 
   require Membrane.Logger
+  @supported_file_extensions %{".mp4" => :mp4, ".m3u8" => :m3u8}
 
   @supported_file_extensions %{".mp4" => :mp4}
 
@@ -328,7 +329,10 @@ defmodule Boombox.Pipeline do
 
     case uri do
       %URI{scheme: nil, path: path} when path != nil ->
-        {:file, parse_file_extension(path), path}
+        case parse_file_extension(path) do
+          :m3u8 -> {:hls, path}
+          file_type -> {:file, file_type, path}
+        end
 
       _other ->
         raise "Unsupported URI: #{output}"
@@ -339,7 +343,7 @@ defmodule Boombox.Pipeline do
     output
   end
 
-  @spec parse_file_extension(Path.t()) :: Boombox.file_extension()
+  @spec parse_file_extension(Path.t()) :: Boombox.file_extension() | :m3u8
   defp parse_file_extension(path) do
     extension = Path.extname(path)
 

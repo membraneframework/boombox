@@ -21,6 +21,7 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
   def handle_init(_ctx, opts) do
     {parsed_video_header, ""} =
       get_prefixed_files(opts.directory, "video_header")
+      |> IO.inspect(label: "dupa")
       |> List.first()
       |> File.read!()
       |> MP4.Container.parse!()
@@ -64,21 +65,17 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
   end
 
   @impl true
-  def handle_pad_added(:input, _ctx, state) do
-    {[], state}
-  end
-
   def handle_pad_added(Pad.ref(:output, id) = pad, _ctx, state) do
     {[stream_format: {pad, state.track_data[id].stream_format}], state}
   end
 
   @impl true
-  def handle_demand(Pad.ref(:output, id) = pad, _size, :buffers, _ctx, state) do
+  def handle_demand(Pad.ref(:output, id) = pad, demand_size, :buffers, _ctx, state) do
     %{current_segment_samples: current_segment_samples, segment_filenames: segment_filenames} =
       state.track_data[id]
 
     {actions, current_segment_samples, segment_filenames} =
-      get_next_sample_actions(pad, current_segment_samples, segment_filenames)
+      get_buffers_from_samples(pad, current_segment_samples, segment_filenames, demand_size)
 
     state =
       state
@@ -88,23 +85,64 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
     {actions, state}
   end
 
-  @spec get_next_sample_actions(Membrane.Pad.ref(), [binary()], [Path.t()]) ::
-          {[Membrane.Element.Action.t()], [binary()], [Path.t()]}
-  def get_next_sample_actions(pad, [], []) do
-    {[end_of_stream: pad], [], []}
+  @spec get_buffers_from_samples(Membrane.Pad.ref(), [binary()], [Path.t()], non_neg_integer(), [
+          Buffer.t()
+        ]) ::
+          {[Buffer.t()], [binary()], [Path.t()]}
+  defp get_buffers_from_samples(
+         pad,
+         current_segment_samples,
+         segment_filenames,
+         buffers_left_to_produce,
+         buffers \\ []
+       )
+
+  defp get_buffers_from_samples(pad, [], [], _buffers_left_to_produce, buffers) do
+    {[buffer: {pad, Enum.reverse(buffers)}, end_of_stream: pad], [], []}
   end
 
-  def get_next_sample_actions(pad, [], [new_segment_filename | rest_segment_filenames]) do
+  defp get_buffers_from_samples(
+         pad,
+         current_segment_samples,
+         segment_filenames,
+         0,
+         buffers
+       ) do
+    {[buffer: {pad, Enum.reverse(buffers)}], current_segment_samples, segment_filenames}
+  end
+
+  defp get_buffers_from_samples(
+         pad,
+         [] = _depleted_current_segment,
+         [new_segment_filename | rest_segment_filenames],
+         buffers_left_to_produce,
+         buffers
+       ) do
     new_segment_samples = get_segment_samples(new_segment_filename)
-    get_next_sample_actions(pad, new_segment_samples, rest_segment_filenames)
+
+    get_buffers_from_samples(
+      pad,
+      new_segment_samples,
+      rest_segment_filenames,
+      buffers_left_to_produce,
+      buffers
+    )
   end
 
-  def get_next_sample_actions(pad, [first_sample | rest_samples], segment_filenames) do
-    {
-      [buffer: {pad, %Buffer{payload: first_sample}}, redemand: pad],
+  defp get_buffers_from_samples(
+         pad,
+         [first_sample | rest_samples],
+         segment_filenames,
+         buffers_left_to_produce,
+         buffers
+       ) do
+    get_buffers_from_samples(
+      pad,
       rest_samples,
-      segment_filenames
-    }
+      segment_filenames,
+      buffers_left_to_produce - 1,
+      [%Buffer{payload: first_sample} | buffers]
+    )
   end
 
   @spec get_segment_samples(Path.t()) :: [binary()]

@@ -8,27 +8,36 @@ defmodule Boombox.HLS do
   alias Membrane.Time
 
   @spec link_output(
-          String.t(),
+          Path.t(),
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, spec_builder) do
+    {directory, manifest_name} =
+      if Path.extname(location) == ".m3u8" do
+        {Path.dirname(location), Path.basename(location, ".m3u8")}
+      else
+        {location, "index"}
+      end
+
     spec =
       [
         spec_builder,
         child(
           :hls_sink_bin,
           %Membrane.HTTPAdaptiveStream.SinkBin{
+            manifest_name: manifest_name,
             manifest_module: Membrane.HTTPAdaptiveStream.HLS,
             storage: %Membrane.HTTPAdaptiveStream.Storages.FileStorage{
-              directory: location
-            }
+              directory: directory
+            },
+            hls_mode: :muxed_av
           }
         ),
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(Membrane.AAC.FDK.Encoder)
+            |> child(:hls_out_aac_encoder, Membrane.AAC.FDK.Encoder)
             |> via_in(Pad.ref(:input, :audio),
               options: [encoding: :AAC, segment_duration: Time.milliseconds(2000)]
             )
