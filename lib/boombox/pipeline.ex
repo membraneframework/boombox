@@ -296,7 +296,7 @@ defmodule Boombox.Pipeline do
         {:rtmp, input}
 
       _other ->
-        raise "Couldn't parse URI: #{input}"
+        raise "Unsupported URI: #{input}"
     end
   end
 
