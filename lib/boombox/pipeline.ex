@@ -22,6 +22,8 @@ defmodule Boombox.Pipeline do
 
   use Membrane.Pipeline
 
+  require Membrane.Logger
+
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
@@ -115,7 +117,12 @@ defmodule Boombox.Pipeline do
 
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :webrtc_output, ctx, state) do
-    %{status: :awaiting_output_link} = state
+    unless state.status == :awaiting_output_link do
+      raise """
+      Invalid status: #{inspect(state.status)}, expected :awaiting_output_link. \
+      This is probably a bug in Boombox.
+      """
+    end
 
     Boombox.WebRTC.handle_output_tracks_negotiated(
       state.track_builders,
@@ -140,7 +147,11 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_child_notification(_notification, _child, _ctx, state) do
+  def handle_child_notification(notification, child, _ctx, state) do
+    Membrane.Logger.debug_verbose(
+      "Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
+    )
+
     {[], state}
   end
 
