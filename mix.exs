@@ -13,6 +13,7 @@ defmodule Boombox.Mixfile do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: dialyzer(),
+      releases: releases(),
 
       # hex
       description: "Boombox",
@@ -27,9 +28,17 @@ defmodule Boombox.Mixfile do
 
   def application do
     [
-      extra_applications: []
+      extra_applications: [],
+      mod:
+        if burrito?() do
+          {Boombox.Utils.BurritoApp, []}
+        else
+          []
+        end
     ]
   end
+
+  defp burrito?, do: System.get_env("BOOMBOX_BURRITO") != nil
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
@@ -47,6 +56,7 @@ defmodule Boombox.Mixfile do
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_rtmp_plugin, github: "membraneframework/membrane_rtmp_plugin"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
+      {:burrito, "~> 1.0", runtime: burrito?()},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false}
@@ -84,6 +94,49 @@ defmodule Boombox.Mixfile do
       formatters: ["html"],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [Boombox]
+    ]
+  end
+
+  defp releases() do
+    if burrito?() do
+      burrito_releases()
+    else
+      []
+    end
+  end
+
+  defp burrito_releases() do
+    current_os =
+      case :os.type() do
+        {:win32, _} -> :windows
+        {:unix, :darwin} -> :darwin
+        {:unix, :linux} -> :linux
+      end
+
+    arch_string =
+      :erlang.system_info(:system_architecture)
+      |> to_string()
+      |> String.downcase()
+      |> String.split("-")
+      |> List.first()
+
+    current_cpu =
+      case arch_string do
+        "x86_64" -> :x86_64
+        "arm64" -> :aarch64
+        "aarch64" -> :aarch64
+        _ -> :unknown
+      end
+
+    [
+      boombox: [
+        steps: [:assemble, &Burrito.wrap/1],
+        burrito: [
+          targets: [
+            current: [os: current_os, cpu: current_cpu]
+          ]
+        ]
+      ]
     ]
   end
 end
