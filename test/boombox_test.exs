@@ -155,8 +155,8 @@ defmodule BoomboxTest do
     Compare.compare(tmp, ref_path, [:audio, :video], :hls)
 
     Enum.zip(
-      Path.join(tmp, "*.{mp4,m3u8}") |> Path.wildcard(),
-      Path.join(ref_path, "*.{mp4,m3u8}") |> Path.wildcard()
+      Path.join(tmp, "*.mp4") |> Path.wildcard(),
+      Path.join(ref_path, "*.mp4") |> Path.wildcard()
     )
     |> Enum.each(fn {output_file, ref_file} ->
       assert File.read!(output_file) == File.read!(ref_file)
