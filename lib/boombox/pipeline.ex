@@ -151,16 +151,17 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_child_notification(:end_of_stream, :hls_sink_bin, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
   def handle_child_notification(notification, child, _ctx, state) do
     Membrane.Logger.debug_verbose(
       "Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
     )
 
     {[], state}
-  end
-
-  def handle_child_notification(:end_of_stream, :hls_sink_bin, _ctx, state) do
-    {[terminate: :normal], state}
   end
 
   @impl true
