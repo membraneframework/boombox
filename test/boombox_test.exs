@@ -152,7 +152,7 @@ defmodule BoomboxTest do
     manifest_filename = Path.join(tmp, "index.m3u8")
     Boombox.run(input: @bbb_mp4, output: manifest_filename)
     ref_path = "test/fixtures/ref_bun10s_hls"
-    # Compare.compare(tmp, ref_path, [:audio, :video], :hls)
+    Compare.compare(tmp, ref_path, [:audio, :video], :hls)
 
     Enum.zip(
       Path.join(tmp, "*.{mp4,m3u8}") |> Path.wildcard(),

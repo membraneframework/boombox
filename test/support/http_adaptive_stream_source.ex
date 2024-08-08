@@ -19,47 +19,45 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
 
   @impl true
   def handle_init(_ctx, opts) do
-    {parsed_video_header, ""} =
-      get_prefixed_files(opts.directory, "video_header")
+    {parsed_header, ""} =
+      get_prefixed_files(opts.directory, "muxed_header")
       |> List.first()
       |> File.read!()
       |> MP4.Container.parse!()
 
-    %MP4.Track{stream_format: video_stream_format} =
-      TrackBox.unpack(parsed_video_header[:moov].children[:trak])
+    [%MP4.Track{id: audio_id} = audio_track, %MP4.Track{id: video_id} = video_track] =
+      parsed_header[:moov].children
+      |> Keyword.get_values(:trak)
+      |> Enum.map(&TrackBox.unpack/1)
+      |> Enum.sort_by(& &1.stream_format.__struct__)
 
-    video_segments_filenames = get_prefixed_files(opts.directory, "video_segment") |> Enum.sort()
+    segments_filenames = get_prefixed_files(opts.directory, "muxed_segment") |> Enum.sort()
 
-    {parsed_audio_header, ""} =
-      get_prefixed_files(opts.directory, "audio_header")
-      |> List.first()
-      |> File.read!()
-      |> MP4.Container.parse!()
-
-    %MP4.Track{stream_format: audio_stream_format} =
-      TrackBox.unpack(parsed_audio_header[:moov].children[:trak])
-
-    audio_segment_filenames = get_prefixed_files(opts.directory, "audio_segment") |> Enum.sort()
+    {audio_buffers, video_buffers} =
+      Enum.map(segments_filenames, fn file ->
+        buffers_map = get_buffers_from_segment(file)
+        %{^audio_id => segment_audio_buffers, ^video_id => segment_video_buffers} = buffers_map
+        {segment_audio_buffers, segment_video_buffers}
+      end)
+      |> Enum.unzip()
 
     state =
       %{
         track_data: %{
-          video: %{
-            stream_format: video_stream_format,
-            segment_filenames: video_segments_filenames,
-            current_segment_samples: []
-          },
           audio: %{
-            stream_format: audio_stream_format,
-            segment_filenames: audio_segment_filenames,
-            current_segment_samples: []
+            stream_format: audio_track.stream_format,
+            buffers_left: audio_buffers
+          },
+          video: %{
+            stream_format: video_track.stream_format,
+            buffers_left: video_buffers
           }
         }
       }
 
     {[
        notify_parent:
-         {:new_tracks, [{:audio, audio_stream_format}, {:video, video_stream_format}]}
+         {:new_tracks, [{:audio, audio_track.stream_format}, {:video, video_track.stream_format}]}
      ], state}
   end
 
@@ -70,102 +68,53 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
 
   @impl true
   def handle_demand(Pad.ref(:output, id) = pad, demand_size, :buffers, _ctx, state) do
-    %{current_segment_samples: current_segment_samples, segment_filenames: segment_filenames} =
-      state.track_data[id]
+    {buffers_to_send, buffers_left} = state.track_data[id].buffers_left |> Enum.split(demand_size)
 
-    {actions, current_segment_samples, segment_filenames} =
-      get_buffers_from_samples(pad, current_segment_samples, segment_filenames, demand_size)
+    actions =
+      if buffers_left == [] do
+        [buffer: {pad, buffers_to_send}, end_of_stream: pad]
+      else
+        [buffer: {pad, buffers_to_send}]
+      end
 
-    state =
-      state
-      |> put_in([:track_data, id, :segment_filenames], segment_filenames)
-      |> put_in([:track_data, id, :current_segment_samples], current_segment_samples)
+    state = put_in(state, [:track_data, id, :buffers_left], buffers_left)
 
     {actions, state}
   end
 
-  @spec get_buffers_from_samples(Membrane.Pad.ref(), [binary()], [Path.t()], non_neg_integer(), [
-          Buffer.t()
-        ]) ::
-          {[Buffer.t()], [binary()], [Path.t()]}
-  defp get_buffers_from_samples(
-         pad,
-         current_segment_samples,
-         segment_filenames,
-         buffers_left_to_produce,
-         buffers \\ []
-       )
-
-  defp get_buffers_from_samples(pad, [], [], _buffers_left_to_produce, buffers) do
-    {[buffer: {pad, Enum.reverse(buffers)}, end_of_stream: pad], [], []}
-  end
-
-  defp get_buffers_from_samples(
-         pad,
-         current_segment_samples,
-         segment_filenames,
-         0,
-         buffers
-       ) do
-    {[buffer: {pad, Enum.reverse(buffers)}], current_segment_samples, segment_filenames}
-  end
-
-  defp get_buffers_from_samples(
-         pad,
-         [] = _depleted_current_segment,
-         [new_segment_filename | rest_segment_filenames],
-         buffers_left_to_produce,
-         buffers
-       ) do
-    new_segment_samples = get_segment_samples(new_segment_filename)
-
-    get_buffers_from_samples(
-      pad,
-      new_segment_samples,
-      rest_segment_filenames,
-      buffers_left_to_produce,
-      buffers
-    )
-  end
-
-  defp get_buffers_from_samples(
-         pad,
-         [first_sample | rest_samples],
-         segment_filenames,
-         buffers_left_to_produce,
-         buffers
-       ) do
-    get_buffers_from_samples(
-      pad,
-      rest_samples,
-      segment_filenames,
-      buffers_left_to_produce - 1,
-      [%Buffer{payload: first_sample} | buffers]
-    )
-  end
-
-  @spec get_segment_samples(Path.t()) :: [binary()]
-  def get_segment_samples(segment_filename) do
+  @spec get_buffers_from_segment(Path.t()) :: %{non_neg_integer() => [Buffer.t()]}
+  defp get_buffers_from_segment(segment_filename) do
     {container, ""} = segment_filename |> File.read!() |> MP4.Container.parse!()
 
-    sample_lengths =
-      container[:moof].children[:traf].children[:trun].fields.samples
-      |> Enum.map(& &1.sample_size)
+    Enum.zip(
+      Keyword.get_values(container, :moof),
+      Keyword.get_values(container, :mdat)
+    )
+    |> Enum.map(fn {moof_box, mdat_box} ->
+      traf_box_children = moof_box.children[:traf].children
 
-    samples_binary = container[:mdat].content
+      sample_sizes =
+        traf_box_children[:trun].fields.samples
+        |> Enum.map(& &1.sample_size)
 
-    split_samples(samples_binary, sample_lengths)
+      buffers = get_buffers_from_samples(sample_sizes, mdat_box.content)
+
+      {traf_box_children[:tfhd].fields.track_id, buffers}
+    end)
+    |> Enum.into(%{})
   end
 
-  @spec split_samples(samples_binary :: binary(), samples_lengths :: [pos_integer()]) ::
-          split_samples :: [binary()]
-  defp split_samples(<<>>, []) do
+  defp get_buffers_from_samples([], <<>>) do
     []
   end
 
-  defp split_samples(samples_binary, [current_length | rest_lengths]) do
-    <<current_sample::binary-size(current_length), samples_rest::binary>> = samples_binary
-    [current_sample | split_samples(samples_rest, rest_lengths)]
+  defp get_buffers_from_samples([first_sample_length | sample_lengths_rest], samples_binary) do
+    <<payload::binary-size(first_sample_length), samples_binary_rest::binary>> = samples_binary
+
+    [
+      %Buffer{payload: payload}
+      | get_buffers_from_samples(sample_lengths_rest, samples_binary_rest)
+    ]
   end
 
   @spec get_prefixed_files(Path.t(), String.t()) :: [Path.t()]
