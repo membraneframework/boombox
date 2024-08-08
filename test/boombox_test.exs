@@ -166,7 +166,7 @@ defmodule BoomboxTest do
   @tag :rtmp_hls
   async_test "rtmp -> hls", %{tmp_dir: tmp} do
     manifest_filename = Path.join(tmp, "index.m3u8")
-    url = "rtmp://localhost:5000/app/stream_key"
+    url = "rtmp://localhost:5003/app/stream_key"
     t = Task.async(fn -> Boombox.run(input: url, output: manifest_filename) end)
 
     # Wait for boombox to be ready
