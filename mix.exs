@@ -45,6 +45,7 @@ defmodule Boombox.Mixfile do
       {:membrane_h264_ffmpeg_plugin, "~> 0.32.0"},
       {:membrane_mp4_plugin,
        github: "membraneframework/membrane_mp4_plugin", branch: "wip-avc3", override: true},
+      {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.18.0"},
       {:membrane_rtmp_plugin, github: "membraneframework/membrane_rtmp_plugin"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},

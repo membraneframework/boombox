@@ -21,7 +21,6 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
   def handle_init(_ctx, opts) do
     {parsed_video_header, ""} =
       get_prefixed_files(opts.directory, "video_header")
-      |> IO.inspect(label: "dupa")
       |> List.first()
       |> File.read!()
       |> MP4.Container.parse!()
