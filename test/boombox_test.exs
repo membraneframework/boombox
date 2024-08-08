@@ -150,10 +150,9 @@ defmodule BoomboxTest do
   defp send_rtmp(url) do
     p =
       Testing.Pipeline.start_link_supervised!(
-        spec: [
+        spec:
           child(%Membrane.File.Source{location: @bbb_mp4, seekable?: true})
           |> child(:demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
-        ]
       )
 
     assert_pipeline_notified(p, :demuxer, {:new_tracks, tracks})

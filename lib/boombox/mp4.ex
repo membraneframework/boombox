@@ -10,11 +10,11 @@ defmodule Boombox.MP4 do
     spec =
       case storage_type do
         :file ->
-          child(%Membrane.File.Source{location: location, seekable?: true})
+          child(:mp4_in_file_source, %Membrane.File.Source{location: location, seekable?: true})
           |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
 
         :http ->
-          child(%Membrane.Hackney.Source{
+          child(:mp4_in_http_source, %Membrane.Hackney.Source{
             location: location,
             hackney_opts: [follow_redirect: true]
           })
@@ -32,8 +32,8 @@ defmodule Boombox.MP4 do
           spec =
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
-            |> child(Membrane.AAC.Parser)
-            |> child(:aac_decoder, Membrane.AAC.FDK.Decoder)
+            |> child(:mp4_in_aac_parser, Membrane.AAC.Parser)
+            |> child(:mp4_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
           {:audio, spec}
 
@@ -59,14 +59,17 @@ defmodule Boombox.MP4 do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(Membrane.AAC.FDK.Encoder)
-            |> child(%Membrane.AAC.Parser{out_encapsulation: :none, output_config: :esds})
+            |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
+            |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
+              out_encapsulation: :none,
+              output_config: :esds
+            })
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:mp4_muxer)
 
           {:video, builder} ->
             builder
-            |> child(%Membrane.H264.Parser{output_stream_structure: :avc3})
+            |> child(:mp4_out_h264_parser, %Membrane.H264.Parser{output_stream_structure: :avc3})
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)
         end)
