@@ -40,6 +40,9 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
         {segment_audio_buffers, segment_video_buffers}
       end)
       |> Enum.unzip()
+      |> then(fn {audio_buffers, video_buffers} ->
+        {List.flatten(audio_buffers), List.flatten(video_buffers)}
+      end)
 
     state =
       %{

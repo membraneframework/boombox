@@ -22,7 +22,7 @@ defmodule BoomboxTest do
   async_test "mp4 file -> mp4 file", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     Boombox.run(input: @bbb_mp4, output: output)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   @tag :file_file_mp4_audio
@@ -151,7 +151,7 @@ defmodule BoomboxTest do
   async_test "mp4 file -> hls output", %{tmp_dir: tmp} do
     manifest_filename = Path.join(tmp, "index.m3u8")
     Boombox.run(input: @bbb_mp4, output: manifest_filename)
-    ref_path = "test/fixtures/ref_bun10s_hls"
+    ref_path = "test/fixtures/ref_bun10s_aac_hls"
     Compare.compare(tmp, ref_path, [:audio, :video], :hls)
 
     Enum.zip(
