@@ -148,7 +148,7 @@ defmodule BoomboxTest do
   end
 
   @tag :file_hls
-  async_test "mp4 file -> hls output", %{tmp_dir: tmp} do
+  async_test "mp4 file -> hls", %{tmp_dir: tmp} do
     manifest_filename = Path.join(tmp, "index.m3u8")
     Boombox.run(input: @bbb_mp4, output: manifest_filename)
     ref_path = "test/fixtures/ref_bun10s_aac_hls"
@@ -161,6 +161,20 @@ defmodule BoomboxTest do
     |> Enum.each(fn {output_file, ref_file} ->
       assert File.read!(output_file) == File.read!(ref_file)
     end)
+  end
+
+  @tag :rtmp_hls
+  async_test "rtmp -> hls", %{tmp_dir: tmp} do
+    manifest_filename = Path.join(tmp, "index.m3u8")
+    url = "rtmp://localhost:5000/app/stream_key"
+    t = Task.async(fn -> Boombox.run(input: url, output: manifest_filename) end)
+
+    # Wait for boombox to be ready
+    Process.sleep(200)
+    p = send_rtmp(url)
+    Task.await(t, 30_000)
+    Testing.Pipeline.terminate(p)
+    Compare.compare(tmp, "test/fixtures/ref_bun10s_aac_hls", [:audio, :video], :hls)
   end
 
   defp send_rtmp(url) do
