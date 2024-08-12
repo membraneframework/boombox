@@ -3,6 +3,8 @@ defmodule Boombox.Transcoders.Audio do
 
   use Membrane.Bin
 
+  require Membrane.Logger
+
   alias Membrane.Funnel
   alias Membrane.Transcoders.DataReceiver
 
@@ -14,13 +16,16 @@ defmodule Boombox.Transcoders.Audio do
 
   @type stream_format :: Membrane.AAC.t() | Membrane.Opus.t()
 
-  def_options output_stream_format: [
-                spec: stream_format() | (stream_format() -> stream_format()),
+  @opus_sample_rate 48_000
+
+  def_options input_stream_format: [
+                spec: stream_format(),
+                description: "Format of the input stream"
+              ],
+              output_stream_format: [
+                spec: stream_format(),
                 description: """
                 Specyfies format of the output stream.
-
-                Can be a struct, that will be returned as output stream format or a function that receives \
-                input stream format and returns output stream format.
 
                 Input stream will be transformed, so it will match the output stream format.
 
@@ -30,51 +35,56 @@ defmodule Boombox.Transcoders.Audio do
 
   @impl true
   def handle_init(_ctx, opts) do
-    spec = [
-      bin_input() |> child(:data_receiver, DataReceiver),
-      child(:output_forward_filter, Funnel) |> bin_output()
-    ]
-
+    spec = generate_transcoding_spec(opts.input_stream_format, opts.output_stream_format)
     {[spec: spec], Map.from_struct(opts)}
   end
 
-  @impl true
-  def handle_child_notification(
-        {:input_stream_format, stream_format},
-        :data_receiver,
-        _ctx,
-        state
-      ) do
-    state = resolve_output_stream_format(stream_format, state)
-    spec = generate_transcoding_spec(stream_format, state.output_stream_format)
+  defp generate_transcoding_spec(_format, _format) do
+    Membrane.Logger.debug("""
+    This bin will only forward buffers, as the input stream format is the same as the output stream format.
+    """)
 
-    {[spec: spec], state}
+    bin_input()
+    |> child(:forwarding_filter, Membrane.Debug.Filter)
+    |> bin_output()
   end
 
-  @impl true
-  def handle_child_notification(_notification, _element, _ctx, state) do
-    {[], state}
+  defp generate_transcoding_spec(
+         %Membrane.AAC{channels: channels} = input_format,
+         %Membrane.Opus{channels: channels} = output_format
+       ) do
+    decoding_spec =
+      bin_input()
+      |> child(:aac_decoder, Membrane.AAC.FDK.Decoder)
+
+    resampling_spec =
+      if input_format.sample_rate == @opus_sample_rate do
+        decoding_spec
+      else
+        decoding_spec
+        |> child(:resampler, %Membrane.FFmpeg.SWResample.Converter{
+          output_stream_format: %Membrane.RawAudio{
+            sample_format: :s16le,
+            sample_rate: @opus_sample_rate,
+            channels: channels
+          }
+        })
+      end
+
+    resampling_spec
+    |> child(:opus_encoder, Membrane.Opus.Encoder)
   end
 
-  defp resolve_output_stream_format(input_stream_format, state) do
-    case state.output_stream_format do
-      function when is_function(function) ->
-        %{state | output_stream_format: function.(input_stream_format)}
-
-      struct when is_struct(struct) ->
-        state
-    end
+  defp generate_transcoding_spec(
+         %Membrane.Opus{channels: channels} = input_format,
+         %Membrane.AAC{channels: channels} = output_format
+       ) do
+    bin_input()
+    |> child(:opus_decoder, Membrane.Opus.Decoder)
+    |> child(:aac_encoder, Membrane.AAC.FDK.Encoder)
   end
 
-  defp generate_transcoding_spec(%module{} = input_format, %module{} = output_format) do
-    if input_format != output_format do
-      raise "Cannot transcode #{inspect(input_format)} to #{input_format(output_format)} yet"
-    end
-
-    get_child(:data_receiver) |> get_child(:output_forward_filter)
+  defp generate_transcoding_spec(input_format, output_format) do
+    raise "Cannot transform #{inspect(input_format)} to #{input_format(output_format)} yet"
   end
-
-  defp generate_
-
-
 end
