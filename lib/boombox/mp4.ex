@@ -17,19 +17,18 @@ defmodule Boombox.MP4 do
   @spec handle_input_tracks(Membrane.MP4.Demuxer.ISOM.new_tracks_t()) :: Ready.t()
   def handle_input_tracks(tracks) do
     track_builders =
-      Map.new(tracks, fn
-        {id, %Membrane.AAC{}} ->
+      Enum.map(tracks, fn
+        {id, %Membrane.AAC{} = format} ->
           spec =
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
             |> child(:mp4_in_aac_parser, Membrane.AAC.Parser)
-            |> child(:mp4_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
-          {:audio, spec}
+          {:audio, format, spec}
 
-        {id, %Membrane.H264{}} ->
+        {id, %Membrane.H264{} = format} ->
           spec = get_child(:mp4_demuxer) |> via_out(Pad.ref(:output, id))
-          {:video, spec}
+          {:video, format, spec}
       end)
 
     %Ready{track_builders: track_builders}
@@ -47,9 +46,13 @@ defmodule Boombox.MP4 do
         child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
         |> child(:mp4_file_sink, %Membrane.File.Sink{location: location}),
         Enum.map(track_builders, fn
-          {:audio, builder} ->
+          {:audio, format, builder} ->
             builder
-            |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
+            # |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
+            |> child(:audio_transcoder, %Boombox.Transcoders.Audio{
+              input_stream_format: format,
+              output_stream_format: Membrane.AAC
+            })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
               output_config: :esds
@@ -57,7 +60,7 @@ defmodule Boombox.MP4 do
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:mp4_muxer)
 
-          {:video, builder} ->
+          {:video, _format, builder} ->
             builder
             |> child(:mp4_out_h264_parser, %Membrane.H264.Parser{output_stream_structure: :avc3})
             |> via_in(Pad.ref(:input, :video))
