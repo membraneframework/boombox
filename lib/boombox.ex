@@ -57,30 +57,36 @@ defmodule Boombox do
   defp consume_stream(stream, opts) do
     procs = start_pipeline(opts)
 
-    {source, demand_atomic} =
+    source =
       receive do
-        {:boombox_ex_stream_source, source, demand_atomic} -> {source, demand_atomic}
+        {:boombox_ex_stream_source, source} -> source
       end
 
     Enum.reduce_while(
       stream,
-      nil,
+      %{demand: 0},
       fn
-        %Boombox.Packet{} = packet, state ->
-          if :atomics.sub_get(demand_atomic, 1, 1) >= 0 do
-            send(source, packet)
-            {:cont, state}
-          else
-            receive do
-              :boombox_demand ->
-                send(source, packet)
-                {:cont, state}
+        %Boombox.Packet{} = packet, %{demand: 0} = state ->
+          dbg(packet)
 
-              {:DOWN, _monitor, :process, supervisor, _reason}
-              when supervisor == procs.supervisor ->
-                {:halt, :terminated}
-            end
+          receive do
+            {:boombox_demand, demand} ->
+              dbg({:demand, demand})
+              send(source, packet)
+              {:cont, %{state | demand: demand - 1}}
+
+            {:DOWN, _monitor, :process, supervisor, _reason}
+            when supervisor == procs.supervisor ->
+              {:halt, :terminated}
           end
+
+        %Boombox.Packet{} = packet, %{demand: demand} = state ->
+          dbg({packet, demand})
+          send(source, packet)
+          {:cont, %{state | demand: demand - 1}}
+
+        value, _state ->
+          raise ArgumentError, "Expected Boombox.Packet.t(), got: #{inspect(value)}"
       end
     )
     |> case do

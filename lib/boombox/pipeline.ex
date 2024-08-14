@@ -177,8 +177,15 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_element_end_of_stream(:elixir_stream_sink, :input, _ctx, state) do
-    {[terminate: :normal], state}
+  def handle_element_end_of_stream(:elixir_stream_sink, Pad.ref(:input, id), _ctx, state) do
+    dbg({:eos, id})
+    eos_info = List.delete(state.eos_info, id)
+    state = %{state | eos_info: eos_info}
+
+    case eos_info do
+      [] -> {[terminate: :normal], state}
+      _eos_info -> {[], state}
+    end
   end
 
   @impl true
