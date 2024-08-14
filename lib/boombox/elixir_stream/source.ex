@@ -11,7 +11,7 @@ defmodule Source do
 
   @impl true
   def handle_init(_ctx, opts) do
-    state = %{producer: opts.producer, demand_atomic: :atomics.new(1, []), dims: nil, pts: 0}
+    state = %{producer: opts.producer, demand_atomic: :atomics.new(1, []), dims: nil}
     {[], state}
   end
 
@@ -39,12 +39,11 @@ defmodule Source do
   end
 
   @impl true
-  def handle_info({:boombox_buffer, image}, _ctx, state) do
-    image = image |> Image.flatten!() |> Image.to_colorspace!(:srgb)
+  def handle_info(%Boombox.Packet{} = packet, _ctx, state) do
+    image = packet.payload |> Image.flatten!() |> Image.to_colorspace!(:srgb)
     dims = %{width: Image.width(image), height: Image.height(image)}
     {:ok, payload} = Vix.Vips.Image.write_to_binary(image)
-    buffer = %Membrane.Buffer{payload: payload, pts: state.pts}
-    state = %{state | pts: state.pts + Membrane.Time.milliseconds(33)}
+    buffer = %Membrane.Buffer{payload: payload, pts: packet.pts}
 
     if dims == state.dims do
       {[buffer: {:output, buffer}], state}

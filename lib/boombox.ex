@@ -66,14 +66,14 @@ defmodule Boombox do
       stream,
       nil,
       fn
-        item, state ->
+        %Boombox.Packet{} = packet, state ->
           if :atomics.sub_get(demand_atomic, 1, 1) >= 0 do
-            send(source, {:boombox_buffer, item})
+            send(source, packet)
             {:cont, state}
           else
             receive do
               :boombox_demand ->
-                send(source, {:boombox_buffer, item})
+                send(source, packet)
                 {:cont, state}
 
               {:DOWN, _monitor, :process, supervisor, _reason}
@@ -107,8 +107,8 @@ defmodule Boombox do
         send(sink, :boombox_demand)
 
         receive do
-          {:boombox_buffer, buffer} ->
-            {[buffer], state}
+          %Boombox.Packet{} = packet ->
+            {[packet], state}
 
           {:DOWN, _monitor, :process, supervisor, _reason}
           when supervisor == procs.supervisor ->

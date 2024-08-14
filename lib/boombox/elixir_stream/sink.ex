@@ -32,7 +32,12 @@ defmodule Sink do
     {:ok, image} =
       Vix.Vips.Image.new_from_binary(buffer.payload, width, height, 3, :VIPS_FORMAT_UCHAR)
 
-    send(state.consumer, {:boombox_buffer, image})
+    send(state.consumer, %Boombox.Packet{
+      payload: image,
+      pts: buffer.pts,
+      kind: :video
+    })
+
     {[], state}
   end
 end
