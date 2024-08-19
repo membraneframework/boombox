@@ -9,6 +9,8 @@ defmodule Support.Compare do
 
   alias Membrane.Testing
 
+  @type compare_option :: {:kinds, [:audio | :video]} | {:format, :mp4 | :hls}
+
   defmodule GetBuffers do
     @moduledoc false
     use Membrane.Sink
@@ -31,9 +33,10 @@ defmodule Support.Compare do
     end
   end
 
-  @spec compare(Path.t(), Path.t(), [:audio | :video], :mp4 | :hls) :: :ok
-  def compare(subject, reference, kinds \\ [:audio, :video], format \\ :mp4) do
-    kinds = Bunch.listify(kinds)
+  @spec compare(Path.t(), Path.t(), [compare_option()]) :: :ok
+  def compare(subject, reference, options \\ []) do
+    kinds = options[:kinds] || [:audio, :video]
+    format = options[:format] || :mp4
     p = Testing.Pipeline.start_link_supervised!()
 
     head_spec =

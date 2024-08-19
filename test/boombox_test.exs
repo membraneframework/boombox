@@ -29,14 +29,14 @@ defmodule BoomboxTest do
   async_test "mp4 file -> mp4 file audio", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     Boombox.run(input: @bbb_mp4_a, output: output)
-    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", :audio)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:audio])
   end
 
   @tag :file_file_mp4_video
   async_test "mp4 file -> mp4 file video", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     Boombox.run(input: @bbb_mp4_v, output: output)
-    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", :video)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:video])
   end
 
   @tag :http_file_mp4
@@ -76,7 +76,7 @@ defmodule BoomboxTest do
 
     Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
     Task.await(t)
-    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", :audio)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", kinds: [:audio])
   end
 
   @tag :webrtc_video
@@ -89,7 +89,7 @@ defmodule BoomboxTest do
 
     Boombox.run(input: {:webrtc, signaling}, output: output)
     Task.await(t)
-    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", :video)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", kinds: [:video])
   end
 
   @tag :webrtc2
@@ -152,7 +152,7 @@ defmodule BoomboxTest do
     manifest_filename = Path.join(tmp, "index.m3u8")
     Boombox.run(input: @bbb_mp4, output: manifest_filename)
     ref_path = "test/fixtures/ref_bun10s_aac_hls"
-    Compare.compare(tmp, ref_path, [:audio, :video], :hls)
+    Compare.compare(tmp, ref_path, format: :hls)
 
     Enum.zip(
       Path.join(tmp, "*.mp4") |> Path.wildcard(),
@@ -167,6 +167,7 @@ defmodule BoomboxTest do
   async_test "rtmp -> hls", %{tmp_dir: tmp} do
     manifest_filename = Path.join(tmp, "index.m3u8")
     url = "rtmp://localhost:5003/app/stream_key"
+    ref_path = "test/fixtures/ref_bun10s_aac_hls"
     t = Task.async(fn -> Boombox.run(input: url, output: manifest_filename) end)
 
     # Wait for boombox to be ready
@@ -174,7 +175,15 @@ defmodule BoomboxTest do
     p = send_rtmp(url)
     Task.await(t, 30_000)
     Testing.Pipeline.terminate(p)
-    Compare.compare(tmp, "test/fixtures/ref_bun10s_aac_hls", [:audio, :video], :hls)
+    Compare.compare(tmp, ref_path, format: :hls)
+
+    Enum.zip(
+      Path.join(tmp, "*.mp4") |> Path.wildcard(),
+      Path.join(ref_path, "*.mp4") |> Path.wildcard()
+    )
+    |> Enum.each(fn {output_file, ref_file} ->
+      assert File.read!(output_file) == File.read!(ref_file)
+    end)
   end
 
   defp send_rtmp(url) do
