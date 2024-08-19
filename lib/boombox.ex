@@ -30,4 +30,26 @@ defmodule Boombox do
       {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
     end
   end
+
+  @spec run_cli([String.t()]) :: :ok
+  def run_cli(args \\ System.argv()) do
+    args =
+      Enum.map(args, fn
+        "-" <> value -> String.to_atom(value)
+        value -> value
+      end)
+
+    run(input: parse_cli_io(:i, args), output: parse_cli_io(:o, args))
+  end
+
+  defp parse_cli_io(type, args) do
+    args
+    |> Enum.drop_while(&(&1 != type))
+    |> Enum.drop(1)
+    |> Enum.take_while(&(&1 not in [:i, :o]))
+    |> case do
+      [value] -> value
+      [_h | _t] = values -> List.to_tuple(values)
+    end
+  end
 end
