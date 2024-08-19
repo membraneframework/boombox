@@ -11,42 +11,64 @@ defmodule BoomboxTest do
   alias Membrane.Testing
   alias Support.Compare
 
+  @bbb_mp4_url "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s.mp4"
   @bbb_mp4 "test/fixtures/bun10s.mp4"
   @bbb_mp4_a "test/fixtures/bun10s_a.mp4"
   @bbb_mp4_v "test/fixtures/bun10s_v.mp4"
 
   @moduletag :tmp_dir
 
-  @tag :mp4
-  async_test "mp4 -> mp4", %{tmp_dir: tmp} do
+  @tag :file_file_mp4
+  async_test "mp4 file -> mp4 file", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     Boombox.run(input: @bbb_mp4, output: output)
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  @tag :mp4_audio
-  async_test "mp4 -> mp4 audio", %{tmp_dir: tmp} do
-    Boombox.run(input: @bbb_mp4_a, output: "#{tmp}/output.mp4")
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :audio)
+  @tag :file_file_mp4_audio
+  async_test "mp4 file -> mp4 file audio", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: @bbb_mp4_a, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:audio])
   end
 
-  @tag :mp4_video
-  async_test "mp4 -> mp4 video", %{tmp_dir: tmp} do
-    Boombox.run(input: @bbb_mp4_v, output: "#{tmp}/output.mp4")
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4", :video)
+  @tag :file_file_mp4_video
+  async_test "mp4 file -> mp4 file video", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: @bbb_mp4_v, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:video])
   end
 
-  @tag :webrtc
-  async_test "mp4 -> webrtc -> mp4", %{tmp_dir: tmp} do
+  @tag :http_file_mp4
+  async_test "http mp4 -> mp4 file", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: @bbb_mp4_url, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  @tag :file_webrtc
+  async_test "mp4 file -> webrtc -> mp4 file", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.SignalingChannel.new()
     t = Task.async(fn -> Boombox.run(input: @bbb_mp4, output: {:webrtc, signaling}) end)
-    Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling}, output: output)
     Task.await(t)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
+  end
+
+  @tag :http_webrtc
+  async_test "http mp4 -> webrtc -> mp4 file", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    signaling = Membrane.WebRTC.SignalingChannel.new()
+    t = Task.async(fn -> Boombox.run(input: @bbb_mp4_url, output: {:webrtc, signaling}) end)
+    Boombox.run(input: {:webrtc, signaling}, output: output)
+    Task.await(t)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
 
   @tag :webrtc_audio
   async_test "mp4 -> webrtc -> mp4 audio", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t =
@@ -54,23 +76,25 @@ defmodule BoomboxTest do
 
     Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
     Task.await(t)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :audio)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", kinds: [:audio])
   end
 
   @tag :webrtc_video
   async_test "mp4 -> webrtc -> mp4 video", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t =
       Task.async(fn -> Boombox.run(input: @bbb_mp4_v, output: {:webrtc, signaling}) end)
 
-    Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling}, output: output)
     Task.await(t)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4", :video)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", kinds: [:video])
   end
 
   @tag :webrtc2
   async_test "mp4 -> webrtc -> webrtc -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     signaling1 = Membrane.WebRTC.SignalingChannel.new()
     signaling2 = Membrane.WebRTC.SignalingChannel.new()
 
@@ -82,23 +106,24 @@ defmodule BoomboxTest do
         Boombox.run(input: {:webrtc, signaling1}, output: {:webrtc, signaling2})
       end)
 
-    Boombox.run(input: {:webrtc, signaling2}, output: "#{tmp}/output.mp4")
+    Boombox.run(input: {:webrtc, signaling2}, output: output)
     Task.await(t1)
     Task.await(t2)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus2_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus2_aac.mp4")
   end
 
   @tag :rtmp
   async_test "rtmp -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     url = "rtmp://localhost:5000/app/stream_key"
-    t = Task.async(fn -> Boombox.run(input: url, output: "#{tmp}/output.mp4") end)
+    t = Task.async(fn -> Boombox.run(input: url, output: output) end)
 
     # Wait for boombox to be ready
     Process.sleep(200)
     p = send_rtmp(url)
     Task.await(t, 30_000)
     Testing.Pipeline.terminate(p)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   @tag :rtsp
@@ -114,15 +139,15 @@ defmodule BoomboxTest do
 
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
     url = "rtmp://localhost:5002/app/stream_key"
-
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
     t1 =
       Task.async(fn -> Boombox.run(input: url, output: {:webrtc, signaling}) end)
 
     t2 =
-      Task.async(fn -> Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4") end)
+      Task.async(fn -> Boombox.run(input: {:webrtc, signaling}, output: output) end)
 
     # Wait for boombox to be ready
     Process.sleep(200)
@@ -130,7 +155,46 @@ defmodule BoomboxTest do
     Task.await(t1, 30_000)
     Task.await(t2)
     Testing.Pipeline.terminate(p)
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_opus_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
+  end
+
+  @tag :file_hls
+  async_test "mp4 file -> hls", %{tmp_dir: tmp} do
+    manifest_filename = Path.join(tmp, "index.m3u8")
+    Boombox.run(input: @bbb_mp4, output: manifest_filename)
+    ref_path = "test/fixtures/ref_bun10s_aac_hls"
+    Compare.compare(tmp, ref_path, format: :hls)
+
+    Enum.zip(
+      Path.join(tmp, "*.mp4") |> Path.wildcard(),
+      Path.join(ref_path, "*.mp4") |> Path.wildcard()
+    )
+    |> Enum.each(fn {output_file, ref_file} ->
+      assert File.read!(output_file) == File.read!(ref_file)
+    end)
+  end
+
+  @tag :rtmp_hls
+  async_test "rtmp -> hls", %{tmp_dir: tmp} do
+    manifest_filename = Path.join(tmp, "index.m3u8")
+    url = "rtmp://localhost:5003/app/stream_key"
+    ref_path = "test/fixtures/ref_bun10s_aac_hls"
+    t = Task.async(fn -> Boombox.run(input: url, output: manifest_filename) end)
+
+    # Wait for boombox to be ready
+    Process.sleep(200)
+    p = send_rtmp(url)
+    Task.await(t, 30_000)
+    Testing.Pipeline.terminate(p)
+    Compare.compare(tmp, ref_path, format: :hls)
+
+    Enum.zip(
+      Path.join(tmp, "*.mp4") |> Path.wildcard(),
+      Path.join(ref_path, "*.mp4") |> Path.wildcard()
+    )
+    |> Enum.each(fn {output_file, ref_file} ->
+      assert File.read!(output_file) == File.read!(ref_file)
+    end)
   end
 
   defp send_rtmp(url) do

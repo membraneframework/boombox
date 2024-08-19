@@ -18,7 +18,7 @@ Mix.install([{:boombox, path: __DIR__}, :kino])
   :inets.start(:httpd,
     bind_address: ~c"localhost",
     port: 1234,
-    document_root: ~c"#{__DIR__}/examples_assets/",
+    document_root: ~c"#{__DIR__}/examples_assets",
     server_name: ~c"assets_server",
     server_root: "/tmp",
     erl_script_nocache: true
@@ -26,6 +26,7 @@ Mix.install([{:boombox, path: __DIR__}, :kino])
 ```
 
 ```elixir
+bbb_mp4_url = "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s.mp4"
 bbb_mp4 = "#{__DIR__}/test/fixtures/bun10s.mp4"
 out_dir = "#{__DIR__}/examples_outputs"
 ```
@@ -38,6 +39,16 @@ To receive the stream, visit http://localhost:1234/stream_to_browser/index.html 
 
 ```elixir
 Boombox.run(input: bbb_mp4, output: {:webrtc, "ws://localhost:8830"})
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## MP4 via HTTP to WebRTC
+
+To receive the stream, visit http://localhost:1234/stream_to_browser/index.html after running the cell below
+
+```elixir
+Boombox.run(input: bbb_mp4_url, output: {:webrtc, "ws://localhost:8830"})
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -62,6 +73,16 @@ Visit http://localhost:1234/stream_from_browser/index.html to send the stream an
 
 ```elixir
 Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://localhost:8830"})
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## MP4 to HLS
+
+To receive the stream, visit http://localhost:1234/hls/stream.html after running the cell below
+
+```elixir
+Boombox.run(input: bbb_mp4, output: {:hls, "examples_assets/hls/hls_output"})
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->

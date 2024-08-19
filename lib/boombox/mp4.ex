@@ -5,11 +5,21 @@ defmodule Boombox.MP4 do
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
 
-  @spec create_input(String.t()) :: Wait.t()
-  def create_input(location) do
+  @spec create_input(Boombox.Pipeline.storage_type(), String.t()) :: Wait.t()
+  def create_input(storage_type, location) do
     spec =
-      child(%Membrane.File.Source{location: location, seekable?: true})
-      |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
+      case storage_type do
+        :file ->
+          child(:mp4_in_file_source, %Membrane.File.Source{location: location, seekable?: true})
+          |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
+
+        :http ->
+          child(:mp4_in_http_source, %Membrane.Hackney.Source{
+            location: location,
+            hackney_opts: [follow_redirect: true]
+          })
+          |> child(:mp4_demuxer, Membrane.MP4.Demuxer.ISOM)
+      end
 
     %Wait{actions: [spec: spec]}
   end
