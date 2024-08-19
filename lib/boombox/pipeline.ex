@@ -24,10 +24,13 @@ defmodule Boombox.Pipeline do
 
   require Membrane.Logger
 
+  @supported_file_extensions %{".mp4" => :mp4}
+
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
         }
+  @type storage_type :: :file | :http
 
   defmodule Ready do
     @moduledoc false
@@ -257,8 +260,8 @@ defmodule Boombox.Pipeline do
     Boombox.WebRTC.create_input(signaling)
   end
 
-  defp create_input({:file, :mp4, location}, _ctx) do
-    Boombox.MP4.create_input(location)
+  defp create_input({storage_type, :mp4, location}, _ctx) do
+    Boombox.MP4.create_input(storage_type, location)
   end
 
   defp create_input({:rtmp, uri}, ctx) do
@@ -293,15 +296,18 @@ defmodule Boombox.Pipeline do
   defp parse_input(input) when is_binary(input) do
     uri = URI.new!(input)
 
-    cond do
-      uri.scheme == nil and Path.extname(uri.path) == ".mp4" ->
-        {:file, :mp4, uri.path}
+    case uri do
+      %URI{scheme: nil, path: path} ->
+        {:file, parse_file_extension(path), path}
 
-      uri.scheme == "rtmp" ->
+      %URI{scheme: scheme, path: path} when scheme in ["http", "https"] and path != nil ->
+        {:http, parse_file_extension(path), input}
+
+      %URI{scheme: "rtmp"} ->
         {:rtmp, input}
 
-      true ->
-        raise "Couldn't parse URI: #{input}"
+      _other ->
+        raise "Unsupported URI: #{input}"
     end
   end
 
@@ -312,15 +318,27 @@ defmodule Boombox.Pipeline do
   defp parse_output(output) when is_binary(output) do
     uri = URI.new!(output)
 
-    if uri.scheme == nil and Path.extname(uri.path) == ".mp4" do
-      {:file, :mp4, uri.path}
-    else
-      raise "Couldn't parse URI: #{output}"
+    case uri do
+      %URI{scheme: nil, path: path} when path != nil ->
+        {:file, parse_file_extension(path), path}
+
+      _other ->
+        raise "Unsupported URI: #{output}"
     end
   end
 
   defp parse_output(output) when is_tuple(output) do
     output
+  end
+
+  @spec parse_file_extension(Path.t()) :: Boombox.file_extension()
+  defp parse_file_extension(path) do
+    extension = Path.extname(path)
+
+    case @supported_file_extensions do
+      %{^extension => file_type} -> file_type
+      _no_match -> raise "Unsupported file extension: #{extension}"
+    end
   end
 
   # Wait between sending the last packet

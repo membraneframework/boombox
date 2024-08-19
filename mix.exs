@@ -47,6 +47,7 @@ defmodule Boombox.Mixfile do
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_rtmp_plugin, github: "membraneframework/membrane_rtmp_plugin"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
+      {:membrane_hackney_plugin, "~> 0.11.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false}
