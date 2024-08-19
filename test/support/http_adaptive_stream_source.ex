@@ -32,7 +32,7 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
       parsed_header[:moov].children
       |> Keyword.get_values(:trak)
       |> Enum.map(&TrackBox.unpack/1)
-      |> Enum.reduce(fn track, tracks_map ->
+      |> Enum.reduce(%{audio_track: nil, video_track: nil}, fn track, tracks_map ->
         case track.stream_format do
           %Membrane.AAC{} -> %{tracks_map | audio_track: track}
           %Membrane.H264{} -> %{tracks_map | video_track: track}
