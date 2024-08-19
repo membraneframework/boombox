@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <h1>Membrane Boombox HLS Example</h1>
+    <video id="player" autoplay muted controls></video>
+    <script>
+        var video = document.getElementById('player');
+        var hls = new Hls();
+        hls.loadSource("hls_output/index.m3u8");
+        hls.attachMedia(video);
+    </script>
+
+</body>
+
+</html>

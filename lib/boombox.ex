@@ -20,6 +20,7 @@ defmodule Boombox do
           | Path.t()
           | {:file, file_extension(), Path.t()}
           | {:webrtc, webrtc_opts()}
+          | {:hls, Path.t()}
 
   @spec run(input: input, output: output) :: :ok
   def run(opts) do

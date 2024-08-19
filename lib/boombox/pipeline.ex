@@ -24,7 +24,7 @@ defmodule Boombox.Pipeline do
 
   require Membrane.Logger
 
-  @supported_file_extensions %{".mp4" => :mp4}
+  @supported_file_extensions %{".mp4" => :mp4, ".m3u8" => :m3u8}
 
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
@@ -147,6 +147,11 @@ defmodule Boombox.Pipeline do
     else
       {[], state}
     end
+  end
+
+  @impl true
+  def handle_child_notification(:end_of_stream, :hls_sink_bin, _ctx, state) do
+    {[terminate: :normal], state}
   end
 
   @impl true
@@ -293,6 +298,10 @@ defmodule Boombox.Pipeline do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 
+  defp link_output({:hls, location}, track_builders, spec_builder, _ctx) do
+    Boombox.HLS.link_output(location, track_builders, spec_builder)
+  end
+
   defp parse_input(input) when is_binary(input) do
     uri = URI.new!(input)
 
@@ -320,7 +329,10 @@ defmodule Boombox.Pipeline do
 
     case uri do
       %URI{scheme: nil, path: path} when path != nil ->
-        {:file, parse_file_extension(path), path}
+        case parse_file_extension(path) do
+          :m3u8 -> {:hls, path}
+          file_type -> {:file, file_type, path}
+        end
 
       _other ->
         raise "Unsupported URI: #{output}"
@@ -331,7 +343,7 @@ defmodule Boombox.Pipeline do
     output
   end
 
-  @spec parse_file_extension(Path.t()) :: Boombox.file_extension()
+  @spec parse_file_extension(Path.t()) :: Boombox.file_extension() | :m3u8
   defp parse_file_extension(path) do
     extension = Path.extname(path)
 
