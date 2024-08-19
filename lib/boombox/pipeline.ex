@@ -326,6 +326,9 @@ defmodule Boombox.Pipeline do
       %URI{scheme: "rtmp"} ->
         {:rtmp, input}
 
+      %URI{scheme: "rtsp"} ->
+        {:rtsp, input}
+
       _other ->
         raise "Unsupported URI: #{input}"
     end

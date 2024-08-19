@@ -15,7 +15,7 @@ defmodule Boombox do
           | {:http, file_extension(), URI.t()}
           | {:webrtc, webrtc_opts()}
           | {:rtmp, URI.t()}
-          | {:rtsp | URI.t()}
+          | {:rtsp, URI.t()}
   @type output ::
           URI.t()
           | Path.t()
