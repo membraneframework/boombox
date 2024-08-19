@@ -23,9 +23,8 @@ defmodule Boombox.Pipeline do
   use Membrane.Pipeline
 
   require Membrane.Logger
-  @supported_file_extensions %{".mp4" => :mp4, ".m3u8" => :m3u8}
 
-  @supported_file_extensions %{".mp4" => :mp4}
+  @supported_file_extensions %{".mp4" => :mp4, ".m3u8" => :m3u8}
 
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
