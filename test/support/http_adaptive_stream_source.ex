@@ -25,18 +25,28 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
       |> File.read!()
       |> MP4.Container.parse!()
 
-    [%MP4.Track{id: audio_id} = audio_track, %MP4.Track{id: video_id} = video_track] =
+    %{
+      audio_track: %MP4.Track{id: audio_id, stream_format: audio_stream_format},
+      video_track: %MP4.Track{id: video_id, stream_format: video_stream_format}
+    } =
       parsed_header[:moov].children
       |> Keyword.get_values(:trak)
       |> Enum.map(&TrackBox.unpack/1)
-      |> Enum.sort_by(& &1.stream_format.__struct__)
+      |> Enum.reduce(fn track, tracks_map ->
+        case track.stream_format do
+          %Membrane.AAC{} -> %{tracks_map | audio_track: track}
+          %Membrane.H264{} -> %{tracks_map | video_track: track}
+          _other -> tracks_map
+        end
+      end)
 
     segments_filenames = get_prefixed_files(opts.directory, "muxed_segment") |> Enum.sort()
 
     {audio_buffers, video_buffers} =
       Enum.map(segments_filenames, fn file ->
-        buffers_map = get_buffers_from_segment(file)
-        %{^audio_id => segment_audio_buffers, ^video_id => segment_video_buffers} = buffers_map
+        %{^audio_id => segment_audio_buffers, ^video_id => segment_video_buffers} =
+          get_buffers_from_segment(file)
+
         {segment_audio_buffers, segment_video_buffers}
       end)
       |> Enum.unzip()
@@ -48,11 +58,11 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
       %{
         track_data: %{
           audio: %{
-            stream_format: audio_track.stream_format,
+            stream_format: audio_stream_format,
             buffers_left: audio_buffers
           },
           video: %{
-            stream_format: video_track.stream_format,
+            stream_format: video_stream_format,
             buffers_left: video_buffers
           }
         }
@@ -60,7 +70,7 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
 
     {[
        notify_parent:
-         {:new_tracks, [{:audio, audio_track.stream_format}, {:video, video_track.stream_format}]}
+         {:new_tracks, [{:audio, audio_stream_format}, {:video, video_stream_format}]}
      ], state}
   end
 
@@ -85,7 +95,7 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
     {actions, state}
   end
 
-  @spec get_buffers_from_segment(Path.t()) :: %{non_neg_integer() => [Buffer.t()]}
+  @spec get_buffers_from_segment(Path.t()) :: %{(track_id :: pos_integer()) => [Buffer.t()]}
   defp get_buffers_from_segment(segment_filename) do
     {container, ""} = segment_filename |> File.read!() |> MP4.Container.parse!()
 
@@ -107,6 +117,7 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
     |> Enum.into(%{})
   end
 
+  @spec get_buffers_from_samples([pos_integer()], binary()) :: [Buffer.t()]
   defp get_buffers_from_samples([], <<>>) do
     []
   end
