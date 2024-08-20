@@ -13,7 +13,8 @@ defmodule Boombox.RTSP do
       child(:rtsp_source, %Membrane.RTSP.Source{
         transport: {:udp, 20000, 20005},
         allowed_media_types: [:video, :audio],
-        stream_uri: uri
+        stream_uri: uri,
+        on_connection_closed: :send_eos
       })
 
     %Wait{actions: [spec: spec]}
