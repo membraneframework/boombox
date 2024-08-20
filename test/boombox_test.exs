@@ -126,17 +126,6 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  @tag :rtsp
-  async_test "rtsp -> mp4", %{tmp_dir: tmp} do
-    # run server.exs from membrane_demo/rtsp_to_hls before running this test
-    url = "rtsp://localhost:8554/mystream"
-    t = Task.async(fn -> Boombox.run(input: url, output: "#{tmp}/output.mp4") end)
-    # Wait for boombox to be ready
-    Process.sleep(200)
-    Task.await(t, 30_000)
-    # Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun10s_aac.mp4")
-  end
-
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")

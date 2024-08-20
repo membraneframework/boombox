@@ -113,8 +113,8 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_child_notification({:new_track, ssrc, track}, :rtsp_source, ctx, state) do
-    Boombox.RTSP.handle_input_tracks(ssrc, track)
+  def handle_child_notification({:new_tracks, tracks}, :rtsp_source, ctx, state) do
+    Boombox.RTSP.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
   end
 
@@ -280,7 +280,7 @@ defmodule Boombox.Pipeline do
     Boombox.RTMP.create_input(uri, ctx.utility_supervisor)
   end
 
-  defp create_input([:rtsp, uri], _ctx) do
+  defp create_input({:rtsp, uri}, _ctx) do
     Boombox.RTSP.create_input(uri)
   end
 

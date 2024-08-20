@@ -20,6 +20,9 @@ defmodule Boombox.HLS do
         {location, "index"}
       end
 
+    hls_mode =
+      if Map.keys(track_builders) == [:video], do: :separate_av, else: :muxed_av
+
     spec =
       [
         spec_builder,
@@ -31,7 +34,7 @@ defmodule Boombox.HLS do
             storage: %Membrane.HTTPAdaptiveStream.Storages.FileStorage{
               directory: directory
             },
-            hls_mode: :muxed_av
+            hls_mode: hls_mode
           }
         ),
         Enum.map(track_builders, fn
