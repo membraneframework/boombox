@@ -6,7 +6,13 @@ defmodule Boombox.RTMP do
   alias Boombox.Pipeline.{Ready, Wait}
   alias Membrane.RTMP
 
-  @spec create_input(String.t(), pid()) :: Wait.t()
+  @spec create_input(String.t() | pid(), pid()) :: Wait.t()
+  def create_input(client_ref, utility_supervisor) when is_pid(client_ref) do
+    IO.puts("GOT PID #{inspect(client_ref)}")
+
+    %Wait{}
+  end
+
   def create_input(uri, utility_supervisor) do
     {use_ssl?, port, target_app, target_stream_key} = RTMP.Utils.parse_url(uri)
 
@@ -37,6 +43,7 @@ defmodule Boombox.RTMP do
     %Wait{}
   end
 
+  # this is used if rtmp works in url mode
   @spec handle_connection(pid()) :: Ready.t()
   def handle_connection(client_ref) do
     spec = [

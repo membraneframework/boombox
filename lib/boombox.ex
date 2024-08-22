@@ -14,7 +14,7 @@ defmodule Boombox do
           | {:file, file_extension(), Path.t()}
           | {:http, file_extension(), URI.t()}
           | {:webrtc, webrtc_opts()}
-          | {:rtmp, URI.t()}
+          | {:rtmp, URI.t() | pid()}
   @type output ::
           URI.t()
           | Path.t()

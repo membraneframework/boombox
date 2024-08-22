@@ -126,6 +126,49 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
+  @tag :rtmp_custom_client_handler
+  async_test "rtmp -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    url = "rtmp://localhost:5000/app/stream_key"
+
+    {use_ssl?, port, target_app, target_stream_key} = Membrane.RTMP.Utils.parse_url(url)
+
+    boombox = self()
+
+    new_client_callback = fn client_ref, app, stream_key ->
+      if app == target_app and stream_key == target_stream_key do
+        send(boombox, {:rtmp_client_ref, client_ref})
+      end
+    end
+
+    # start RTMP server to listen for connections
+    {:ok, _server} =
+      Membrane.RTMPServer.start_link(
+        handler: %Membrane.RTMP.Source.ClientHandler{controlling_process: self()},
+        port: port,
+        use_ssl?: use_ssl?,
+        new_client_callback: new_client_callback,
+        client_timeout: 1_000
+      )
+
+
+    # send RTMP stream
+    p = send_rtmp(url)
+
+    # wait for a client to connect
+    client_ref = receive do
+      {:rtmp_client_ref, client_ref}  -> client_ref
+    after
+      5_000 -> "Didn't receive client_ref before timeout"
+    end
+
+    # run boombox with client_ref
+    t = Task.async(fn -> Boombox.run(input: client_ref, output: output) end)
+    Task.await(t, 30_000)
+    Testing.Pipeline.terminate(p)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
