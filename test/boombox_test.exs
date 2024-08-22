@@ -138,32 +138,29 @@ defmodule BoomboxTest do
       send(parent_process_pid, {:client_ref, client_ref, app, stream_key})
     end
 
-    # start RTMP server to listen for connections
     {:ok, server} =
       Membrane.RTMPServer.start_link(
         handler: %Membrane.RTMP.Source.ClientHandlerImpl{controlling_process: self()},
         port: port,
         use_ssl?: use_ssl?,
         new_client_callback: new_client_callback,
-        client_timeout: 9_000
+        client_timeout: 1_000
       )
 
-    # send RTMP stream
     p = send_rtmp(url)
 
-    # wait for a client to connect
     {:ok, client_ref} =
       receive do
         {:client_ref, client_ref, ^app, ^stream_key} ->
           {:ok, client_ref}
       after
-        10_000 -> :timeout
+        5_000 -> :timeout
       end
 
-    # run boombox with client_ref
     t = Task.async(fn -> Boombox.run(input: client_ref, output: output) end)
     Task.await(t, 30_000)
     Testing.Pipeline.terminate(p)
+    Process.exit(server, :normal)
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 

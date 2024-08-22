@@ -7,8 +7,7 @@ defmodule Boombox.RTMP do
   alias Membrane.{RTMP, RTMPServer}
 
   @spec create_input(String.t() | pid(), pid()) :: Wait.t()
-  def create_input(client_ref, utility_supervisor) when is_pid(client_ref) do
-    IO.puts("GOT PID #{inspect(client_ref)}")
+  def create_input(client_ref, _utility_supervisor) when is_pid(client_ref) do
     handle_connection(client_ref)
   end
 

@@ -102,7 +102,7 @@ defmodule Boombox.Pipeline do
       output: opts |> Keyword.fetch!(:output) |> parse_output(),
       status: :init
     }
-    IO.inspect(state.input)
+
     proceed(ctx, state)
   end
 
@@ -271,10 +271,6 @@ defmodule Boombox.Pipeline do
 
   defp create_input({:rtmp, src}, ctx) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
-  end
-  defp create_input(any, ctx) do
-    IO.inspect(any)
-    # Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
 
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t()) ::
