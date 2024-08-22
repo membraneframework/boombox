@@ -130,37 +130,35 @@ defmodule BoomboxTest do
   async_test "rtmp -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     url = "rtmp://localhost:5000/app/stream_key"
+    {use_ssl?, port, app, stream_key} = Membrane.RTMPServer.parse_url(url)
 
-    {use_ssl?, port, target_app, target_stream_key} = Membrane.RTMP.Utils.parse_url(url)
-
-    boombox = self()
+    parent_process_pid = self()
 
     new_client_callback = fn client_ref, app, stream_key ->
-      if app == target_app and stream_key == target_stream_key do
-        send(boombox, {:rtmp_client_ref, client_ref})
-      end
+      send(parent_process_pid, {:client_ref, client_ref, app, stream_key})
     end
 
     # start RTMP server to listen for connections
-    {:ok, _server} =
+    {:ok, server} =
       Membrane.RTMPServer.start_link(
-        handler: %Membrane.RTMP.Source.ClientHandler{controlling_process: self()},
+        handler: %Membrane.RTMP.Source.ClientHandlerImpl{controlling_process: self()},
         port: port,
         use_ssl?: use_ssl?,
         new_client_callback: new_client_callback,
-        client_timeout: 1_000
+        client_timeout: 9_000
       )
-
 
     # send RTMP stream
     p = send_rtmp(url)
 
     # wait for a client to connect
-    client_ref = receive do
-      {:rtmp_client_ref, client_ref}  -> client_ref
-    after
-      5_000 -> "Didn't receive client_ref before timeout"
-    end
+    {:ok, client_ref} =
+      receive do
+        {:client_ref, client_ref, ^app, ^stream_key} ->
+          {:ok, client_ref}
+      after
+        10_000 -> :timeout
+      end
 
     # run boombox with client_ref
     t = Task.async(fn -> Boombox.run(input: client_ref, output: output) end)

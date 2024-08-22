@@ -9,8 +9,7 @@ defmodule Boombox.RTMP do
   @spec create_input(String.t() | pid(), pid()) :: Wait.t()
   def create_input(client_ref, utility_supervisor) when is_pid(client_ref) do
     IO.puts("GOT PID #{inspect(client_ref)}")
-
-    %Wait{}
+    handle_connection(client_ref)
   end
 
   def create_input(uri, utility_supervisor) do
