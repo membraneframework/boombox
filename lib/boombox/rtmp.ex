@@ -41,7 +41,6 @@ defmodule Boombox.RTMP do
     %Wait{}
   end
 
-  # this is used if rtmp works in url mode
   @spec handle_connection(pid()) :: Ready.t()
   def handle_connection(client_ref) do
     spec = [
