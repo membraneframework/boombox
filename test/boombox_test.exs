@@ -129,7 +129,7 @@ defmodule BoomboxTest do
   @tag :rtmp_custom_client_handler
   async_test "rtmp -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
-    url = "rtmp://localhost:5000/app/stream_key"
+    url = "rtmp://localhost:5001/app/stream_key"
     {use_ssl?, port, app, stream_key} = Membrane.RTMPServer.parse_url(url)
 
     parent_process_pid = self()
