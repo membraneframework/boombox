@@ -59,9 +59,9 @@ defmodule Boombox.Mixfile do
       {:membrane_rtmp_plugin, "~> 0.25.0"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
+      {:membrane_ffmpeg_swscale_plugin, "~> 0.16.0"},
+      {:image, "~> 0.54.0"},
       {:burrito, "~> 1.0", runtime: burrito?()},
-      {:membrane_ffmpeg_swscale_plugin, ">= 0.0.0"},
-      {:image, ">= 0.0.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false}

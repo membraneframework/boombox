@@ -12,7 +12,12 @@ defmodule Sink do
 
   @impl true
   def handle_init(_ctx, opts) do
-    {[], %{consumer: opts.consumer, last_audio_pts: 0, last_video_pts: 0}}
+    {[], Map.merge(Map.from_struct(opts), %{last_pts: %{}, audio_format: nil})}
+  end
+
+  @impl true
+  def handle_pad_added(Pad.ref(:input, kind), _ctx, state) do
+    {[], %{state | last_pts: Map.put(state.last_pts, kind, 0)}}
   end
 
   @impl true
@@ -23,16 +28,29 @@ defmodule Sink do
 
   @impl true
   def handle_info(:boombox_demand, _ctx, state) do
-    if state.last_audio_pts < state.last_video_pts do
-      {[demand: Pad.ref(:input, :audio)], state}
-    else
-      {[demand: Pad.ref(:input, :video)], state}
-    end
+    {kind, _pts} = Enum.min_by(state.last_pts, fn {_kind, pts} -> pts end)
+    {[demand: Pad.ref(:input, kind)], state}
+  end
+
+  @impl true
+  def handle_stream_format(Pad.ref(:input, :audio), stream_format, _ctx, state) do
+    audio_format = %{
+      audio_format: stream_format.sample_format,
+      audio_rate: stream_format.sample_rate,
+      audio_channels: stream_format.channels
+    }
+
+    {[], %{state | audio_format: audio_format}}
+  end
+
+  @impl true
+  def handle_stream_format(_pad, _stream_format, _ctx, state) do
+    {[], state}
   end
 
   @impl true
   def handle_buffer(Pad.ref(:input, :video), buffer, ctx, state) do
-    state = %{state | last_video_pts: buffer.pts}
+    state = %{state | last_pts: %{state.last_pts | video: buffer.pts}}
     %{width: width, height: height} = ctx.pads[Pad.ref(:input, :video)].stream_format
 
     {:ok, image} =
@@ -49,12 +67,13 @@ defmodule Sink do
 
   @impl true
   def handle_buffer(Pad.ref(:input, :audio), buffer, _ctx, state) do
-    state = %{state | last_audio_pts: buffer.pts}
+    state = %{state | last_pts: %{state.last_pts | audio: buffer.pts}}
 
     send(state.consumer, %Boombox.Packet{
       payload: buffer.payload,
       pts: buffer.pts,
-      kind: :audio
+      kind: :audio,
+      format: state.audio_format
     })
 
     {[], state}

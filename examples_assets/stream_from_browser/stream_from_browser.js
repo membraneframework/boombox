@@ -1,5 +1,5 @@
 const pcConfig = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' },] };
-const mediaConstraints = { video: true, audio: true }
+const mediaConstraints = { video: {width: 640, height: 480}, audio: true }
 
 const ws = new WebSocket(`ws://localhost:8829`);
 const connStatus = document.getElementById("status");

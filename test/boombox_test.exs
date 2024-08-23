@@ -225,7 +225,7 @@ defmodule BoomboxTest do
 
   @tag :mp4_elixir_rotate_mp4
   async_test "mp4 -> elixir rotate -> mp4", %{tmp_dir: tmp} do
-    Boombox.run(input: @bbb_mp4, output: {:stream, format: :image})
+    Boombox.run(input: @bbb_mp4, output: {:stream, video: :image, audio: :binary})
     |> Stream.map(fn
       %Boombox.Packet{kind: :video, payload: image} = packet ->
         image = Image.rotate!(image, 180)
@@ -234,9 +234,9 @@ defmodule BoomboxTest do
       %Boombox.Packet{kind: :audio} = packet ->
         packet
     end)
-    |> Boombox.run(input: {:stream, format: :image}, output: "#{tmp}/output.mp4")
+    |> Boombox.run(input: {:stream, video: :image, audio: :binary}, output: "#{tmp}/output.mp4")
 
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun_rotated.mp4", :video)
+    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun_rotated.mp4")
   end
 
   defp send_rtmp(url) do

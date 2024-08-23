@@ -6,27 +6,34 @@ Logger.configure(level: :info)
 # For ffmpeg and ffplay commands to work on Mac Livebook Desktop
 System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 
-Mix.install([{:boombox, path: __DIR__}, :kino])
+Mix.install([{:boombox, path: __DIR__}, :kino, :nx, :exla, :bumblebee])
+
+Nx.global_default_backend(EXLA.Backend)
 ```
 
 ## Boombox
 
 ```elixir
-:ok = :inets.start()
+:inets.start()
 
-{:ok, _server} =
-  :inets.start(:httpd,
-    bind_address: ~c"localhost",
-    port: 1234,
-    document_root: ~c"#{__DIR__}/examples_assets",
-    server_name: ~c"assets_server",
-    server_root: "/tmp",
-    erl_script_nocache: true
-  )
+:inets.start(:httpd,
+  bind_address: ~c"localhost",
+  port: 1234,
+  document_root: ~c"#{__DIR__}/examples_assets",
+  server_name: ~c"assets_server",
+  server_root: "/tmp",
+  erl_script_nocache: true
+)
+|> case do
+  {:ok, _server} -> :ok
+  {:error, {:already_started, _server}} -> :ok
+end
 ```
 
 ```elixir
-bbb_mp4_url = "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s.mp4"
+bbb_mp4_url =
+  "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s.mp4"
+
 bbb_mp4 = "#{__DIR__}/test/fixtures/bun10s.mp4"
 out_dir = "#{__DIR__}/examples_outputs"
 ```
@@ -82,7 +89,7 @@ Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://loc
 To receive the stream, visit http://localhost:1234/hls/stream.html after running the cell below
 
 ```elixir
-Boombox.run(input: bbb_mp4, output: {:hls, "examples_assets/hls/hls_output"})
+Boombox.run(input: bbb_mp4, output: {:hls, "#{__DIR__}/examples_assets/hls/hls_output"})
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -144,4 +151,44 @@ Task.await(t)
 
 ```elixir
 System.shell("ffplay #{out_dir}/mp4_webrtc_mp4.mp4")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Speech to text
+
+```elixir
+{:ok, whisper} = Bumblebee.load_model({:hf, "openai/whisper-tiny"})
+{:ok, featurizer} = Bumblebee.load_featurizer({:hf, "openai/whisper-tiny"})
+{:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "openai/whisper-tiny"})
+{:ok, generation_config} = Bumblebee.load_generation_config({:hf, "openai/whisper-tiny"})
+
+serving =
+  Bumblebee.Audio.speech_to_text_whisper(
+    whisper,
+    featurizer,
+    tokenizer,
+    generation_config,
+    defn_options: [compiler: EXLA]
+  )
+```
+
+To send the stream, visit http://localhost:1234/stream_from_browser/index.html
+
+```elixir
+Boombox.run(
+  input: {:webrtc, "ws://localhost:8829"},
+  output:
+    {:stream,
+     video: false, audio: :binary, audio_rate: 16_000, audio_channels: 1, audio_format: :f32le}
+)
+|> Stream.map(&Nx.from_binary(&1.payload, :f32))
+|> Stream.chunk_every(200)
+|> Enum.each(fn chunk ->
+  batch = Nx.concatenate(chunk)
+
+  Nx.Serving.run(serving, batch).chunks
+  |> Enum.map_join(& &1.text)
+  |> IO.puts()
+end)
 ```

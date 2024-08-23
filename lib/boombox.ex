@@ -5,6 +5,14 @@ defmodule Boombox do
   See `t:input/0` and `t:output/0` for supported protocols.
   """
   @type webrtc_opts :: Membrane.WebRTC.SignalingChannel.t() | URI.t()
+  @type in_stream_opts :: [audio: :binary | boolean(), video: :image | boolean()]
+  @type out_stream_opts :: [
+          audio: :binary | boolean(),
+          video: :image | boolean(),
+          audio_format: Membrane.RawAudio.SampleFormat.t(),
+          audio_rate: Membrane.RawAudio.sample_rate_t(),
+          audio_channels: Membrane.RawAudio.channels_t()
+        ]
 
   @type file_extension :: :mp4
 
@@ -15,14 +23,15 @@ defmodule Boombox do
           | {:http, file_extension(), URI.t()}
           | {:webrtc, webrtc_opts()}
           | {:rtmp, URI.t() | pid()}
-          | {:stream, term()}
+          | {:stream, in_stream_opts()}
+
   @type output ::
           URI.t()
           | Path.t()
           | {:file, file_extension(), Path.t()}
           | {:webrtc, webrtc_opts()}
           | {:hls, Path.t()}
-          | {:stream, term()}
+          | {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{input: input(), output: output()}
@@ -67,11 +76,8 @@ defmodule Boombox do
       %{demand: 0},
       fn
         %Boombox.Packet{} = packet, %{demand: 0} = state ->
-          dbg(packet)
-
           receive do
             {:boombox_demand, demand} ->
-              dbg({:demand, demand})
               send(source, packet)
               {:cont, %{state | demand: demand - 1}}
 
@@ -81,7 +87,6 @@ defmodule Boombox do
           end
 
         %Boombox.Packet{} = packet, %{demand: demand} = state ->
-          dbg({packet, demand})
           send(source, packet)
           {:cont, %{state | demand: demand - 1}}
 

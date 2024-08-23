@@ -8,13 +8,14 @@ defmodule Boombox.Packet do
   @type t :: %__MODULE__{
           payload: payload(),
           pts: Membrane.Time.t(),
-          kind: :audio | :video
+          kind: :audio | :video,
+          format: map()
         }
 
   @type payload :: Vix.Vips.Image.t() | binary()
 
   @enforce_keys [:payload, :pts, :kind]
-  defstruct @enforce_keys
+  defstruct @enforce_keys ++ [format: %{}]
 
   @spec update_payload(t(), (payload() -> payload())) :: t()
   def update_payload(packet, fun) do

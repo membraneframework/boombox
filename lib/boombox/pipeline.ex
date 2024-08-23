@@ -178,7 +178,6 @@ defmodule Boombox.Pipeline do
 
   @impl true
   def handle_element_end_of_stream(:elixir_stream_sink, Pad.ref(:input, id), _ctx, state) do
-    dbg({:eos, id})
     eos_info = List.delete(state.eos_info, id)
     state = %{state | eos_info: eos_info}
 
@@ -287,8 +286,8 @@ defmodule Boombox.Pipeline do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
 
-  defp create_input({:stream, _params}, _ctx, state) do
-    Boombox.ElixirStream.create_input(state.parent)
+  defp create_input({:stream, params}, _ctx, state) do
+    Boombox.ElixirStream.create_input(state.parent, params)
   end
 
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
@@ -321,8 +320,8 @@ defmodule Boombox.Pipeline do
     Boombox.HLS.link_output(location, track_builders, spec_builder)
   end
 
-  defp link_output({:stream, _opts}, track_builders, spec_builder, _ctx, state) do
-    Boombox.ElixirStream.link_output(state.parent, track_builders, spec_builder)
+  defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
+    Boombox.ElixirStream.link_output(state.parent, opts, track_builders, spec_builder)
   end
 
   defp parse_input(input) when is_binary(input) do

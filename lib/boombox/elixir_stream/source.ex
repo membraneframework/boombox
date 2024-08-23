@@ -8,24 +8,18 @@ defmodule Source do
     flow_control: :manual,
     demand_unit: :buffers
 
-  def_options producer: []
+  def_options producer: [spec: pid()]
 
   @impl true
   def handle_init(_ctx, opts) do
-    state = %{producer: opts.producer, dims: nil}
+    state = Map.merge(Map.from_struct(opts), %{video_dims: nil, audio_format: nil})
     {[], state}
   end
 
   @impl true
-  def handle_playing(ctx, state) do
+  def handle_playing(_ctx, state) do
     send(state.producer, {:boombox_ex_stream_source, self()})
-
-    if Map.has_key?(ctx.pads, Pad.ref(:output, :audio)) do
-      format = %Membrane.RawAudio{sample_format: :s16le, sample_rate: 44100, channels: 2}
-      {[stream_format: {Pad.ref(:output, :audio), format}], state}
-    else
-      {[], state}
-    end
+    {[], state}
   end
 
   @impl true
@@ -43,16 +37,16 @@ defmodule Source do
   @impl true
   def handle_info(%Boombox.Packet{kind: :video} = packet, _ctx, state) do
     image = packet.payload |> Image.flatten!() |> Image.to_colorspace!(:srgb)
-    dims = %{width: Image.width(image), height: Image.height(image)}
+    video_dims = %{width: Image.width(image), height: Image.height(image)}
     {:ok, payload} = Vix.Vips.Image.write_to_binary(image)
     buffer = %Membrane.Buffer{payload: payload, pts: packet.pts}
 
-    if dims == state.dims do
+    if video_dims == state.video_dims do
       {[buffer: {Pad.ref(:output, :video), buffer}], state}
     else
       stream_format = %Membrane.RawVideo{
-        width: dims.width,
-        height: dims.height,
+        width: video_dims.width,
+        height: video_dims.height,
         pixel_format: :RGB,
         aligned: true,
         framerate: nil
@@ -61,14 +55,29 @@ defmodule Source do
       {[
          stream_format: {Pad.ref(:output, :video), stream_format},
          buffer: {Pad.ref(:output, :video), buffer}
-       ], %{state | dims: dims}}
+       ], %{state | video_dims: video_dims}}
     end
   end
 
   @impl true
   def handle_info(%Boombox.Packet{kind: :audio} = packet, _ctx, state) do
-    buffer = %Membrane.Buffer{payload: packet.payload, pts: packet.pts}
-    {[buffer: {Pad.ref(:output, :audio), buffer}], state}
+    %Boombox.Packet{payload: payload, format: format} = packet
+    buffer = %Membrane.Buffer{payload: payload, pts: packet.pts}
+
+    if format == state.audio_format do
+      {[buffer: {Pad.ref(:output, :audio), buffer}], state}
+    else
+      stream_format = %Membrane.RawAudio{
+        sample_format: format.audio_format,
+        sample_rate: format.audio_rate,
+        channels: format.audio_channels
+      }
+
+      {[
+         stream_format: {Pad.ref(:output, :audio), stream_format},
+         buffer: {Pad.ref(:output, :audio), buffer}
+       ], %{state | audio_format: format}}
+    end
   end
 
   @impl true
