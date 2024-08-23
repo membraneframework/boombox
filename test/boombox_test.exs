@@ -186,23 +186,25 @@ defmodule BoomboxTest do
     end)
   end
 
-  @tag :rtsp_hls
-  async_test "rtsp -> hls", %{tmp_dir: tmp} do
-    # tmp = "tmp/BoomboxTest.AsyncTest_AD1CB48DEBDAAADADA4C2596/test-rtsp----hls-88891efc"
+  @tag :rtsp_hls_video
+  async_test "rtsp video -> hls", %{tmp_dir: tmp} do
+    rtsp_server_port = 8554
+    rtp_server_port = 30003
+
+    {:ok, _server} =
+      Membrane.RTSP.Server.start_link(
+        handler: Membrane.Support.RTSP.Server.Handler,
+        handler_config: %{fixture_path: @bbb_mp4},
+        port: rtsp_server_port,
+        address: {127, 0, 0, 1},
+        udp_rtp_port: rtp_server_port,
+        udp_rtcp_port: rtp_server_port + 1
+      )
+
     manifest_filename = Path.join(tmp, "index.m3u8")
     Boombox.run(input: "rtsp://localhost:8554/livestream", output: manifest_filename)
-    # IO.inspect("boombox finished")
-    # ref_path = "output"
     ref_path = "test/fixtures/ref_bun10s_aac_hls"
     Compare.compare(tmp, ref_path, kinds: [:video], format: :hls)
-
-    # Enum.zip(
-    # Path.join(tmp, "*.mp4") |> Path.wildcard(),
-    # Path.join(ref_path, "*.mp4") |> Path.wildcard()
-    # )
-    # |> Enum.each(fn {output_file, ref_file} ->
-    # assert File.read!(output_file) == File.read!(ref_file)
-    # end)
   end
 
   defp send_rtmp(url) do

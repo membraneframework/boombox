@@ -4,11 +4,11 @@ defmodule Boombox.RTMP do
   import Membrane.ChildrenSpec
   require Membrane.Logger
   alias Boombox.Pipeline.{Ready, Wait}
-  alias Membrane.RTMP
+  alias Membrane.{RTMP, RTMPServer}
 
   @spec create_input(String.t(), pid()) :: Wait.t()
   def create_input(uri, utility_supervisor) do
-    {use_ssl?, port, target_app, target_stream_key} = RTMP.Utils.parse_url(uri)
+    {use_ssl?, port, target_app, target_stream_key} = RTMPServer.parse_url(uri)
 
     boombox = self()
 
@@ -21,7 +21,7 @@ defmodule Boombox.RTMP do
     end
 
     server_options = %{
-      handler: %Membrane.RTMP.Source.ClientHandler{controlling_process: self()},
+      handler: %RTMP.Source.ClientHandlerImpl{controlling_process: self()},
       port: port,
       use_ssl?: use_ssl?,
       new_client_callback: new_client_callback,
@@ -31,7 +31,7 @@ defmodule Boombox.RTMP do
     {:ok, _server} =
       Membrane.UtilitySupervisor.start_link_child(
         utility_supervisor,
-        {Membrane.RTMP.Server, server_options}
+        {Membrane.RTMPServer, server_options}
       )
 
     %Wait{}
