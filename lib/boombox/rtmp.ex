@@ -12,7 +12,7 @@ defmodule Boombox.RTMP do
 
     boombox = self()
 
-    new_client_callback = fn client_ref, app, stream_key ->
+    handle_new_client = fn client_ref, app, stream_key ->
       if app == target_app and stream_key == target_stream_key do
         send(boombox, {:rtmp_client_ref, client_ref})
       else
@@ -24,7 +24,7 @@ defmodule Boombox.RTMP do
       handler: %RTMP.Source.ClientHandlerImpl{controlling_process: self()},
       port: port,
       use_ssl?: use_ssl?,
-      new_client_callback: new_client_callback,
+      handle_new_client: handle_new_client,
       client_timeout: 1_000
     }
 
