@@ -27,6 +27,7 @@ defmodule Boombox.WebRTC do
             get_child(:webrtc_input)
             |> via_out(Pad.ref(:output, id))
             |> child(:webrtc_in_opus_decoder, Membrane.Opus.Decoder)
+
           {:audio, spec}
 
         %{kind: :video, id: id} ->
