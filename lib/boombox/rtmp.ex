@@ -6,7 +6,11 @@ defmodule Boombox.RTMP do
   alias Boombox.Pipeline.{Ready, Wait}
   alias Membrane.{RTMP, RTMPServer}
 
-  @spec create_input(String.t(), pid()) :: Wait.t()
+  @spec create_input(String.t() | pid(), pid()) :: Wait.t()
+  def create_input(client_ref, _utility_supervisor) when is_pid(client_ref) do
+    handle_connection(client_ref)
+  end
+
   def create_input(uri, utility_supervisor) do
     {use_ssl?, port, target_app, target_stream_key} = RTMPServer.parse_url(uri)
 

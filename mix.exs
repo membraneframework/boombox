@@ -56,7 +56,7 @@ defmodule Boombox.Mixfile do
        github: "membraneframework/membrane_mp4_plugin", branch: "wip-avc3", override: true},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.18.0"},
-      {:membrane_rtmp_plugin, "~> 0.24.0"},
+      {:membrane_rtmp_plugin, "~> 0.25.0"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:burrito, "~> 1.0", runtime: burrito?()},

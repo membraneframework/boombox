@@ -126,6 +126,43 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
+  @tag :rtmp_external_server
+  async_test "rtmp -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    url = "rtmp://localhost:5001/app/stream_key"
+    {use_ssl?, port, app, stream_key} = Membrane.RTMPServer.parse_url(url)
+
+    parent_process_pid = self()
+
+    new_client_callback = fn client_ref, app, stream_key ->
+      send(parent_process_pid, {:client_ref, client_ref, app, stream_key})
+    end
+
+    {:ok, server} =
+      Membrane.RTMPServer.start_link(
+        handler: %Membrane.RTMP.Source.ClientHandlerImpl{controlling_process: self()},
+        port: port,
+        use_ssl?: use_ssl?,
+        new_client_callback: new_client_callback,
+        client_timeout: 1_000
+      )
+
+    p = send_rtmp(url)
+
+    {:ok, client_ref} =
+      receive do
+        {:client_ref, client_ref, ^app, ^stream_key} ->
+          {:ok, client_ref}
+      after
+        5_000 -> :timeout
+      end
+
+    Boombox.run(input: client_ref, output: output)
+    Testing.Pipeline.terminate(p)
+    Process.exit(server, :normal)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
