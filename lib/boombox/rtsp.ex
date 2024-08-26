@@ -2,16 +2,16 @@ defmodule Boombox.RTSP do
   @moduledoc false
   import Membrane.ChildrenSpec
 
+  require Membrane.Pad
+
   alias Membrane.RTP
   alias Boombox.Pipeline.{Ready, Wait}
-  require Membrane.Pad
-  @type state :: %{server_pid: pid()} | nil
 
   @spec create_input(URI.t()) :: Wait.t()
   def create_input(uri) do
     spec =
       child(:rtsp_source, %Membrane.RTSP.Source{
-        transport: {:udp, 20000, 20005},
+        transport: {:udp, 20_000, 20_020},
         allowed_media_types: [:video, :audio],
         stream_uri: uri,
         on_connection_closed: :send_eos

@@ -189,7 +189,7 @@ defmodule BoomboxTest do
   @tag :rtsp_hls_video
   async_test "rtsp video -> hls", %{tmp_dir: tmp} do
     rtsp_server_port = 8554
-    rtp_server_port = 30003
+    rtp_server_port = 30_003
 
     {:ok, _server} =
       Membrane.RTSP.Server.start_link(
