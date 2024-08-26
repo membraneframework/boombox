@@ -38,8 +38,8 @@ defmodule Boombox.RTSP do
               :rtsp_in_h264_parser,
               %Membrane.H264.Parser{
                 spss: spss,
-                ppss: ppss,
-                generate_best_effort_timestamps: %{framerate: {60, 1}}
+                ppss: ppss
+                # generate_best_effort_timestamps: %{framerate: {60, 1}}
               }
             )
 
