@@ -4,6 +4,9 @@ defmodule Boombox do
 
   See `t:input/0` and `t:output/0` for supported protocols.
   """
+
+  require Membrane.Time
+
   @type webrtc_opts :: Membrane.WebRTC.SignalingChannel.t() | URI.t()
   @type in_stream_opts :: [audio: :binary | boolean(), video: :image | boolean()]
   @type out_stream_opts :: [
@@ -119,6 +122,7 @@ defmodule Boombox do
 
         receive do
           %Boombox.Packet{} = packet ->
+            verify_packet!(packet)
             {[packet], state}
 
           {:DOWN, _monitor, :process, supervisor, _reason}
@@ -153,6 +157,25 @@ defmodule Boombox do
     receive do
       {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
     end
+  end
+
+  @spec verify_packet!(term()) :: :ok
+  defp verify_packet!(packet) do
+    %Boombox.Packet{kind: kind, pts: pts, format: format} = packet
+
+    unless kind in [:audio, :video] do
+      raise "Boombox.Packet field :kind must be set to :audio or :video, got #{inspect(kind)}"
+    end
+
+    unless Membrane.Time.is_time(pts) do
+      raise "Boombox.Packet field :pts must be of type `Membrane.Time.t`, got #{inspect(pts)}"
+    end
+
+    unless is_map(format) do
+      raise "Boombox.Packet field :format must be a map, got #{inspect(format)}"
+    end
+
+    :ok
   end
 
   @spec run_cli([String.t()]) :: :ok
