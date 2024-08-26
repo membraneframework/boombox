@@ -24,11 +24,10 @@ defmodule Source do
 
   @impl true
   def handle_demand(Pad.ref(:output, _id), _size, _unit, ctx, state) do
-    audio_demand = ctx.pads[Pad.ref(:output, :audio)].demand
-    video_demand = ctx.pads[Pad.ref(:output, :video)].demand
+    demands = Enum.map(ctx.pads, fn {_pad, %{demand: demand}} -> demand end)
 
-    if audio_demand > 0 and video_demand > 0 do
-      send(state.producer, {:boombox_demand, audio_demand + video_demand})
+    if Enum.all?(demands, &(&1 > 0)) do
+      send(state.producer, {:boombox_demand, Enum.sum(demands)})
     end
 
     {[], state}
@@ -81,7 +80,8 @@ defmodule Source do
   end
 
   @impl true
-  def handle_info(:boombox_eos, _ctx, state) do
-    {[end_of_stream: Pad.ref(:output, :audio), end_of_stream: Pad.ref(:output, :video)], state}
+  def handle_info(:boombox_eos, ctx, state) do
+    actions = Enum.map(ctx.pads, fn {ref, _data} -> {:end_of_stream, ref} end)
+    {actions, state}
   end
 end

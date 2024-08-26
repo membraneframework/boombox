@@ -239,6 +239,62 @@ defmodule BoomboxTest do
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun_rotated.mp4")
   end
 
+  @tag :bouncing_bubble_webrtc_mp4
+  async_test "bouncing bubble -> webrtc -> mp4", %{tmp_dir: tmp} do
+    signaling = Membrane.WebRTC.SignalingChannel.new()
+
+    Task.async(fn ->
+      overlay =
+        Image.new!(_w = 100, _h = 100, color: [0, 0, 0, 0])
+        |> Image.Draw.circle!(_x = 50, _y = 50, _r = 48, color: :blue)
+
+      bg = Image.new!(640, 480, color: :light_gray)
+      max_x = Image.width(bg) - Image.width(overlay)
+      max_y = Image.height(bg) - Image.height(overlay)
+      fps = 60
+
+      Stream.iterate({_x = 300, _y = 0, _dx = 1, _dy = 2, _pts = 0}, fn {x, y, dx, dy, pts} ->
+        dx = if (x + dx) in 0..max_x, do: dx, else: -dx
+        dy = if (y + dy) in 0..max_y, do: dy, else: -dy
+        pts = pts + div(Membrane.Time.seconds(1), fps)
+        {x + dx, y + dy, dx, dy, pts}
+      end)
+      |> Stream.map(fn {x, y, _dx, _dy, pts} ->
+        img = Image.compose!(bg, overlay, x: x, y: y)
+        %Boombox.Packet{kind: :video, payload: img, pts: pts}
+      end)
+      |> Stream.take(5 * fps)
+      |> Boombox.run(
+        input: {:stream, video: :image, audio: false},
+        output: {:webrtc, signaling}
+      )
+    end)
+
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: {:webrtc, signaling}, output: output)
+
+    Compare.compare(output, "test/fixtures/ref_bouncing_bubble.mp4", kinds: [:video])
+  end
+
+  @tag :mp4_resampled_pcm
+  async_test "mp4 -> resampled PCM" do
+    pcm =
+      Boombox.run(
+        input: @bbb_mp4,
+        output:
+          {:stream,
+           video: false,
+           audio: :binary,
+           audio_rate: 16_000,
+           audio_channels: 1,
+           audio_format: :s16le}
+      )
+      |> Enum.map_join(& &1.payload)
+
+    ref = File.read!("test/fixtures/ref_bun.pcm")
+    assert Compare.samples_min_square_error(ref, pcm, 16) < 500
+  end
+
   defp send_rtmp(url) do
     p =
       Testing.Pipeline.start_link_supervised!(

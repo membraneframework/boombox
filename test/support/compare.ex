@@ -139,7 +139,8 @@ defmodule Support.Compare do
     Testing.Pipeline.terminate(p)
   end
 
-  defp samples_min_square_error(bin1, bin2, sample_size) do
+  @spec samples_min_square_error(binary, binary, pos_integer) :: non_neg_integer()
+  def samples_min_square_error(bin1, bin2, sample_size) do
     assert byte_size(bin1) == byte_size(bin2)
 
     Enum.zip(
