@@ -189,6 +189,7 @@ defmodule BoomboxTest do
   @tag :rtsp_mp4_video
   async_test "rtsp video -> mp4", %{tmp_dir: tmp} do
     rtp_server_port = 30_003
+    rtsp_port = 8554
     output = Path.join(tmp, "output.mp4")
 
     {:ok, _server} =
@@ -196,38 +197,40 @@ defmodule BoomboxTest do
         handler: Membrane.Support.RTSP.Server.Handler,
         handler_config: %{fixture_path: @bbb_mp4},
         address: {127, 0, 0, 1},
-        port: 8554,
+        port: rtsp_port,
         udp_rtp_port: rtp_server_port,
         udp_rtcp_port: rtp_server_port + 1
       )
 
-    Boombox.run(input: "rtsp://localhost:8554/livestream", output: output)
+    Boombox.run(input: "rtsp://localhost:#{rtsp_port}/livestream", output: output)
     Compare.compare(output, "test/fixtures/ref_bun10s_rtsp.mp4", kinds: [:video])
   end
 
   @tag :rtsp_hls_video
   async_test "rtsp video -> hls", %{tmp_dir: tmp} do
-    rtp_server_port = 30_003
+    rtp_server_port = 30_005
+    rtsp_port = 8555
 
     {:ok, _server} =
       Membrane.RTSP.Server.start_link(
         handler: Membrane.Support.RTSP.Server.Handler,
         handler_config: %{fixture_path: @bbb_mp4},
         address: {127, 0, 0, 1},
-        port: 8554,
+        port: rtsp_port,
         udp_rtp_port: rtp_server_port,
         udp_rtcp_port: rtp_server_port + 1
       )
 
     manifest_filename = Path.join(tmp, "index.m3u8")
-    Boombox.run(input: "rtsp://localhost:8554/livestream", output: manifest_filename)
+    Boombox.run(input: "rtsp://localhost:#{rtsp_port}/livestream", output: manifest_filename)
     ref_path = "test/fixtures/ref_bun10s_aac_hls"
     Compare.compare(tmp, ref_path, kinds: [:video], format: :hls)
   end
 
   @tag :rtsp_webrtc_mp4_video
   async_test "rtsp video -> webrtc -> mp4", %{tmp_dir: tmp} do
-    rtp_server_port = 30_003
+    rtp_server_port = 30_007
+    rtsp_port = 8556
     output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
@@ -236,19 +239,22 @@ defmodule BoomboxTest do
         handler: Membrane.Support.RTSP.Server.Handler,
         handler_config: %{fixture_path: @bbb_mp4_v},
         address: {127, 0, 0, 1},
-        port: 8554,
+        port: rtsp_port,
         udp_rtp_port: rtp_server_port,
         udp_rtcp_port: rtp_server_port + 1
       )
 
     t =
       Task.async(fn ->
-        Boombox.run(input: "rtsp://localhost:8554/livestream", output: {:webrtc, signaling})
+        Boombox.run(
+          input: "rtsp://localhost:#{rtsp_port}/livestream",
+          output: {:webrtc, signaling}
+        )
       end)
 
     Boombox.run(input: {:webrtc, signaling}, output: output)
     Task.await(t)
-    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", kinds: [:video])
+    Compare.compare(output, "test/fixtures/ref_bun10s_rtsp.mp4", kinds: [:video])
   end
 
   defp send_rtmp(url) do

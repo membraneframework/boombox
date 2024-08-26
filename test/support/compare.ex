@@ -58,29 +58,32 @@ defmodule Support.Compare do
 
     Testing.Pipeline.execute_actions(p, spec: head_spec)
 
-    assert_pipeline_notified(p, :ref_demuxer, {:new_tracks, tracks})
+    assert_pipeline_notified(p, :ref_demuxer, {:new_tracks, ref_tracks})
 
-    [{audio_id, %Membrane.AAC{}}, {video_id, %Membrane.H264{}}] =
-      Enum.sort_by(tracks, fn {_id, %format{}} -> format end)
+    # [{audio_id, %Membrane.AAC{}}, {video_id, %Membrane.H264{}}] =
+    # Enum.sort_by(tracks, fn {_id, %format{}} -> format end)
 
     ref_spec =
-      [
-        get_child(:ref_demuxer)
-        |> via_out(Pad.ref(:output, video_id))
-        |> child(:ref_video_bufs, GetBuffers),
-        get_child(:ref_demuxer)
-        |> via_out(Pad.ref(:output, audio_id))
-        |> child(:ref_aac, Membrane.AAC.Parser)
-        |> child(Membrane.AAC.FDK.Decoder)
-        |> child(:ref_audio_bufs, GetBuffers)
-      ]
+      Enum.map(ref_tracks, fn
+        {id, %Membrane.AAC{}} ->
+          get_child(:ref_demuxer)
+          |> via_out(Pad.ref(:output, id))
+          |> child(:ref_aac, Membrane.AAC.Parser)
+          |> child(Membrane.AAC.FDK.Decoder)
+          |> child(:ref_audio_bufs, GetBuffers)
 
-    assert_pipeline_notified(p, :sub_demuxer, {:new_tracks, tracks})
+        {id, %Membrane.H264{}} ->
+          get_child(:ref_demuxer)
+          |> via_out(Pad.ref(:output, id))
+          |> child(:ref_video_bufs, GetBuffers)
+      end)
 
-    assert length(tracks) == length(kinds)
+    assert_pipeline_notified(p, :sub_demuxer, {:new_tracks, sub_tracks})
+
+    assert length(sub_tracks) == length(kinds)
 
     sub_spec =
-      Enum.map(tracks, fn
+      Enum.map(sub_tracks, fn
         {id, %Membrane.AAC{}} ->
           assert :audio in kinds
 

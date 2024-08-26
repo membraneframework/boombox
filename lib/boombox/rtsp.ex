@@ -9,9 +9,11 @@ defmodule Boombox.RTSP do
 
   @spec create_input(URI.t()) :: Wait.t()
   def create_input(uri) do
+    port = Enum.random(5_000..65_000)
+
     spec =
       child(:rtsp_source, %Membrane.RTSP.Source{
-        transport: {:udp, 20_000, 20_020},
+        transport: {:udp, port, port + 20},
         allowed_media_types: [:video, :audio],
         stream_uri: uri,
         on_connection_closed: :send_eos
