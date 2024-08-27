@@ -9,10 +9,17 @@ defmodule Boombox.Packet do
           payload: payload(),
           pts: Membrane.Time.t(),
           kind: :audio | :video,
-          format: map()
+          format: format()
         }
 
   @type payload :: Vix.Vips.Image.t() | binary()
+  @type format ::
+          %{}
+          | %{
+              audio_format: Membrane.RawAudio.SampleFormat.t(),
+              audio_rate: pos_integer(),
+              audio_channels: pos_integer()
+            }
 
   @enforce_keys [:payload, :pts, :kind]
   defstruct @enforce_keys ++ [format: %{}]

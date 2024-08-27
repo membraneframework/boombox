@@ -39,7 +39,7 @@ defmodule Boombox do
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{input: input(), output: output()}
 
-  @spec run(Enumerable.t(), input: input, output: output) :: :ok | Enumerable.t()
+  @spec run(Enumerable.t(), input: input(), output: output()) :: :ok | Enumerable.t()
   def run(stream \\ nil, opts) do
     opts = Keyword.validate!(opts, [:input, :output]) |> Map.new()
 
