@@ -256,6 +256,7 @@ defmodule Boombox do
     run(args)
   end
 
+  @spec get_switch_type([String.t()], atom(), Keyword.t()) :: :boolean | :string
   defp get_switch_type(argv, option, aliases) do
     with [] <- OptionParser.parse(argv, strict: [{option, :string}], aliases: aliases) |> elem(0),
          [] <- OptionParser.parse(argv, strict: [{option, :boolean}], aliases: aliases) |> elem(0) do
@@ -266,6 +267,7 @@ defmodule Boombox do
     end
   end
 
+  @spec resolve_endpoint(Keyword.t()) :: {:input, input()} | {:output, output()}
   defp resolve_endpoint(parsed) do
     case parsed do
       [{direction, true}, {endpoint, value}] -> {direction, {endpoint, value}}
@@ -275,6 +277,8 @@ defmodule Boombox do
     end
   end
 
+  @spec cli_exit_error() :: no_return
+  @spec cli_exit_error(String.t() | nil) :: no_return
   defp cli_exit_error(description \\ nil) do
     description = if description, do: "Error: #{description}\n\n"
 
