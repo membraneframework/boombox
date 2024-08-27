@@ -127,7 +127,7 @@ defmodule BoomboxTest do
   end
 
   @tag :rtmp_external_server
-  async_test "rtmp -> mp4", %{tmp_dir: tmp} do
+  async_test "rtmp client_ref -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     url = "rtmp://localhost:5001/app/stream_key"
     {use_ssl?, port, app, stream_key} = Membrane.RTMPServer.parse_url(url)
@@ -157,7 +157,7 @@ defmodule BoomboxTest do
         5_000 -> :timeout
       end
 
-    Boombox.run(input: client_ref, output: output)
+    Boombox.run(input: {:rtmp, client_ref}, output: output)
     Testing.Pipeline.terminate(p)
     Process.exit(server, :normal)
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")

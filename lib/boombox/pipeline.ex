@@ -278,8 +278,8 @@ defmodule Boombox.Pipeline do
     Boombox.WebRTC.create_input(signaling)
   end
 
-  defp create_input({storage_type, :mp4, location}, _ctx, _state) do
-    Boombox.MP4.create_input(storage_type, location)
+  defp create_input({:mp4, location, opts}, _ctx, _state) do
+    Boombox.MP4.create_input(location, opts)
   end
 
   defp create_input({:rtmp, src}, ctx, _state) do
@@ -312,7 +312,7 @@ defmodule Boombox.Pipeline do
     Boombox.WebRTC.link_output(track_builders)
   end
 
-  defp link_output({:file, :mp4, location}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:mp4, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 

@@ -5,7 +5,7 @@ defmodule Boombox.WebRTC do
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
 
-  @spec create_input(Boombox.webrtc_opts()) :: Wait.t()
+  @spec create_input(Boombox.webrtc_signaling()) :: Wait.t()
   def create_input(signaling) do
     signaling = resolve_signaling(signaling)
 
@@ -41,7 +41,7 @@ defmodule Boombox.WebRTC do
     %Ready{track_builders: track_builders}
   end
 
-  @spec create_output(Boombox.webrtc_opts()) :: Ready.t()
+  @spec create_output(Boombox.webrtc_signaling()) :: Ready.t()
   def create_output(signaling) do
     signaling = resolve_signaling(signaling)
 
