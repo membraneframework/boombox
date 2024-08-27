@@ -13,7 +13,7 @@ defmodule Boombox do
           | {:file, file_extension(), path :: String.t()}
           | {:http, file_extension(), url :: String.t()}
           | {:webrtc, webrtc_opts()}
-          | {:rtmp, url :: String.t() | pid()}
+          | {:rtmp, (url :: String.t()) | (client_ref :: pid())}
           | {:rtsp, url :: String.t()}
   @type output ::
           String.t()

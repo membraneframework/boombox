@@ -119,7 +119,6 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-
   def handle_child_notification({:new_tracks, tracks}, :webrtc_input, ctx, state) do
     Boombox.WebRTC.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)

@@ -105,7 +105,7 @@ To receive the stream, visit http://localhost:1234/hls/stream.html after running
 rtp_server_port = 30_003
 rtsp_port = 8554
 
-{:ok, _server} =
+{:ok, server} =
   Membrane.RTSP.Server.start_link(
     handler: Membrane.Support.RTSP.Server.Handler,
     handler_config: %{fixture_path: bbb_mp4},
@@ -116,6 +116,8 @@ rtsp_port = 8554
   )
 
 Boombox.run(input: "rtsp://localhost:#{rtsp_port}/livestream", output: {:hls, hls_out_dir})
+
+GenServer.stop(server)
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
