@@ -276,8 +276,8 @@ defmodule Boombox.Pipeline do
     Boombox.MP4.create_input(storage_type, location)
   end
 
-  defp create_input({:rtmp, uri}, ctx) do
-    Boombox.RTMP.create_input(uri, ctx.utility_supervisor)
+  defp create_input({:rtmp, src}, ctx) do
+    Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
 
   defp create_input({:rtsp, uri}, _ctx) do
@@ -332,6 +332,10 @@ defmodule Boombox.Pipeline do
       _other ->
         raise "Unsupported URI: #{input}"
     end
+  end
+
+  defp parse_input(input) when is_pid(input) do
+    {:rtmp, input}
   end
 
   defp parse_input(input) when is_tuple(input) do

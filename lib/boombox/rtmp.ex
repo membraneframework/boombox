@@ -6,7 +6,11 @@ defmodule Boombox.RTMP do
   alias Boombox.Pipeline.{Ready, Wait}
   alias Membrane.{RTMP, RTMPServer}
 
-  @spec create_input(String.t(), pid()) :: Wait.t()
+  @spec create_input(String.t() | pid(), pid()) :: Wait.t()
+  def create_input(client_ref, _utility_supervisor) when is_pid(client_ref) do
+    handle_connection(client_ref)
+  end
+
   def create_input(uri, utility_supervisor) do
     {use_ssl?, port, target_app, target_stream_key} = RTMPServer.parse_url(uri)
 
@@ -31,7 +35,7 @@ defmodule Boombox.RTMP do
     {:ok, _server} =
       Membrane.UtilitySupervisor.start_link_child(
         utility_supervisor,
-        {Membrane.RTMPServer, server_options}
+        {RTMPServer, server_options}
       )
 
     %Wait{}
@@ -40,7 +44,7 @@ defmodule Boombox.RTMP do
   @spec handle_connection(pid()) :: Ready.t()
   def handle_connection(client_ref) do
     spec =
-      child(:rtmp_source, %Membrane.RTMP.SourceBin{client_ref: client_ref})
+      child(:rtmp_source, %RTMP.SourceBin{client_ref: client_ref})
       |> via_out(:audio)
       |> child(:rtmp_in_aac_parser, Membrane.AAC.Parser)
       |> child(:rtmp_in_aac_decoder, Membrane.AAC.FDK.Decoder)

@@ -62,7 +62,7 @@ defmodule Boombox.Mixfile do
       # {:membrane_http_adaptive_stream_plugin, "~> 0.18.0"},
       {:membrane_http_adaptive_stream_plugin,
        github: "membraneframework/membrane_http_adaptive_stream_plugin", branch: "fix-linking"},
-      {:membrane_rtmp_plugin, github: "membraneframework/membrane_rtmp_plugin"},
+      {:membrane_rtmp_plugin, "~> 0.25.0"},
       {:membrane_rtsp_plugin,
        github: "membraneframework-labs/membrane_rtsp_plugin", branch: "allow-for-eos"},
       # {:membrane_rtsp_plugin, "~> 0.2.0"},
