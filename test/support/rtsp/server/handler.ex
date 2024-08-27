@@ -6,8 +6,8 @@ defmodule Membrane.Support.RTSP.Server.Handler do
   require Membrane.Logger
 
   alias Membrane.RTSP.Response
-  @test_pt 96
-  @test_clock_rate 90_000
+  @pt 96
+  @clock_rate 90_000
 
   @impl true
   def init(config) do
@@ -27,8 +27,8 @@ defmodule Membrane.Support.RTSP.Server.Handler do
     v=0
     m=video 0 RTP/AVP 96
     a=control:/control
-    a=rtpmap:#{@test_pt} H264/#{@test_clock_rate}
-    a=fmtp:#{@test_pt} packetization-mode=1
+    a=rtpmap:#{@pt} H264/#{@clock_rate}
+    a=fmtp:#{@pt} packetization-mode=1
     """
 
     response =
@@ -53,8 +53,8 @@ defmodule Membrane.Support.RTSP.Server.Handler do
     arg = %{
       socket: state.socket,
       ssrc: media_context.ssrc,
-      pt: @test_pt,
-      clock_rate: @test_clock_rate,
+      pt: @pt,
+      clock_rate: @clock_rate,
       client_port: client_rtp_port,
       client_ip: media_context.address,
       server_rtp_socket: media_context.rtp_socket,
