@@ -9,19 +9,17 @@ defmodule Boombox do
   @type file_extension :: :mp4
 
   @type input ::
-          URI.t()
-          | Path.t()
-          | {:file, file_extension(), Path.t()}
-          | {:http, file_extension(), URI.t()}
+          String.t()
+          | {:file, file_extension(), path :: String.t()}
+          | {:http, file_extension(), url :: String.t()}
           | {:webrtc, webrtc_opts()}
-          | {:rtmp, URI.t()}
-          | {:rtsp, URI.t()}
+          | {:rtmp, url :: String.t()}
+          | {:rtsp, url :: String.t()}
   @type output ::
-          URI.t()
-          | Path.t()
-          | {:file, file_extension(), Path.t()}
+          String.t()
+          | {:file, file_extension(), path :: String.t()}
           | {:webrtc, webrtc_opts()}
-          | {:hls, Path.t()}
+          | {:hls, path :: String.t()}
 
   @spec run(input: input, output: output) :: :ok
   def run(opts) do
