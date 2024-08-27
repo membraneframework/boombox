@@ -209,6 +209,25 @@ defmodule BoomboxTest do
     end)
   end
 
+  @tag :file_hls_http
+  async_test "mp4 file -> http hls", %{tmp_dir: tmp} do
+    port = 9090
+    Bandit.start_link(plug: {HTTPServer.Router, %{directory: tmp}}, port: port)
+    url = "http://localhost:#{port}/hls_output/index.m3u8"
+
+    Boombox.run(input: @bbb_mp4, output: url)
+    ref_path = "test/fixtures/ref_bun10s_aac_hls"
+    Compare.compare(tmp, ref_path, format: :hls)
+
+    Enum.zip(
+      Path.join(tmp, "*.mp4") |> Path.wildcard(),
+      Path.join(ref_path, "*.mp4") |> Path.wildcard()
+    )
+    |> Enum.each(fn {output_file, ref_file} ->
+      assert File.read!(output_file) == File.read!(ref_file)
+    end)
+  end
+
   @tag :rtmp_hls
   async_test "rtmp -> hls", %{tmp_dir: tmp} do
     manifest_filename = Path.join(tmp, "index.m3u8")
