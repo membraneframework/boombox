@@ -36,14 +36,7 @@ defmodule Boombox.RTSP do
           spec =
             get_child(:rtsp_source)
             |> via_out(Membrane.Pad.ref(:output, ssrc))
-            |> child(
-              :rtsp_in_h264_parser,
-              %Membrane.H264.Parser{
-                spss: spss,
-                ppss: ppss
-                # generate_best_effort_timestamps: %{framerate: {60, 1}}
-              }
-            )
+            |> child(:rtsp_in_h264_parser, %Membrane.H264.Parser{spss: spss, ppss: ppss})
 
           {:video, spec}
 
@@ -55,6 +48,9 @@ defmodule Boombox.RTSP do
             |> child(:rtsp_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
           {:audio, spec}
+
+        {_ssrc, %{rtpmap: %{encoding: unsupported_encoding}}} ->
+          raise "Received unsupported encoding with RTSP: #{inspect(unsupported_encoding)}"
       end)
 
     %Ready{track_builders: track_builders}

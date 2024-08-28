@@ -60,9 +60,6 @@ defmodule Support.Compare do
 
     assert_pipeline_notified(p, :ref_demuxer, {:new_tracks, ref_tracks})
 
-    # [{audio_id, %Membrane.AAC{}}, {video_id, %Membrane.H264{}}] =
-    # Enum.sort_by(tracks, fn {_id, %format{}} -> format end)
-
     ref_spec =
       Enum.map(ref_tracks, fn
         {id, %Membrane.AAC{}} ->

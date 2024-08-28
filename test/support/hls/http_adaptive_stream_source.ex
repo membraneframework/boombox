@@ -26,7 +26,6 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
         _muxed_header -> :muxed_av
       end
 
-    # %{audio_track: audio_track, video_track: video_track} = get_tracks(opts.directory, hls_mode)
     tracks_map = get_tracks(opts.directory, hls_mode)
 
     %{audio_buffers: audio_buffers, video_buffers: video_buffers} =
