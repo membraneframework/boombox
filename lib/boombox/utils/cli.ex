@@ -2,7 +2,7 @@ defmodule Boombox.Utils.CLI do
   @moduledoc false
 
   @spec parse_argv([String.t()]) ::
-          {:args, input: Boombox.input(), output: Boombox.output()} | {:sript, String.t()}
+          {:args, input: Boombox.input(), output: Boombox.output()} | {:script, String.t()}
   def parse_argv(argv) do
     OptionParser.parse(argv, strict: [script: :string], aliases: [s: :script, S: :script])
     |> case do
@@ -10,10 +10,8 @@ defmodule Boombox.Utils.CLI do
         {:args, parse_args(argv)}
 
       result ->
-        case handle_option_parser_result(result) do
-          [script: script] -> {:script, script}
-          [] -> cli_exit_error()
-        end
+        [script: script] = handle_option_parser_result(result)
+        {:script, script}
     end
   end
 
@@ -64,6 +62,7 @@ defmodule Boombox.Utils.CLI do
     end
   end
 
+  @spec handle_option_parser_result({Keyword.t(), [String.t()], Keyword.t()}) :: Keyword.t()
   defp handle_option_parser_result(result) do
     case result do
       {parsed, [], []} -> parsed
