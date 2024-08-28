@@ -118,9 +118,9 @@ rtsp_port = 8554
     udp_rtcp_port: rtp_server_port + 1
   )
 
-Boombox.run(input: "rtsp://localhost:#{rtsp_port}/livestream", output: {:hls, hls_out_dir})
+Boombox.run(input: "rtsp://localhost:#{rtsp_port}/livestream", output: "#{hls_out_dir}/index.m3u8")
 
-GenServer.stop(server)
+Membrane.RTSP.Server.stop(server)
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
