@@ -60,8 +60,9 @@ defmodule Boombox.HLS do
           {:ok, status, _headers, _ref} when status in 200..299 ->
             :ok
 
-          {:ok, status, _headers, _ref} ->
-            {:error, "DELETE failed with status code #{status}"}
+          {:ok, status, _headers, ref} ->
+            {:ok, body} = :hackney.body(ref)
+            {:error, "DELETE failed with status code #{status}: #{body}"}
 
           error ->
             error
