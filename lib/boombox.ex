@@ -62,9 +62,10 @@ defmodule Boombox do
 
   @spec run_cli([String.t()]) :: :ok
   def run_cli(argv \\ System.argv()) do
-    argv
-    |> Boombox.Utils.CLI.parse_args()
-    |> run()
+    case Boombox.Utils.CLI.parse_argv(argv) do
+      {:args, args} -> run(args)
+      {:script, script} -> Code.eval_file(script)
+    end
   end
 
   @spec parse_opt!(:input, input()) :: input()

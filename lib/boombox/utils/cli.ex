@@ -1,8 +1,23 @@
 defmodule Boombox.Utils.CLI do
   @moduledoc false
 
-  @spec parse_args([String.t()]) :: [input: Boombox.input(), output: Boombox.output()]
-  def parse_args(argv) do
+  @spec parse_argv([String.t()]) ::
+          {:args, input: Boombox.input(), output: Boombox.output()} | {:sript, String.t()}
+  def parse_argv(argv) do
+    OptionParser.parse(argv, strict: [script: :string], aliases: [s: :script, S: :script])
+    |> case do
+      {[], _argv, _switches} ->
+        {:args, parse_args(argv)}
+
+      result ->
+        case handle_option_parser_result(result) do
+          [script: script] -> {:script, script}
+          [] -> cli_exit_error()
+        end
+    end
+  end
+
+  defp parse_args(argv) do
     aliases = [i: :input, o: :output]
     i_type = get_switch_type(argv, :input, aliases)
     o_type = get_switch_type(argv, :output, aliases)
@@ -12,11 +27,8 @@ defmodule Boombox.Utils.CLI do
         Keyword.from_keys([:mp4, :webrtc, :rtmp, :hls, :transport], :string)
 
     {input, output} =
-      case OptionParser.parse(argv, strict: switches, aliases: aliases) do
-        {parsed, [], []} -> parsed
-        {_parsed, _argv, [{s, _v} | _switches]} -> cli_exit_error("unknown option '#{s}'")
-        {_parsed, [arg | _argv], []} -> cli_exit_error("unexpected value '#{arg}'")
-      end
+      OptionParser.parse(argv, strict: switches, aliases: aliases)
+      |> handle_option_parser_result()
       |> case do
         [input: _value] ++ _rest = parsed ->
           Enum.split_while(parsed, fn {k, _v} -> k != :output end)
@@ -49,6 +61,14 @@ defmodule Boombox.Utils.CLI do
       [{direction, true}, {endpoint, value} | opts] -> {direction, {endpoint, value, opts}}
       [{direction, value}] -> {direction, value}
       _other -> cli_exit_error()
+    end
+  end
+
+  defp handle_option_parser_result(result) do
+    case result do
+      {parsed, [], []} -> parsed
+      {_parsed, _argv, [{s, _v} | _switches]} -> cli_exit_error("unexpected option '#{s}'")
+      {_parsed, [arg | _argv], []} -> cli_exit_error("unexpected value '#{arg}'")
     end
   end
 
