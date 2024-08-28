@@ -8,7 +8,7 @@ defmodule Boombox.HLS do
   alias Boombox.Pipeline.Ready
   alias Membrane.{HTTPAdaptiveStream, Time}
 
-  defmodule Uploader do
+  defmodule HTTPUploader do
     @moduledoc false
     use GenServer
 
@@ -92,7 +92,7 @@ defmodule Boombox.HLS do
           %HTTPAdaptiveStream.Storages.FileStorage{directory: directory}
 
         :http ->
-          {:ok, uploader} = GenServer.start_link(Uploader, %{directory: directory})
+          {:ok, uploader} = GenServer.start_link(HTTPUploader, %{directory: directory})
           %HTTPAdaptiveStream.Storages.GenServerStorage{destination: uploader}
       end
 
