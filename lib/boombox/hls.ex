@@ -1,7 +1,15 @@
 defmodule Boombox.HLS do
   @moduledoc false
 
+  import Membrane.ChildrenSpec
+
+  require Membrane.Pad, as: Pad
+
+  alias Boombox.Pipeline.Ready
+  alias Membrane.{HTTPAdaptiveStream, Time}
+
   defmodule Uploader do
+    @moduledoc false
     use GenServer
 
     require Logger
@@ -62,12 +70,6 @@ defmodule Boombox.HLS do
       {:reply, reply, state}
     end
   end
-
-  import Membrane.ChildrenSpec
-
-  require Membrane.Pad, as: Pad
-  alias Boombox.Pipeline.Ready
-  alias Membrane.{HTTPAdaptiveStream, Time}
 
   @spec link_output(
           Path.t(),

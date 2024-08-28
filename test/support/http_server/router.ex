@@ -3,7 +3,6 @@ defmodule HTTPServer.Router do
 
   require Logger
 
-  # plug(:opts)
   plug(:match)
   plug(:dispatch)
 
