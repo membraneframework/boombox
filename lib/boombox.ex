@@ -36,7 +36,12 @@ defmodule Boombox do
 
   @spec run(Enumerable.t(), input: input(), output: output()) :: :ok | Enumerable.t()
   def run(stream \\ nil, opts) do
-    opts = Keyword.validate!(opts, [:input, :output]) |> Map.new()
+    opts_keys = [:input, :output]
+    opts = Keyword.validate!(opts, opts_keys) |> Map.new(fn {k, v} -> {k, parse_opt!(k, v)} end)
+
+    if key = Enum.find(opts_keys, fn k -> not is_map_key(opts, k) end) do
+      raise "#{key} is not provided"
+    end
 
     case opts do
       %{input: {:stream, _in_stream_opts}, output: {:stream, _out_stream_opts}} ->
