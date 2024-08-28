@@ -13,17 +13,15 @@ defmodule HTTPServer.Router do
   end
 
   post "/hls_output/:filename" do
-    hls_dir = conn.assigns.directory
+    file_path = Path.join(conn.assigns.directory, filename)
 
-    file_path = Path.join(hls_dir, filename)
-    conn = write_body_to_file(conn, file_path)
-    send_resp(conn, 200, "File successfully written")
+    conn
+    |> write_body_to_file(file_path)
+    |> send_resp(200, "File successfully written")
   end
 
   delete "/hls_output/:filename" do
-    hls_dir = conn.assigns.directory
-
-    case Path.join(hls_dir, filename) |> File.rm() do
+    case Path.join(conn.assigns.directory, filename) |> File.rm() do
       :ok ->
         send_resp(conn, 200, "File deleted successfully")
 

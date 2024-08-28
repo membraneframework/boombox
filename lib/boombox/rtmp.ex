@@ -4,9 +4,9 @@ defmodule Boombox.RTMP do
   import Membrane.ChildrenSpec
   require Membrane.Logger
   alias Boombox.Pipeline.{Ready, Wait}
-  alias Membrane.{RTMP, RTMPServer}
+  alias Membrane.{RTMP, RTMPServer, UtilitySupervisor}
 
-  @spec create_input(String.t() | pid(), pid()) :: Wait.t()
+  @spec create_input(String.t() | pid(), UtilitySupervisor.t()) :: Wait.t()
   def create_input(client_ref, _utility_supervisor) when is_pid(client_ref) do
     handle_connection(client_ref)
   end

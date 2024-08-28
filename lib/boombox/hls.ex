@@ -6,7 +6,7 @@ defmodule Boombox.HLS do
   require Membrane.Pad, as: Pad
 
   alias Boombox.Pipeline.Ready
-  alias Membrane.{HTTPAdaptiveStream, Time}
+  alias Membrane.{HTTPAdaptiveStream, Time, UtilitySupervisor}
 
   defmodule HTTPUploader do
     @moduledoc false
@@ -15,6 +15,11 @@ defmodule Boombox.HLS do
     require Logger
 
     alias Membrane.HTTPAdaptiveStream.Storages.GenServerStorage
+
+    @spec start_link(directory: String.t()) :: GenServer.on_start()
+    def start_link(config) do
+      GenServer.start_link(__MODULE__, config)
+    end
 
     @impl true
     def init(config) do
@@ -76,9 +81,10 @@ defmodule Boombox.HLS do
           Path.t(),
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t(),
+          UtilitySupervisor.t(),
           transport: :file | :http
         ) :: Ready.t()
-  def link_output(location, track_builders, spec_builder, opts) do
+  def link_output(location, track_builders, spec_builder, utility_supervisor, opts) do
     {directory, manifest_name} =
       if Path.extname(location) == ".m3u8" do
         {Path.dirname(location), Path.basename(location, ".m3u8")}
@@ -92,7 +98,12 @@ defmodule Boombox.HLS do
           %HTTPAdaptiveStream.Storages.FileStorage{directory: directory}
 
         :http ->
-          {:ok, uploader} = GenServer.start_link(HTTPUploader, %{directory: directory})
+          {:ok, uploader} =
+            UtilitySupervisor.start_link_child(
+              utility_supervisor,
+              {HTTPUploader, directory: directory}
+            )
+
           %HTTPAdaptiveStream.Storages.GenServerStorage{destination: uploader}
       end
 
