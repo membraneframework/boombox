@@ -23,7 +23,7 @@ defmodule Boombox.HLS do
 
     @impl true
     def init(config) do
-      {:ok, config}
+      {:ok, %{directory: config[:directory]}}
     end
 
     @impl true
