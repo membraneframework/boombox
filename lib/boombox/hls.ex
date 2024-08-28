@@ -36,17 +36,8 @@ defmodule Boombox.HLS do
       location = Path.join(state.directory, params.name)
 
       reply =
-        case :hackney.request(:post, location, [], params.contents, follow_redirect: true) do
-          {:ok, status, _headers, _ref} when status in 200..299 ->
-            :ok
-
-          {:ok, status, _headers, ref} ->
-            {:ok, body} = :hackney.body(ref)
-            {:error, "POST failed with status code #{status}: #{body}"}
-
-          error ->
-            error
-        end
+        :hackney.request(:post, location, [], params.contents, follow_redirect: true)
+        |> handle_request_result()
 
       {:reply, reply, state}
     end
@@ -56,19 +47,28 @@ defmodule Boombox.HLS do
       location = Path.join(state.directory, params.name)
 
       reply =
-        case :hackney.request(:delete, location, [], <<>>, follow_redirect: true) do
-          {:ok, status, _headers, _ref} when status in 200..299 ->
-            :ok
-
-          {:ok, status, _headers, ref} ->
-            {:ok, body} = :hackney.body(ref)
-            {:error, "DELETE failed with status code #{status}: #{body}"}
-
-          error ->
-            error
-        end
+        :hackney.request(:delete, location, [], <<>>, follow_redirect: true)
+        |> handle_request_result()
 
       {:reply, reply, state}
+    end
+
+    @spec handle_request_result(
+            {:ok, pos_integer(), list(), :hackney.client_ref()}
+            | {:error, term()}
+          ) :: :ok | {:error, term()}
+    defp handle_request_result(result) do
+      case result do
+        {:ok, status, _headers, _ref} when status in 200..299 ->
+          :ok
+
+        {:ok, status, _headers, ref} ->
+          {:ok, body} = :hackney.body(ref)
+          {:error, "Request failed with status code #{status}: #{body}"}
+
+        error ->
+          error
+      end
     end
   end
 
