@@ -8,13 +8,13 @@ defmodule Boombox do
   require Membrane.Time
 
   @type webrtc_opts :: Membrane.WebRTC.SignalingChannel.t() | URI.t()
-  @type in_stream_opts :: [audio: :binary | boolean(), video: :image | boolean()]
+  @type in_stream_opts :: [{:audio, :binary | boolean()} | {:video, :image | boolean()}]
   @type out_stream_opts :: [
-          audio: :binary | boolean(),
-          video: :image | boolean(),
-          audio_format: Membrane.RawAudio.SampleFormat.t(),
-          audio_rate: Membrane.RawAudio.sample_rate_t(),
-          audio_channels: Membrane.RawAudio.channels_t()
+          {:audio, :binary | boolean()}
+          | {:video, :image | boolean()}
+          | {:audio_format, Membrane.RawAudio.SampleFormat.t()}
+          | {:audio_rate, Membrane.RawAudio.sample_rate_t()}
+          | {:audio_channels, Membrane.RawAudio.channels_t()}
         ]
 
   @type file_extension :: :mp4
