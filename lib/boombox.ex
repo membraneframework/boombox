@@ -76,25 +76,27 @@ defmodule Boombox do
     extension = if uri.path, do: Path.extname(uri.path)
 
     case {scheme, extension, direction} do
-      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value, []}
+      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value}
       {nil, ".mp4", :output} -> {:mp4, value}
       {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
       {nil, ".m3u8", :output} -> {:hls, value}
       _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
+    |> then(&parse_opt!(direction, &1))
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp parse_opt!(direction, value) when is_tuple(value) do
     case value do
       {:mp4, location} when is_binary(location) and direction == :input ->
-        {:mp4, location, []}
+        parse_opt!(:input, {:mp4, location, []})
+
+      {:mp4, location, opts} when is_binary(location) and direction == :input ->
+        if Keyword.keyword?(opts),
+          do: {:mp4, location, transport: resolve_transport(location, opts)}
 
       {:mp4, location} when is_binary(location) and direction == :output ->
         {:mp4, location}
-
-      {:mp4, location, opts} when is_binary(location) and direction == :input ->
-        if Keyword.keyword?(opts), do: value
 
       {:webrtc, %Membrane.WebRTC.SignalingChannel{}} ->
         value
@@ -231,5 +233,26 @@ defmodule Boombox do
     end
 
     :ok
+  end
+
+  @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
+  defp resolve_transport(location, opts) do
+    case Keyword.validate!(opts, transport: nil)[:transport] do
+      nil ->
+        uri = URI.new!(location)
+
+        case uri.scheme do
+          nil -> :file
+          "http" -> :http
+          "https" -> :http
+          _other -> raise ArgumentError, "Unsupported URI: #{location}"
+        end
+
+      transport when transport in [:file, :http] ->
+        transport
+
+      transport ->
+        raise ArgumentError, "Invalid transport: #{inspect(transport)}"
+    end
   end
 end

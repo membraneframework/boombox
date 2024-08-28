@@ -8,7 +8,7 @@ defmodule Boombox.MP4 do
   @spec create_input(String.t(), transport: :file | :http) :: Wait.t()
   def create_input(location, opts) do
     spec =
-      case resolve_transport(location, opts) do
+      case opts[:transport] do
         :file ->
           child(:mp4_in_file_source, %Membrane.File.Source{location: location, seekable?: true})
           |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
@@ -76,25 +76,5 @@ defmodule Boombox.MP4 do
       ]
 
     %Ready{actions: [spec: spec]}
-  end
-
-  defp resolve_transport(location, opts) do
-    case Keyword.validate!(opts, transport: nil)[:transport] do
-      nil ->
-        uri = URI.new!(location)
-
-        case uri.scheme do
-          nil -> :file
-          "http" -> :http
-          "https" -> :http
-          _other -> raise ArgumentError, "Unsupported MP4 URI: #{location}"
-        end
-
-      transport when transport in [:file, :http] ->
-        transport
-
-      transport ->
-        raise ArgumentError, "Invalid transport: #{inspect(transport)}"
-    end
   end
 end
