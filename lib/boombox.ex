@@ -7,8 +7,8 @@ defmodule Boombox do
 
   require Membrane.Time
 
-  @type webrtc_opts :: Membrane.WebRTC.SignalingChannel.t() | URI.t()
-  @type in_stream_opts :: [{:audio, :binary | boolean()} | {:video, :image | boolean()}]
+  @type webrtc_signaling :: Membrane.WebRTC.SignalingChannel.t() | String.t()
+  @type in_stream_opts :: [audio: :binary | boolean(), video: :image | boolean()]
   @type out_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
@@ -17,23 +17,18 @@ defmodule Boombox do
           | {:audio_channels, Membrane.RawAudio.channels_t()}
         ]
 
-  @type file_extension :: :mp4
-
   @type input ::
-          URI.t()
-          | Path.t()
-          | {:file, file_extension(), Path.t()}
-          | {:http, file_extension(), URI.t()}
-          | {:webrtc, webrtc_opts()}
-          | {:rtmp, URI.t() | pid()}
+          (path_or_uri :: String.t())
+          | {:mp4, location :: String.t(), transport: :file | :http}
+          | {:webrtc, webrtc_signaling()}
+          | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:stream, in_stream_opts()}
 
   @type output ::
-          URI.t()
-          | Path.t()
-          | {:file, file_extension(), Path.t()}
-          | {:webrtc, webrtc_opts()}
-          | {:hls, Path.t()}
+          (path_or_uri :: String.t())
+          | {:mp4, location :: String.t()}
+          | {:webrtc, webrtc_signaling()}
+          | {:hls, location :: String.t()}
           | {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
@@ -41,7 +36,12 @@ defmodule Boombox do
 
   @spec run(Enumerable.t(), input: input(), output: output()) :: :ok | Enumerable.t()
   def run(stream \\ nil, opts) do
-    opts = Keyword.validate!(opts, [:input, :output]) |> Map.new()
+    opts_keys = [:input, :output]
+    opts = Keyword.validate!(opts, opts_keys) |> Map.new(fn {k, v} -> {k, parse_opt!(k, v)} end)
+
+    if key = Enum.find(opts_keys, fn k -> not is_map_key(opts, k) end) do
+      raise "#{key} is not provided"
+    end
 
     case opts do
       %{input: {:stream, _in_stream_opts}, output: {:stream, _out_stream_opts}} ->
@@ -62,6 +62,68 @@ defmodule Boombox do
         opts
         |> start_pipeline()
         |> await_pipeline()
+    end
+  end
+
+  @spec run_cli([String.t()]) :: :ok
+  def run_cli(argv \\ System.argv()) do
+    case Boombox.Utils.CLI.parse_argv(argv) do
+      {:args, args} -> run(args)
+      {:script, script} -> Code.eval_file(script)
+    end
+  end
+
+  @spec parse_opt!(:input, input()) :: input()
+  @spec parse_opt!(:output, output()) :: output()
+  defp parse_opt!(direction, value) when is_binary(value) do
+    uri = URI.new!(value)
+    scheme = uri.scheme
+    extension = if uri.path, do: Path.extname(uri.path)
+
+    case {scheme, extension, direction} do
+      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value}
+      {nil, ".mp4", :output} -> {:mp4, value}
+      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
+      {nil, ".m3u8", :output} -> {:hls, value}
+      _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
+    end
+    |> then(&parse_opt!(direction, &1))
+  end
+
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
+  defp parse_opt!(direction, value) when is_tuple(value) do
+    case value do
+      {:mp4, location} when is_binary(location) and direction == :input ->
+        parse_opt!(:input, {:mp4, location, []})
+
+      {:mp4, location, opts} when is_binary(location) and direction == :input ->
+        if Keyword.keyword?(opts),
+          do: {:mp4, location, transport: resolve_transport(location, opts)}
+
+      {:mp4, location} when is_binary(location) and direction == :output ->
+        {:mp4, location}
+
+      {:webrtc, %Membrane.WebRTC.SignalingChannel{}} ->
+        value
+
+      {:webrtc, uri} when is_binary(uri) ->
+        value
+
+      {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
+        value
+
+      {:hls, location} when direction == :output and is_binary(location) ->
+        value
+
+      {:stream, opts} ->
+        if Keyword.keyword?(opts), do: value
+
+      _other ->
+        nil
+    end
+    |> case do
+      nil -> raise ArgumentError, "Invalid #{direction} specification: #{inspect(value)}"
+      value -> value
     end
   end
 
@@ -178,25 +240,24 @@ defmodule Boombox do
     :ok
   end
 
-  @spec run_cli([String.t()]) :: :ok
-  def run_cli(args \\ System.argv()) do
-    args =
-      Enum.map(args, fn
-        "-" <> value -> String.to_atom(value)
-        value -> value
-      end)
+  @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
+  defp resolve_transport(location, opts) do
+    case Keyword.validate!(opts, transport: nil)[:transport] do
+      nil ->
+        uri = URI.new!(location)
 
-    run(input: parse_cli_io(:i, args), output: parse_cli_io(:o, args))
-  end
+        case uri.scheme do
+          nil -> :file
+          "http" -> :http
+          "https" -> :http
+          _other -> raise ArgumentError, "Unsupported URI: #{location}"
+        end
 
-  defp parse_cli_io(type, args) do
-    args
-    |> Enum.drop_while(&(&1 != type))
-    |> Enum.drop(1)
-    |> Enum.take_while(&(&1 not in [:i, :o]))
-    |> case do
-      [value] -> value
-      [_h | _t] = values -> List.to_tuple(values)
+      transport when transport in [:file, :http] ->
+        transport
+
+      transport ->
+        raise ArgumentError, "Invalid transport: #{inspect(transport)}"
     end
   end
 end

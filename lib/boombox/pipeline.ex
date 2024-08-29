@@ -24,8 +24,6 @@ defmodule Boombox.Pipeline do
 
   require Membrane.Logger
 
-  @supported_file_extensions %{".mp4" => :mp4, ".m3u8" => :m3u8}
-
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
@@ -99,8 +97,8 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_init(ctx, opts) do
     state = %State{
-      input: parse_input(opts.input),
-      output: parse_output(opts.output),
+      input: opts.input,
+      output: opts.output,
       parent: opts.parent,
       status: :init
     }
@@ -278,8 +276,8 @@ defmodule Boombox.Pipeline do
     Boombox.WebRTC.create_input(signaling)
   end
 
-  defp create_input({storage_type, :mp4, location}, _ctx, _state) do
-    Boombox.MP4.create_input(storage_type, location)
+  defp create_input({:mp4, location, opts}, _ctx, _state) do
+    Boombox.MP4.create_input(location, opts)
   end
 
   defp create_input({:rtmp, src}, ctx, _state) do
@@ -312,7 +310,7 @@ defmodule Boombox.Pipeline do
     Boombox.WebRTC.link_output(track_builders)
   end
 
-  defp link_output({:file, :mp4, location}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:mp4, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 
@@ -322,61 +320,6 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
     Boombox.ElixirStream.link_output(state.parent, opts, track_builders, spec_builder)
-  end
-
-  defp parse_input(input) when is_binary(input) do
-    uri = URI.new!(input)
-
-    case uri do
-      %URI{scheme: nil, path: path} ->
-        {:file, parse_file_extension(path), path}
-
-      %URI{scheme: scheme, path: path} when scheme in ["http", "https"] and path != nil ->
-        {:http, parse_file_extension(path), input}
-
-      %URI{scheme: "rtmp"} ->
-        {:rtmp, input}
-
-      _other ->
-        raise "Unsupported URI: #{input}"
-    end
-  end
-
-  defp parse_input(input) when is_pid(input) do
-    {:rtmp, input}
-  end
-
-  defp parse_input(input) when is_tuple(input) do
-    input
-  end
-
-  defp parse_output(output) when is_binary(output) do
-    uri = URI.new!(output)
-
-    case uri do
-      %URI{scheme: nil, path: path} when path != nil ->
-        case parse_file_extension(path) do
-          :m3u8 -> {:hls, path}
-          file_type -> {:file, file_type, path}
-        end
-
-      _other ->
-        raise "Unsupported URI: #{output}"
-    end
-  end
-
-  defp parse_output(output) when is_tuple(output) do
-    output
-  end
-
-  @spec parse_file_extension(Path.t()) :: Boombox.file_extension() | :m3u8
-  defp parse_file_extension(path) do
-    extension = Path.extname(path)
-
-    case @supported_file_extensions do
-      %{^extension => file_type} -> file_type
-      _no_match -> raise "Unsupported file extension: #{extension}"
-    end
   end
 
   # Wait between sending the last packet
