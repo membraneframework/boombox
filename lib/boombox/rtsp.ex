@@ -4,7 +4,8 @@ defmodule Boombox.RTSP do
 
   require Membrane.Pad
 
-  alias Membrane.{RTSP, RTP}
+  require Membrane.Logger
+  alias Membrane.{RTP, RTSP}
   alias Boombox.Pipeline.{Ready, State, Wait}
 
   @spec create_input(URI.t()) :: Wait.t()
@@ -41,6 +42,11 @@ defmodule Boombox.RTSP do
     {spec, track_builders} =
       case track do
         %{type: type} when is_map_key(track_builders, type) ->
+          Membrane.Logger.warning(
+            "Tried to link a track of type #{inspect(type)}, but another track
+            of that type has already been received"
+          )
+
           spec =
             get_child(:rtsp_source)
             |> via_out(Membrane.Pad.ref(:output, ssrc))
