@@ -103,14 +103,23 @@ defmodule Boombox.Mixfile do
   end
 
   defp releases() do
-    if burrito?() do
-      burrito_releases()
-    else
-      []
-    end
+    {burrito_wrap, burrito_config} =
+      if burrito?() do
+        {&Burrito.wrap/1, burrito_config()}
+      else
+        {& &1, []}
+      end
+
+    [
+      boombox:
+        [
+          steps: [:assemble, &restore_symlinks/1, burrito_wrap]
+        ] ++
+          burrito_config
+    ]
   end
 
-  defp burrito_releases() do
+  defp burrito_config() do
     current_os =
       case :os.type() do
         {:win32, _} -> :windows
@@ -134,14 +143,47 @@ defmodule Boombox.Mixfile do
       end
 
     [
-      boombox: [
-        steps: [:assemble, &Burrito.wrap/1],
-        burrito: [
-          targets: [
-            current: [os: current_os, cpu: current_cpu]
-          ]
+      burrito: [
+        targets: [
+          current: [os: current_os, cpu: current_cpu]
         ]
       ]
     ]
+  end
+
+  # mix release doesn't preserve symlinks, but replaces
+  # them with whatever they point to, while
+  # bundlex uses symlinks to provide precompiled deps.
+  # That makes the release size enormous, so this workaroud
+  # recreates the symlinks by replacing the copied data
+  # with new symlinks pointing to bundlex's
+  # priv/shared/precompiled directory
+  defp restore_symlinks(release) do
+    base_dir = "#{__DIR__}/_build/dev/rel/boombox/lib"
+
+    shared =
+      Path.wildcard("#{base_dir}/bundlex*/priv/shared/precompiled/*")
+      |> Enum.map(&Path.relative_to(&1, base_dir))
+      |> Map.new(&{Path.basename(&1), &1})
+
+    Path.wildcard("#{base_dir}/*/priv/bundlex/*/*")
+    |> Enum.each(fn path ->
+      name = Path.basename(path)
+
+      case shared[name] do
+        nil ->
+          :ok
+
+        shared_dir ->
+          File.rm_rf!(path)
+          depth = path |> Path.relative_to(base_dir) |> Path.split() |> length()
+          ln = String.duplicate("../", depth - 1) <> shared_dir
+          dbg(path)
+          dbg(ln)
+          File.ln_s!(ln, path)
+      end
+    end)
+
+    release
   end
 end
