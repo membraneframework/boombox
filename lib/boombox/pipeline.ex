@@ -63,7 +63,8 @@ defmodule Boombox.Pipeline do
                   spec_builder: [],
                   track_builders: nil,
                   last_result: nil,
-                  eos_info: nil
+                  eos_info: nil,
+                  rtsp_state: %{set_up_tracks: %{}, tracks_left_to_link: 0, track_builders: %{}}
                 ]
 
     @typedoc """
@@ -91,7 +92,15 @@ defmodule Boombox.Pipeline do
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
-            eos_info: term()
+            eos_info: term(),
+            rtsp_state: %{
+              set_up_tracks: %{
+                optional(:audio) => Membrane.RTSP.Source.track(),
+                optional(:video) => Membrane.RTSP.Source.track()
+              },
+              tracks_left_to_link: non_neg_integer(),
+              track_builders: Boombox.Pipeline.track_builders()
+            }
           }
   end
 
@@ -113,9 +122,15 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_child_notification({:new_tracks, tracks}, :rtsp_source, ctx, state) do
-    Boombox.RTSP.handle_input_tracks(tracks)
-    |> proceed_result(ctx, state)
+  def handle_child_notification({:set_up_tracks, tracks}, :rtsp_source, ctx, state) do
+    {result, state} = Boombox.RTSP.handle_set_up_tracks(tracks, state)
+    proceed_result(result, ctx, state)
+  end
+
+  @impl true
+  def handle_child_notification({:new_track, ssrc, track}, :rtsp_source, ctx, state) do
+    {result, state} = Boombox.RTSP.handle_input_track(ssrc, track, state)
+    proceed_result(result, ctx, state)
   end
 
   @impl true
