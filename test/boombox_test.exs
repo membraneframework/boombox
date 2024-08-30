@@ -25,6 +25,15 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
+  @tag :file_file_file_mp4
+  async_test "mp4 file -> mp4 file -> mp4 file", %{tmp_dir: tmp} do
+    mid_output = Path.join(tmp, "mid_output.mp4")
+    Boombox.run(input: @bbb_mp4, output: mid_output)
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: mid_output, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac2.mp4")
+  end
+
   @tag :file_file_mp4_audio
   async_test "mp4 file -> mp4 file audio", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
