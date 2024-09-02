@@ -86,7 +86,7 @@ defmodule Boombox do
       {nil, ".mp4", :output} -> {:mp4, value}
       {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
       {"rtsp", _ext, :input} -> {:rtsp, value}
-      {nil, ".m3u8", :output} -> {:hls, value}
+      {scheme, ".m3u8", :output} when scheme in [nil, "http", "https"] -> {:hls, value}
       _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
     |> then(&parse_opt!(direction, &1))
