@@ -1,2 +1,2 @@
 #/bin/sh
-elixir -e 'Logger.configure(level: :warning);Mix.install([{:boombox, github: "membraneframework-labs/boombox"}]);Boombox.run_cli()' $@
+elixir -e 'Logger.configure(level: :info);Mix.install([{:boombox, github: "membraneframework-labs/boombox"}]);Boombox.run_cli()' $@
