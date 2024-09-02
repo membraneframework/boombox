@@ -6,6 +6,8 @@ Logger.configure(level: :info)
 # For ffmpeg and ffplay commands to work on Mac Livebook Desktop
 System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 
+# In case of problems installing EXLA, you can remove it and comment out the Nx backend config.
+# Examples should still work, except for speech to text.
 Mix.install([{:boombox, github: "membraneframework-labs/boombox"}, :kino, :nx, :exla, :bumblebee])
 
 Nx.global_default_backend(EXLA.Backend)
@@ -13,7 +15,9 @@ Nx.global_default_backend(EXLA.Backend)
 
 ## Boombox
 
-Assets setup
+👋 Here are some examples of using Boombox. Some of them use [ffmpeg](https://www.ffmpeg.org/) to generate stream. Some use [ffplay](https://www.ffmpeg.org/ffplay.html) to playback generated videos, but you can use any other player, for example VLC.
+
+The cell below downloads assets to be used in the examples, and runs an HTTP server on port `1234` that serves static HTML files for sending/receiving the stream in the browser.
 
 ```elixir
 data_dir = "/tmp/boombox_examples_data"
@@ -30,7 +34,8 @@ unless File.exists?("#{input_dir}/bun.mp4") do
   File.write!("#{input_dir}/bun.mp4", bbb_mp4)
 end
 
-assets_url = "https://raw.githubusercontent.com/membraneframework-labs/boombox/dev/boombox_examples_data"
+assets_url =
+  "https://raw.githubusercontent.com/membraneframework-labs/boombox/dev/boombox_examples_data"
 
 for asset <- ["hls", "webrtc_from_browser", "webrtc_to_browser"],
     path = "#{data_dir}/#{asset}.html",
@@ -56,32 +61,21 @@ end
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## MP4 to WebRTC
+## WebRTC proxy
 
-To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below
+Visit http://localhost:1234/webrtc_from_browser.html to send the stream and http://localhost:1234/webrtc_to_browser.html to receive it
 
 ```elixir
-Boombox.run(input: "#{input_dir}/bun.mp4", output: {:webrtc, "ws://localhost:8830"})
+Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://localhost:8830"})
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## MP4 via HTTP to WebRTC
+## Record WebRTC to MP4
 
-To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below
+To send the stream, visit http://localhost:1234/webrtc_from_browser.html.
 
-```elixir
-Boombox.run(
-  input: "#{samples_url}/big-buck-bunny/bun33s.mp4",
-  output: {:webrtc, "ws://localhost:8830"}
-)
-```
-
-<!-- livebook:{"branch_parent_index":0} -->
-
-## WebRTC to MP4
-
-To send the stream, visit http://localhost:1234/webrtc_from_browser.html
+Note: don't stop this cell to finish recording - click 'disconnect' or close the browser tab instead, so the recording is finalized properly.
 
 ```elixir
 Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
@@ -93,17 +87,7 @@ System.shell("ffplay #{out_dir}/webrtc_to_mp4.mp4")
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## WebRTC to WebRTC
-
-Visit http://localhost:1234/webrtc_from_browser.html to send the stream and http://localhost:1234/webrtc_to_browser.html to receive it
-
-```elixir
-Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://localhost:8830"})
-```
-
-<!-- livebook:{"branch_parent_index":0} -->
-
-## MP4 to HLS
+## Broadcast MP4 via HLS
 
 To receive the stream, visit http://localhost:1234/hls.html after running the cell below
 
@@ -113,7 +97,7 @@ Boombox.run(input: "#{input_dir}/bun.mp4", output: {:hls, "#{out_dir}/index.m3u8
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## RTMP to HLS
+## Broadcast RTMP via HLS
 
 To receive the stream, visit http://localhost:1234/hls.html after running the cell below
 
@@ -148,7 +132,8 @@ Kino.start_child!({
 
     Kino.Markdown.new("""
     New streamer connects with app #{app} and stream_key #{stream_key},
-    stream will be available at http://localhost:1234/hls.html?src=output/#{stream_key}/index.m3u8
+    stream will be available at http://localhost:1234/hls.html?src=output/#{stream_key}/index.m3u8.
+    It may take a few seconds before the stream is playable.
     """)
     |> Kino.render()
   end,
@@ -171,68 +156,7 @@ end)
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## RTMP to WebRTC
-
-To receive the stream, visit http://localhost:1234/webrtc_to_browser.html
-
-```elixir
-uri = "rtmp://localhost:5432"
-
-t =
-  Task.async(fn ->
-    Boombox.run(input: uri, output: {:webrtc, "ws://localhost:8830"})
-  end)
-
-{_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
-
-Task.await(t)
-```
-
-<!-- livebook:{"branch_parent_index":0} -->
-
-## RTMP to MP4
-
-```elixir
-uri = "rtmp://localhost:5432"
-
-t =
-  Task.async(fn ->
-    Boombox.run(input: uri, output: "#{out_dir}/rtmp_to_mp4.mp4")
-  end)
-
-{_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
-
-Task.await(t)
-```
-
-```elixir
-System.shell("ffplay #{out_dir}/rtmp_to_mp4.mp4")
-```
-
-<!-- livebook:{"branch_parent_index":0} -->
-
-## MP4 via WebRTC to MP4
-
-```elixir
-signaling = Membrane.WebRTC.SignalingChannel.new()
-
-t =
-  Task.async(fn ->
-    Boombox.run(input: "#{input_dir}/bun.mp4", output: {:webrtc, signaling})
-  end)
-
-Boombox.run(input: {:webrtc, signaling}, output: "#{out_dir}/mp4_webrtc_mp4.mp4")
-
-Task.await(t)
-```
-
-```elixir
-System.shell("ffplay #{out_dir}/mp4_webrtc_mp4.mp4")
-```
-
-<!-- livebook:{"branch_parent_index":0} -->
-
-## MP4 speech to text
+## Read speech audio from MP4 chunk-by-chunk, generate transcription
 
 ```elixir
 {:ok, whisper} = Bumblebee.load_model({:hf, "openai/whisper-tiny"})
@@ -268,7 +192,7 @@ end)
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## WebRTC speech to text
+## Receive speech audio via WebRTC, generate live transcription
 
 To send the stream, visit http://localhost:1234/webrtc_from_browser.html
 
@@ -306,7 +230,7 @@ end)
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## Bouncing logo
+## Generate a bouncing logo video, stream it via WebRTC
 
 To receive the stream, visit http://localhost:1234/webrtc_to_browser.html
 
@@ -334,6 +258,94 @@ end)
 end)
 |> Boombox.run(
   input: {:stream, video: :image, audio: false},
+  output: {:webrtc, "ws://localhost:8830"}
+)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Forward RTMP via WebRTC
+
+To receive the stream, visit http://localhost:1234/webrtc_to_browser.html
+
+```elixir
+uri = "rtmp://localhost:5432"
+
+t =
+  Task.async(fn ->
+    Boombox.run(input: uri, output: {:webrtc, "ws://localhost:8830"})
+  end)
+
+{_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
+
+Task.await(t)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Record RTMP to MP4
+
+```elixir
+uri = "rtmp://localhost:5432"
+
+t =
+  Task.async(fn ->
+    Boombox.run(input: uri, output: "#{out_dir}/rtmp_to_mp4.mp4")
+  end)
+
+{_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
+
+Task.await(t)
+```
+
+```elixir
+System.shell("ffplay #{out_dir}/rtmp_to_mp4.mp4")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Stream MP4 via WebRTC, receive it and record to MP4 again
+
+```elixir
+signaling = Membrane.WebRTC.SignalingChannel.new()
+
+t =
+  Task.async(fn ->
+    Boombox.run(input: "#{input_dir}/bun.mp4", output: {:webrtc, signaling})
+  end)
+
+Boombox.run(input: {:webrtc, signaling}, output: "#{out_dir}/mp4_webrtc_mp4.mp4")
+
+Task.await(t)
+```
+
+```elixir
+System.shell("ffplay #{out_dir}/mp4_webrtc_mp4.mp4")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Stream MP4 via WebRTC
+
+To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below.
+
+Note: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
+
+```elixir
+Boombox.run(input: "#{input_dir}/bun.mp4", output: {:webrtc, "ws://localhost:8830"})
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Stream MP4 via HTTP, forward it via WebRTC
+
+To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below.
+
+Note: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
+
+```elixir
+Boombox.run(
+  input: "#{samples_url}/big-buck-bunny/bun33s.mp4",
   output: {:webrtc, "ws://localhost:8830"}
 )
 ```

@@ -4,7 +4,7 @@
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/boombox)
 [![CircleCI](https://circleci.com/gh/membraneframework/boombox.svg?style=svg)](https://circleci.com/gh/membraneframework/boombox)
 
-Boombox is a high-level tool for audio & video streaming based on the [Membrane Framework](https://membrane.stream).
+Boombox is a high-level tool for audio & video streaming tool based on the [Membrane Framework](https://membrane.stream).
 
 
 The code below receives a stream via RTMP and sends it over HLS:
@@ -52,7 +52,12 @@ end)
 ```
 
 To receive WebRTC/HLS from boombox in a browser or send WebRTC from a browser to boombox
-you can use simple HTML examples in the `boombox_examples_data` folder.
+you can use simple HTML examples in the `boombox_examples_data` folder, for example
+
+```
+wget https://raw.githubusercontent.com/membraneframework-labs/boombox/dev/boombox_examples_data/webrtc_to_browser.html
+open webrtc_to_browser.html
+```
 
 For more examples, see `examples.livemd`.
 
@@ -63,7 +68,6 @@ format | direction
 MP4 | input, output
 WebRTC | input, output 
 RTMP | input
-RTSP | input
 HLS | output
 Elixir Stream | input, output
 
@@ -81,6 +85,7 @@ to use via CLI, run the following:
 
 ```
 wget https://raw.githubusercontent.com/membraneframework-labs/boombox/dev/bin/boombox
+chmod u+x boombox
 ./boombox
 ```
 
@@ -112,7 +117,7 @@ The first run of the CLI may take longer than usual, as the necessary artifacts 
 
 ## Copyright and License
 
-Copyright 2020, [Software Mansion](https://swmansion.com/?utm_source=git&utm_medium=readme&utm_campaign=boombox)
+Copyright 2024, [Software Mansion](https://swmansion.com/?utm_source=git&utm_medium=readme&utm_campaign=boombox)
 
 [![Software Mansion](https://logo.swmansion.com/logo?color=white&variant=desktop&width=200&tag=membrane-github)](https://swmansion.com/?utm_source=git&utm_medium=readme&utm_campaign=boombox)
 
