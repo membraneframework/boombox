@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" style="font-family: arial; color: white; background-color: black; margin: 0;">
+
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script>
+        function play() {
+            var video = document.getElementById('player');
+            var hls = new Hls();
+            hls.loadSource(document.querySelector("#source").value);
+            hls.attachMedia(video);
+        }
+    </script>
+    <h1>Boombox HLS Example</h1>
+    Source:<br>
+    <input type="text" id="source" value="output/index.m3u8" style="width:400px">&ensp;
+    <button id="play" onclick="play()">Play</button><br><br>
+    <video id="player" autoplay muted controls></video>
+    <script>
+        const source = document.querySelector("#source");
+        source.value = new URLSearchParams(window.location.search).get("src") || "output/index.m3u8";
+        play();
+    </script>
+</body>
+
+</html>

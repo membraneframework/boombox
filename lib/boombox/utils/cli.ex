@@ -83,7 +83,7 @@ defmodule Boombox.Utils.CLI do
     Examples:
 
     boombox -i rtmp://localhost:5432 -o output/index.m3u8
-    boombox -i file.mp4 -o --webrtc ws://localhost:1234
+    boombox -i file.mp4 -o --webrtc ws://localhost:8830
     """)
 
     System.halt(1)
