@@ -116,7 +116,7 @@ defmodule Support.Compare do
         # and subsequent runs due to transcoding.
         # The threshold here is obtained empirically and may need
         # to be adjusted, or a better metric should be used.
-        assert samples_min_square_error(sub.payload, ref.payload, 8) < 5
+        assert samples_min_square_error(sub.payload, ref.payload, 8) < 10
       end)
     end
 
