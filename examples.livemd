@@ -6,30 +6,34 @@ Logger.configure(level: :info)
 # For ffmpeg and ffplay commands to work on Mac Livebook Desktop
 System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 
-Mix.install([{:boombox, path: __DIR__, env: :test}, :kino])
+Mix.install([{:boombox, path: __DIR__, env: :test}, :kino, :nx, :exla, :bumblebee])
+
+Nx.global_default_backend(EXLA.Backend)
 ```
 
 ## Boombox
 
-```elixir
-:ok = :inets.start()
-
-{:ok, _server} =
-  :inets.start(:httpd,
-    bind_address: ~c"localhost",
-    port: 1234,
-    document_root: ~c"#{__DIR__}/examples_assets",
-    server_name: ~c"assets_server",
-    server_root: "/tmp",
-    erl_script_nocache: true
-  )
-```
+Assets setup
 
 ```elixir
-bbb_mp4_url = "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s.mp4"
-bbb_mp4 = "#{__DIR__}/test/fixtures/bun10s.mp4"
+input_dir = "#{__DIR__}/test/fixtures"
 out_dir = "#{__DIR__}/examples_outputs"
-hls_out_dir = "#{__DIR__}/examples_assets/hls/hls_output"
+
+# HTTP server for assets
+:inets.start()
+
+:inets.start(:httpd,
+  bind_address: ~c"localhost",
+  port: 1234,
+  document_root: ~c"#{__DIR__}/examples_assets",
+  server_name: ~c"assets_server",
+  server_root: "/tmp",
+  erl_script_nocache: true
+)
+|> case do
+  {:ok, _server} -> :ok
+  {:error, {:already_started, _server}} -> :ok
+end
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -39,7 +43,7 @@ hls_out_dir = "#{__DIR__}/examples_assets/hls/hls_output"
 To receive the stream, visit http://localhost:1234/stream_to_browser/index.html after running the cell below
 
 ```elixir
-Boombox.run(input: bbb_mp4, output: {:webrtc, "ws://localhost:8830"})
+Boombox.run(input: "#{input_dir}/bun10s.mp4", output: {:webrtc, "ws://localhost:8830"})
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -80,16 +84,14 @@ Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://loc
 
 ## MP4 to HLS
 
-```elixir
-__DIR__
-```
-
 To receive the stream, visit http://localhost:1234/hls/stream.html after running the cell below
 
 ```elixir
+hls_out_dir = "#{__DIR__}/examples_assets/hls/hls_output"
+
 "#{hls_out_dir}/*" |> Path.wildcard() |> Enum.each(&File.rm!/1)
 
-Boombox.run(input: bbb_mp4, output: {:hls, hls_out_dir})
+Boombox.run(input: "#{input_dir}/bun10s.mp4", output: {:hls, hls_out_dir})
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -99,6 +101,7 @@ Boombox.run(input: bbb_mp4, output: {:hls, hls_out_dir})
 To receive the stream, visit http://localhost:1234/hls/stream.html after running the cell below
 
 ```elixir
+hls_out_dir = "#{__DIR__}/examples_assets/hls/hls_output"
 
 "#{hls_out_dir}/*" |> Path.wildcard() |> Enum.each(&File.rm!/1)
 
@@ -169,7 +172,7 @@ signaling = Membrane.WebRTC.SignalingChannel.new()
 
 t =
   Task.async(fn ->
-    Boombox.run(input: bbb_mp4, output: {:webrtc, signaling})
+    Boombox.run(input: "#{input_dir}/bun10s.mp4", output: {:webrtc, signaling})
   end)
 
 Boombox.run(input: {:webrtc, signaling}, output: "#{out_dir}/mp4_webrtc_mp4.mp4")
@@ -179,4 +182,112 @@ Task.await(t)
 
 ```elixir
 System.shell("ffplay #{out_dir}/mp4_webrtc_mp4.mp4")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## MP4 speech to text
+
+```elixir
+{:ok, whisper} = Bumblebee.load_model({:hf, "openai/whisper-tiny"})
+{:ok, featurizer} = Bumblebee.load_featurizer({:hf, "openai/whisper-tiny"})
+{:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "openai/whisper-tiny"})
+{:ok, generation_config} = Bumblebee.load_generation_config({:hf, "openai/whisper-tiny"})
+
+serving =
+  Bumblebee.Audio.speech_to_text_whisper(
+    whisper,
+    featurizer,
+    tokenizer,
+    generation_config,
+    defn_options: [compiler: EXLA]
+  )
+
+Boombox.run(
+  input: "#{input_dir}/sherlock.mp4",
+  output:
+    {:stream,
+     video: false, audio: :binary, audio_rate: 16_000, audio_channels: 1, audio_format: :f32le}
+)
+|> Stream.map(&Nx.from_binary(&1.payload, :f32))
+|> Stream.chunk_every(200)
+|> Enum.each(fn chunk ->
+  batch = Nx.concatenate(chunk)
+
+  Nx.Serving.run(serving, batch).chunks
+  |> Enum.map_join(& &1.text)
+  |> IO.puts()
+end)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## WebRTC speech to text
+
+To send the stream, visit http://localhost:1234/stream_from_browser/index.html
+
+```elixir
+{:ok, whisper} = Bumblebee.load_model({:hf, "openai/whisper-tiny"})
+{:ok, featurizer} = Bumblebee.load_featurizer({:hf, "openai/whisper-tiny"})
+{:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "openai/whisper-tiny"})
+{:ok, generation_config} = Bumblebee.load_generation_config({:hf, "openai/whisper-tiny"})
+
+serving =
+  Bumblebee.Audio.speech_to_text_whisper(
+    whisper,
+    featurizer,
+    tokenizer,
+    generation_config,
+    defn_options: [compiler: EXLA]
+  )
+
+Boombox.run(
+  input: {:webrtc, "ws://localhost:8829"},
+  output:
+    {:stream,
+     video: false, audio: :binary, audio_rate: 16_000, audio_channels: 1, audio_format: :f32le}
+)
+|> Stream.map(&Nx.from_binary(&1.payload, :f32))
+|> Stream.chunk_every(200)
+|> Enum.each(fn chunk ->
+  batch = Nx.concatenate(chunk)
+
+  Nx.Serving.run(serving, batch).chunks
+  |> Enum.map_join(& &1.text)
+  |> IO.puts()
+end)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Bouncing logo
+
+To receive the stream, visit http://localhost:1234/stream_to_browser/index.html
+
+```elixir
+overlay =
+  Req.get!("https://avatars.githubusercontent.com/u/25247695?s=200&v=4").body
+  |> Vix.Vips.Image.new_from_buffer()
+  |> then(fn {:ok, img} -> img end)
+  |> Image.trim!()
+  |> Image.thumbnail!(100)
+
+bg = Image.new!(640, 480, color: :light_gray)
+max_x = Image.width(bg) - Image.width(overlay)
+max_y = Image.height(bg) - Image.height(overlay)
+
+Stream.iterate({_x = 300, _y = 0, _dx = 1, _dy = 2, _pts = 0}, fn {x, y, dx, dy, pts} ->
+  dx = if (x + dx) in 0..max_x, do: dx, else: -dx
+  dy = if (y + dy) in 0..max_y, do: dy, else: -dy
+  pts = pts + div(Membrane.Time.seconds(1), _fps = 60)
+  {x + dx, y + dy, dx, dy, pts}
+end)
+|> Stream.map(fn {x, y, _dx, _dy, pts} ->
+  img = Image.compose!(bg, overlay, x: x, y: y)
+  %Boombox.Packet{kind: :video, payload: img, pts: pts}
+end)
+|> Boombox.run(
+  input: {:stream, video: :image, audio: false},
+  output: {:webrtc, "ws://localhost:8830"}
+)
 ```

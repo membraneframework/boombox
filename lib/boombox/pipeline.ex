@@ -24,8 +24,6 @@ defmodule Boombox.Pipeline do
 
   require Membrane.Logger
 
-  @supported_file_extensions %{".mp4" => :mp4, ".m3u8" => :m3u8}
-
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
@@ -55,7 +53,7 @@ defmodule Boombox.Pipeline do
   defmodule State do
     @moduledoc false
 
-    @enforce_keys [:status, :input, :output]
+    @enforce_keys [:status, :input, :output, :parent]
 
     defstruct @enforce_keys ++
                 [
@@ -100,15 +98,17 @@ defmodule Boombox.Pipeline do
               },
               tracks_left_to_link: non_neg_integer(),
               track_builders: Boombox.Pipeline.track_builders()
-            }
+            },
+            parent: pid()
           }
   end
 
   @impl true
   def handle_init(ctx, opts) do
     state = %State{
-      input: opts |> Keyword.fetch!(:input) |> parse_input(),
-      output: opts |> Keyword.fetch!(:output) |> parse_output(),
+      input: opts.input,
+      output: opts.output,
+      parent: opts.parent,
       status: :init
     }
 
@@ -196,6 +196,17 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_element_end_of_stream(:elixir_stream_sink, Pad.ref(:input, id), _ctx, state) do
+    eos_info = List.delete(state.eos_info, id)
+    state = %{state | eos_info: eos_info}
+
+    case eos_info do
+      [] -> {[terminate: :normal], state}
+      _eos_info -> {[], state}
+    end
+  end
+
+  @impl true
   def handle_element_end_of_stream(_element, _pad, _ctx, state) do
     {[], state}
   end
@@ -223,12 +234,12 @@ defmodule Boombox.Pipeline do
   @spec proceed(Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Membrane.Pipeline.callback_return()
   defp proceed(ctx, %{status: :init} = state) do
-    create_output(state.output, ctx)
+    create_output(state.output, ctx, state)
     |> do_proceed(:output_ready, :awaiting_output, ctx, state)
   end
 
   defp proceed(ctx, %{status: :output_ready} = state) do
-    create_input(state.input, ctx)
+    create_input(state.input, ctx, state)
     |> do_proceed(:input_ready, :awaiting_input, ctx, state)
   end
 
@@ -242,7 +253,7 @@ defmodule Boombox.Pipeline do
        when track_builders != nil do
     state = %{state | track_builders: track_builders, spec_builder: spec_builder}
 
-    link_output(state.output, track_builders, spec_builder, ctx)
+    link_output(state.output, track_builders, spec_builder, ctx, state)
     |> do_proceed(:output_linked, :awaiting_output_link, ctx, state)
   end
 
@@ -280,31 +291,35 @@ defmodule Boombox.Pipeline do
     end
   end
 
-  @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t()) ::
+  @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
-  defp create_input({:webrtc, signaling}, _ctx) do
+  defp create_input({:webrtc, signaling}, _ctx, _state) do
     Boombox.WebRTC.create_input(signaling)
   end
 
-  defp create_input({storage_type, :mp4, location}, _ctx) do
-    Boombox.MP4.create_input(storage_type, location)
+  defp create_input({:mp4, location, opts}, _ctx, _state) do
+    Boombox.MP4.create_input(location, opts)
   end
 
-  defp create_input({:rtmp, src}, ctx) do
+  defp create_input({:rtmp, src}, ctx, _state) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
 
-  defp create_input({:rtsp, uri}, _ctx) do
+  defp create_input({:rtsp, uri}, _ctx, _state) do
     Boombox.RTSP.create_input(uri)
   end
 
-  @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t()) ::
+  defp create_input({:stream, params}, _ctx, state) do
+    Boombox.ElixirStream.create_input(state.parent, params)
+  end
+
+  @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
-  defp create_output({:webrtc, signaling}, _ctx) do
+  defp create_output({:webrtc, signaling}, _ctx, _state) do
     Boombox.WebRTC.create_output(signaling)
   end
 
-  defp create_output(_output, _ctx) do
+  defp create_output(_output, _ctx, _state) do
     %Ready{}
   end
 
@@ -312,77 +327,24 @@ defmodule Boombox.Pipeline do
           Boombox.output(),
           track_builders(),
           Membrane.ChildrenSpec.t(),
-          Membrane.Pipeline.CallbackContext.t()
+          Membrane.Pipeline.CallbackContext.t(),
+          State.t()
         ) ::
           Ready.t() | Wait.t()
-  defp link_output({:webrtc, _signaling}, track_builders, _spec_builder, _ctx) do
+  defp link_output({:webrtc, _signaling}, track_builders, _spec_builder, _ctx, _state) do
     Boombox.WebRTC.link_output(track_builders)
   end
 
-  defp link_output({:file, :mp4, location}, track_builders, spec_builder, _ctx) do
+  defp link_output({:mp4, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
   end
 
-  defp link_output({:hls, location}, track_builders, spec_builder, _ctx) do
+  defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.HLS.link_output(location, track_builders, spec_builder)
   end
 
-  defp parse_input(input) when is_binary(input) do
-    uri = URI.new!(input)
-
-    case uri do
-      %URI{scheme: nil, path: path} ->
-        {:file, parse_file_extension(path), path}
-
-      %URI{scheme: scheme, path: path} when scheme in ["http", "https"] and path != nil ->
-        {:http, parse_file_extension(path), input}
-
-      %URI{scheme: "rtmp"} ->
-        {:rtmp, input}
-
-      %URI{scheme: "rtsp"} ->
-        {:rtsp, input}
-
-      _other ->
-        raise "Unsupported URI: #{input}"
-    end
-  end
-
-  defp parse_input(input) when is_pid(input) do
-    {:rtmp, input}
-  end
-
-  defp parse_input(input) when is_tuple(input) do
-    input
-  end
-
-  defp parse_output(output) when is_binary(output) do
-    uri = URI.new!(output)
-
-    case uri do
-      %URI{scheme: nil, path: path} when path != nil ->
-        case parse_file_extension(path) do
-          :m3u8 -> {:hls, path}
-          file_type -> {:file, file_type, path}
-        end
-
-      _other ->
-        raise "Unsupported URI: #{output}"
-    end
-  end
-
-  defp parse_output(output) when is_tuple(output) do
-    output
-  end
-
-  @spec parse_file_extension(Path.t()) :: Boombox.file_extension() | :m3u8
-  defp parse_file_extension(path) do
-    extension = Path.extname(path)
-
-    case @supported_file_extensions do
-      %{^extension => file_type} -> file_type
-      _no_match -> raise "Unsupported file extension: #{extension}"
-    end
+  defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
+    Boombox.ElixirStream.link_output(state.parent, opts, track_builders, spec_builder)
   end
 
   # Wait between sending the last packet

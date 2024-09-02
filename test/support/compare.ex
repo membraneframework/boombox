@@ -72,6 +72,8 @@ defmodule Support.Compare do
         {id, %Membrane.H264{}} ->
           get_child(:ref_demuxer)
           |> via_out(Pad.ref(:output, id))
+          |> child(%Membrane.H264.Parser{output_stream_structure: :annexb})
+          |> child(Membrane.H264.FFmpeg.Decoder)
           |> child(:ref_video_bufs, GetBuffers)
       end)
 
@@ -95,6 +97,8 @@ defmodule Support.Compare do
 
           get_child(:sub_demuxer)
           |> via_out(Pad.ref(:output, id))
+          |> child(%Membrane.H264.Parser{output_stream_structure: :annexb})
+          |> child(Membrane.H264.FFmpeg.Decoder)
           |> child(:sub_video_bufs, GetBuffers)
       end)
 
@@ -108,7 +112,11 @@ defmodule Support.Compare do
 
       Enum.zip(sub_video_bufs, ref_video_bufs)
       |> Enum.each(fn {sub, ref} ->
-        assert sub.payload == ref.payload
+        # The results differ between operating systems
+        # and subsequent runs due to transcoding.
+        # The threshold here is obtained empirically and may need
+        # to be adjusted, or a better metric should be used.
+        assert samples_min_square_error(sub.payload, ref.payload, 8) < 5
       end)
     end
 
@@ -124,17 +132,21 @@ defmodule Support.Compare do
         # and subsequent runs due to transcoding.
         # The threshold here is obtained empirically and may need
         # to be adjusted, or a better metric should be used.
-        assert samples_min_square_error(sub.payload, ref.payload) < 30_000
+        assert samples_min_square_error(sub.payload, ref.payload, 16) < 30_000
       end)
     end
 
     Testing.Pipeline.terminate(p)
   end
 
-  defp samples_min_square_error(bin1, bin2) do
+  @spec samples_min_square_error(binary, binary, pos_integer) :: non_neg_integer()
+  def samples_min_square_error(bin1, bin2, sample_size) do
     assert byte_size(bin1) == byte_size(bin2)
 
-    Enum.zip(for(<<b::16 <- bin1>>, do: b), for(<<b::16 <- bin2>>, do: b))
+    Enum.zip(
+      for(<<b::size(sample_size) <- bin1>>, do: b),
+      for(<<b::size(sample_size) <- bin2>>, do: b)
+    )
     |> Enum.map(fn {b1, b2} ->
       (b1 - b2) ** 2
     end)

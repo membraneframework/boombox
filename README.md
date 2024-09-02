@@ -42,8 +42,16 @@ Boombox.run(input: "file.mp4", output: {:webrtc, "ws://localhost:8830"})
 is equivalent to:
 
 ```
-./boombox -i file.mp4 -o -webrtc ws://localhost:8830
+./boombox -i file.mp4 -o --webrtc ws://localhost:8830
 ```
+
+It's also possible to pass an `.exs` script:
+
+```
+./boombox -S script.exs
+```
+
+In the script you can call `Boombox.run(...)` and execute other Elixir code.
 
 The first run of the CLI may take longer than usual, as the necessary artifacts are installed in the system.
 
