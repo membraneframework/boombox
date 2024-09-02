@@ -17,8 +17,8 @@ defmodule Boombox.Utils.CLI do
 
   defp parse_args(argv) do
     aliases = [i: :input, o: :output]
-    i_type = get_switch_type(argv, :input, aliases)
-    o_type = get_switch_type(argv, :output, aliases)
+    i_type = [get_switch_type(argv, :input, aliases), :keep]
+    o_type = [get_switch_type(argv, :output, aliases), :keep]
 
     switches =
       [input: i_type, output: o_type] ++
@@ -47,8 +47,8 @@ defmodule Boombox.Utils.CLI do
          [] <- OptionParser.parse(argv, strict: [{option, :boolean}], aliases: aliases) |> elem(0) do
       cli_exit_error("#{option} not provided")
     else
-      [{^option, true}] -> [:boolean, :keep]
-      [{^option, string}] when is_binary(string) -> [:string, :keep]
+      [{^option, true}] -> :boolean
+      [{^option, string}] when is_binary(string) -> :string
     end
   end
 
@@ -83,7 +83,7 @@ defmodule Boombox.Utils.CLI do
     Examples:
 
     boombox -i rtmp://localhost:5432 -o output/index.m3u8
-    boombox -i file.mp4 -o --webrtc ws://localhost:8830
+    boombox -i --webrtc ws://localhost:8829 -o file.mp4
     """)
 
     System.halt(1)
