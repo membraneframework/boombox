@@ -4,34 +4,89 @@
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/boombox)
 [![CircleCI](https://circleci.com/gh/membraneframework/boombox.svg?style=svg)](https://circleci.com/gh/membraneframework/boombox)
 
-Boombox is a powerful tool for audio & video streaming based on the [Membrane Framework](https://membrane.stream).
+Boombox is a high-level tool for audio & video streaming based on the [Membrane Framework](https://membrane.stream).
+
+
+The code below receives a stream via RTMP and sends it over HLS:
+
+```elixir
+Boombox.run(input: "rtmp://localhost:5432", output: "index.m3u8")
+```
+
+you can use CLI interface too:
+
+```
+boombox -i "rtmp://localhost:5432" -o "index.m3u8"
+```
+
+And the code below generates a video with bouncing Membrane logo and sends it over WebRTC:
+
+```elixir
+Mix.install([{:boombox, github: "membraneframework-labs/boombox"}, :req, :image])
+
+overlay =
+  Req.get!("https://avatars.githubusercontent.com/u/25247695?s=200&v=4").body
+  |> Vix.Vips.Image.new_from_buffer()
+  |> then(fn {:ok, img} -> img end)
+  |> Image.trim!()
+  |> Image.thumbnail!(100)
+
+bg = Image.new!(640, 480, color: :light_gray)
+max_x = Image.width(bg) - Image.width(overlay)
+max_y = Image.height(bg) - Image.height(overlay)
+
+Stream.iterate({_x = 300, _y = 0, _dx = 1, _dy = 2, _pts = 0}, fn {x, y, dx, dy, pts} ->
+  dx = if (x + dx) in 0..max_x, do: dx, else: -dx
+  dy = if (y + dy) in 0..max_y, do: dy, else: -dy
+  pts = pts + div(Membrane.Time.seconds(1), _fps = 60)
+  {x + dx, y + dy, dx, dy, pts}
+end)
+|> Stream.map(fn {x, y, _dx, _dy, pts} ->
+  img = Image.compose!(bg, overlay, x: x, y: y)
+  %Boombox.Packet{kind: :video, payload: img, pts: pts}
+end)
+|> Boombox.run(
+  input: {:stream, video: :image, audio: false},
+  output: {:webrtc, "ws://localhost:8830"}
+)
+```
+
+To receive WebRTC/HLS from boombox in a browser or send WebRTC from a browser to boombox
+you can use simple HTML examples in the `boombox_examples_data` folder.
+
+For more examples, see `examples.livemd`.
+
+### Supported formats
+
+format | direction
+---|---
+MP4 | input, output
+WebRTC | input, output 
+RTMP | input
+RTSP | input
+HLS | output
+Elixir Stream | input, output
 
 ## Installation
 
-The package can be installed by adding `boombox` to your list of dependencies in `mix.exs`:
+To use Boombox as an Elixir library, add
 
 ```elixir
-def deps do
-  [
-    {:boombox, "~> 0.1.0"}
-  ]
-end
+{:boombox, github: "membraneframework-labs/boombox"}
 ```
 
-## Usage
+to your dependencies or `Mix.install`.
 
-See `examples.livemd` for usage examples.
-
-## CLI app
-
-To build a CLI app, clone the repo and run
+to use via CLI, run the following:
 
 ```
-mix deps.get
-./build_binary.sh
+wget https://raw.githubusercontent.com/membraneframework-labs/boombox/dev/bin/boombox
+./boombox
 ```
 
-It should generate a single executable called `boombox`, which you can run.
+Make sure you have [Elixir](https://elixir-lang.org/) installed. The first call to `boombox` will install it in a default directory in the system. The directory can be set with `MIX_INSTALL_DIR` env variable if preferred.
+
+## CLI API
 
 The CLI API is similar to the Elixir API, for example:
 
