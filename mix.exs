@@ -46,7 +46,6 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.1"},
-      {:ex_sdp, "~> 0.17.0", override: true},
       {:membrane_webrtc_plugin, "~> 0.21.0"},
       {:membrane_opus_plugin, "~> 0.20.3"},
       {:membrane_aac_plugin, "~> 0.18.0"},
@@ -60,7 +59,6 @@ defmodule Boombox.Mixfile do
       {:membrane_rtmp_plugin, "~> 0.25.0"},
       {:membrane_rtsp_plugin,
        github: "membraneframework-labs/membrane_rtsp_plugin", branch: "allow-for-eos"},
-      {:membrane_udp_plugin, "~> 0.14.0"},
       {:membrane_rtp_plugin, "~> 0.29.0"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
