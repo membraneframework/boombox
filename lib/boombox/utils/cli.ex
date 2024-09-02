@@ -22,7 +22,7 @@ defmodule Boombox.Utils.CLI do
 
     switches =
       [input: i_type, output: o_type] ++
-        Keyword.from_keys([:mp4, :webrtc, :rtmp, :hls, :transport], :string)
+        Keyword.from_keys([:mp4, :webrtc, :rtmp, :hls, :transport], [:string, :keep])
 
     {input, output} =
       OptionParser.parse(argv, strict: switches, aliases: aliases)
@@ -47,8 +47,8 @@ defmodule Boombox.Utils.CLI do
          [] <- OptionParser.parse(argv, strict: [{option, :boolean}], aliases: aliases) |> elem(0) do
       cli_exit_error("#{option} not provided")
     else
-      [{^option, true}] -> :boolean
-      [{^option, string}] when is_binary(string) -> :string
+      [{^option, true}] -> [:boolean, :keep]
+      [{^option, string}] when is_binary(string) -> [:string, :keep]
     end
   end
 
