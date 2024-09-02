@@ -30,6 +30,7 @@
 
       const pc = new RTCPeerConnection(pcConfig);
       pc.ontrack = event => videoPlayer.srcObject.addTrack(event.track);
+      videoPlayer.play();
       pc.onicecandidate = event => {
         if (event.candidate === null) return;
 
