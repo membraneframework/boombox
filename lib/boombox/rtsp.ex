@@ -8,6 +8,15 @@ defmodule Boombox.RTSP do
   alias Membrane.{RTP, RTSP}
   alias Boombox.Pipeline.{Ready, State, Wait}
 
+  @type rtsp_state :: %{
+          set_up_tracks: %{
+            optional(:audio) => Membrane.RTSP.Source.track(),
+            optional(:video) => Membrane.RTSP.Source.track()
+          },
+          tracks_left_to_link: non_neg_integer(),
+          track_builders: Boombox.Pipeline.track_builders()
+        }
+
   @spec create_input(URI.t()) :: Wait.t()
   def create_input(uri) do
     port = Enum.random(5_000..65_000)

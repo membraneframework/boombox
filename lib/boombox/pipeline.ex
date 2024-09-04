@@ -62,7 +62,7 @@ defmodule Boombox.Pipeline do
                   track_builders: nil,
                   last_result: nil,
                   eos_info: nil,
-                  rtsp_state: %{set_up_tracks: %{}, tracks_left_to_link: 0, track_builders: %{}}
+                  rtsp_state: nil
                 ]
 
     @typedoc """
@@ -91,14 +91,7 @@ defmodule Boombox.Pipeline do
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
             eos_info: term(),
-            rtsp_state: %{
-              set_up_tracks: %{
-                optional(:audio) => Membrane.RTSP.Source.track(),
-                optional(:video) => Membrane.RTSP.Source.track()
-              },
-              tracks_left_to_link: non_neg_integer(),
-              track_builders: Boombox.Pipeline.track_builders()
-            },
+            rtsp_state: Boombox.RTSP.rtsp_state() | nil,
             parent: pid()
           }
   end
