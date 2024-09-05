@@ -22,6 +22,7 @@ defmodule Boombox do
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
+          | {:rtsp, url :: String.t()}
           | {:stream, in_stream_opts()}
 
   @type output ::
@@ -84,6 +85,7 @@ defmodule Boombox do
       {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value}
       {nil, ".mp4", :output} -> {:mp4, value}
       {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
+      {"rtsp", _ext, :input} -> {:rtsp, value}
       {nil, ".m3u8", :output} -> {:hls, value}
       _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
@@ -113,6 +115,9 @@ defmodule Boombox do
         value
 
       {:hls, location} when direction == :output and is_binary(location) ->
+        value
+
+      {:rtsp, location} when direction == :input and is_binary(location) ->
         value
 
       {:stream, opts} ->

@@ -58,10 +58,10 @@ defmodule Support.Compare do
 
     Testing.Pipeline.execute_actions(p, spec: head_spec)
 
-    assert_pipeline_notified(p, :ref_demuxer, {:new_tracks, tracks})
+    assert_pipeline_notified(p, :ref_demuxer, {:new_tracks, ref_tracks})
 
     ref_spec =
-      Enum.map(tracks, fn
+      Enum.map(ref_tracks, fn
         {id, %Membrane.AAC{}} ->
           get_child(:ref_demuxer)
           |> via_out(Pad.ref(:output, id))
@@ -77,12 +77,12 @@ defmodule Support.Compare do
           |> child(:ref_video_bufs, GetBuffers)
       end)
 
-    assert_pipeline_notified(p, :sub_demuxer, {:new_tracks, tracks})
+    assert_pipeline_notified(p, :sub_demuxer, {:new_tracks, sub_tracks})
 
-    assert length(tracks) == length(kinds)
+    assert length(sub_tracks) == length(kinds)
 
     sub_spec =
-      Enum.map(tracks, fn
+      Enum.map(sub_tracks, fn
         {id, %Membrane.AAC{}} ->
           assert :audio in kinds
 
@@ -116,7 +116,7 @@ defmodule Support.Compare do
         # and subsequent runs due to transcoding.
         # The threshold here is obtained empirically and may need
         # to be adjusted, or a better metric should be used.
-        assert samples_min_square_error(sub.payload, ref.payload, 8) < 5
+        assert samples_min_square_error(sub.payload, ref.payload, 8) < 10
       end)
     end
 

@@ -6,7 +6,7 @@ Logger.configure(level: :info)
 # For ffmpeg and ffplay commands to work on Mac Livebook Desktop
 System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 
-Mix.install([{:boombox, path: __DIR__}, :kino, :nx, :exla, :bumblebee])
+Mix.install([{:boombox, path: __DIR__, env: :test}, :kino, :nx, :exla, :bumblebee])
 
 Nx.global_default_backend(EXLA.Backend)
 ```
@@ -87,10 +87,40 @@ Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://loc
 To receive the stream, visit http://localhost:1234/hls/stream.html after running the cell below
 
 ```elixir
-Boombox.run(
-  input: "#{input_dir}/bun10s.mp4",
-  output: {:hls, "#{__DIR__}/examples_assets/hls/hls_output"}
-)
+hls_out_dir = "#{__DIR__}/examples_assets/hls/hls_output"
+
+"#{hls_out_dir}/*" |> Path.wildcard() |> Enum.each(&File.rm!/1)
+
+Boombox.run(input: "#{input_dir}/bun10s.mp4", output: {:hls, hls_out_dir})
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## RTSP to HLS
+
+To receive the stream, visit http://localhost:1234/hls/stream.html after running the cell below
+
+```elixir
+hls_out_dir = "#{__DIR__}/examples_assets/hls/hls_output"
+
+"#{hls_out_dir}/*" |> Path.wildcard() |> Enum.each(&File.rm!/1)
+
+rtp_server_port = 30_003
+rtsp_port = 8554
+
+{:ok, server} =
+  Membrane.RTSP.Server.start_link(
+    handler: Membrane.Support.RTSP.Server.Handler,
+    handler_config: %{fixture_path: bbb_mp4},
+    address: {127, 0, 0, 1},
+    port: rtsp_port,
+    udp_rtp_port: rtp_server_port,
+    udp_rtcp_port: rtp_server_port + 1
+  )
+
+Boombox.run(input: "rtsp://localhost:#{rtsp_port}/livestream", output: {:hls, hls_out_dir})
+
+GenServer.stop(server)
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->

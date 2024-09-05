@@ -61,7 +61,8 @@ defmodule Boombox.Pipeline do
                   spec_builder: [],
                   track_builders: nil,
                   last_result: nil,
-                  eos_info: nil
+                  eos_info: nil,
+                  rtsp_state: nil
                 ]
 
     @typedoc """
@@ -90,6 +91,7 @@ defmodule Boombox.Pipeline do
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
             eos_info: term(),
+            rtsp_state: Boombox.RTSP.rtsp_state() | nil,
             parent: pid()
           }
   end
@@ -110,6 +112,18 @@ defmodule Boombox.Pipeline do
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do
     Boombox.MP4.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
+  end
+
+  @impl true
+  def handle_child_notification({:set_up_tracks, tracks}, :rtsp_source, ctx, state) do
+    {result, state} = Boombox.RTSP.handle_set_up_tracks(tracks, state)
+    proceed_result(result, ctx, state)
+  end
+
+  @impl true
+  def handle_child_notification({:new_track, ssrc, track}, :rtsp_source, ctx, state) do
+    {result, state} = Boombox.RTSP.handle_input_track(ssrc, track, state)
+    proceed_result(result, ctx, state)
   end
 
   @impl true
@@ -282,6 +296,10 @@ defmodule Boombox.Pipeline do
 
   defp create_input({:rtmp, src}, ctx, _state) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
+  end
+
+  defp create_input({:rtsp, uri}, _ctx, _state) do
+    Boombox.RTSP.create_input(uri)
   end
 
   defp create_input({:stream, params}, _ctx, state) do

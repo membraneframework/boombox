@@ -38,7 +38,10 @@ defmodule Boombox.MP4 do
           {:audio, spec}
 
         {id, %Membrane.H264{}} ->
-          spec = get_child(:mp4_demuxer) |> via_out(Pad.ref(:output, id))
+          spec =
+            get_child(:mp4_demuxer)
+            |> via_out(Pad.ref(:output, id))
+
           {:video, spec}
       end)
 
