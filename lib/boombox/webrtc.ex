@@ -12,7 +12,8 @@ defmodule Boombox.WebRTC do
     spec =
       child(:webrtc_input, %Membrane.WebRTC.Source{
         signaling: signaling,
-        video_codec: :h264
+        video_codec: :h264,
+        keyframe_interval: Membrane.Time.seconds(2)
       })
 
     %Wait{actions: [spec: spec]}
