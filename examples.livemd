@@ -9,7 +9,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 # In case of problems installing EXLA, you can remove it and comment out the Nx backend config.
 # Examples should still work, except for speech to text.
 Mix.install([
-  {:boombox, github: "membraneframework-labs/boombox", env: :test},
+  {:boombox, github: "membraneframework-labs/boombox", branch: "webrtc-keyframe-interval"},
   :kino,
   :nx,
   :exla,
@@ -103,7 +103,6 @@ Boombox.run(input: "#{input_dir}/bun.mp4", output: {:hls, "#{out_dir}/index.m3u8
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-
 ## Broadcast RTMP via HLS
 
 To receive the stream, visit http://localhost:1234/hls.html after running the cell below
@@ -123,15 +122,12 @@ t =
 
 ## WebRTC to HLS
 
-Visit http://localhost:1234/stream_from_browser/index.html to send the stream and http://localhost:1234/hls/stream.html to receive it
+Visit http://localhost:1234/webrtc_from_browser.html to send the stream and http://localhost:1234/hls.html to receive it
 
 ```elixir
-hls_out_dir = "#{__DIR__}/examples_assets/hls/hls_output"
-
-"#{hls_out_dir}/*" |> Path.wildcard() |> Enum.each(&File.rm!/1)
-
-Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:hls, hls_out_dir})
+Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:hls, "#{out_dir}/index.m3u8"})
 ```
+
 <!-- livebook:{"branch_parent_index":0} -->
 
 ## Micro Twitch clone
