@@ -13,11 +13,6 @@ defmodule Support.Async do
              end,
              do: block
            ) do
-    id = :crypto.strong_rand_bytes(12) |> Base.encode16()
-    test_module_name = Module.concat(__CALLER__.module, "AsyncTest_#{id}")
-    fun_name = :"async_test_#{id}"
-    after_compile_fun_name = :"async_test_ac_#{id}"
-
     quote do
       @tags_attrs [:tag, :describetag, :moduletag]
                   |> Enum.flat_map(fn attr ->
@@ -25,13 +20,18 @@ defmodule Support.Async do
                     |> Enum.map(&{attr, &1})
                   end)
 
-      def unquote(fun_name)(unquote(context)) do
+      id = :crypto.strong_rand_bytes(12) |> Base.encode16()
+      test_module_name = Module.concat(__MODULE__, "AsyncTest_#{id}")
+      fun_name = :"async_test_#{id}"
+      after_compile_fun_name = :"async_test_ac_#{id}"
+
+      def unquote(unquoted(quote do: fun_name))(unquote(context)) do
         unquote(block)
       end
 
-      def unquote(after_compile_fun_name)(_bytecode, _env) do
+      def unquote(unquoted(quote do: after_compile_fun_name))(_bytecode, _env) do
         test_name = unquote(test_name)
-        fun_name = unquote(fun_name)
+        fun_name = unquote(unquoted(quote do: fun_name))
 
         content =
           quote do
@@ -46,12 +46,16 @@ defmodule Support.Async do
             end
           end
 
-        Module.create(unquote(test_module_name), content, __ENV__)
+        Module.create(unquote(unquoted(quote do: test_module_name)), content, __ENV__)
       end
 
-      @after_compile {__MODULE__, unquote(after_compile_fun_name)}
+      @after_compile {__MODULE__, after_compile_fun_name}
 
       Module.delete_attribute(__MODULE__, :tag)
     end
+  end
+
+  defp unquoted(code) do
+    {:unquote, [], [code]}
   end
 end
