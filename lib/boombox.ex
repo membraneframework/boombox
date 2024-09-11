@@ -77,7 +77,7 @@ defmodule Boombox do
   @spec parse_opt!(:input, input()) :: input()
   @spec parse_opt!(:output, output()) :: output()
   defp parse_opt!(direction, value) when is_binary(value) do
-    uri = URI.new!(value)
+    uri = URI.parse(value)
     scheme = uri.scheme
     extension = if uri.path, do: Path.extname(uri.path)
 
@@ -249,7 +249,7 @@ defmodule Boombox do
   defp resolve_transport(location, opts) do
     case Keyword.validate!(opts, transport: nil)[:transport] do
       nil ->
-        uri = URI.new!(location)
+        uri = URI.parse(location)
 
         case uri.scheme do
           nil -> :file

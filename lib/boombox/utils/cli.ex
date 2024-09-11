@@ -17,12 +17,12 @@ defmodule Boombox.Utils.CLI do
 
   defp parse_args(argv) do
     aliases = [i: :input, o: :output]
-    i_type = get_switch_type(argv, :input, aliases)
-    o_type = get_switch_type(argv, :output, aliases)
+    i_type = [get_switch_type(argv, :input, aliases), :keep]
+    o_type = [get_switch_type(argv, :output, aliases), :keep]
 
     switches =
       [input: i_type, output: o_type] ++
-        Keyword.from_keys([:mp4, :webrtc, :rtmp, :hls, :transport], :string)
+        Keyword.from_keys([:mp4, :webrtc, :rtmp, :hls, :transport], [:string, :keep])
 
     {input, output} =
       OptionParser.parse(argv, strict: switches, aliases: aliases)
@@ -83,7 +83,7 @@ defmodule Boombox.Utils.CLI do
     Examples:
 
     boombox -i rtmp://localhost:5432 -o output/index.m3u8
-    boombox -i file.mp4 -o --webrtc ws://localhost:1234
+    boombox -i --webrtc ws://localhost:8829 -o file.mp4
     """)
 
     System.halt(1)

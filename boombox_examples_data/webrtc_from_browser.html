@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Boombox stream WebRTC from browser example</title>
+</head>
+
+<body
+  style="background-color: black; color: white; font-family: Arial, Helvetica, sans-serif; min-height: 100vh; margin: 0px; padding: 5px 0px 5px 0px">
+  <main>
+    <h1>Boombox stream WebRTC from browser example</h1>
+    <div>
+      Boombox URL: <input type="text" value="ws://localhost:8829" id="url" /> <button id="button">Connect</button>
+    </div>
+    <div id="status"></div>
+    <br>
+    <video id="preview" autoplay muted></video>
+  </main>
+
+  <script>
+    const pcConfig = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' },] };
+    const mediaConstraints = { video: { width: 640, height: 480 }, audio: true };
+    const button = document.getElementById("button");
+    const connStatus = document.getElementById("status");
+    const preview = document.getElementById("preview");
+    const url = document.getElementById("url");
+
+    const connectRTC = async (ws) => {
+      const localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+      preview.srcObject = localStream;
+      const pc = new RTCPeerConnection(pcConfig);
+
+      pc.onicecandidate = event => {
+        if (event.candidate === null) return;
+        console.log("Sent ICE candidate:", event.candidate);
+        ws.send(JSON.stringify({ type: "ice_candidate", data: event.candidate }));
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState == "connected") {
+          button.innerHTML = "Disconnect";
+          button.onclick = () => {
+            ws.close();
+            localStream.getTracks().forEach(track => track.stop())
+            button.onclick = connect;
+            button.innerHTML = "Connect";
+          }
+          connStatus.innerHTML = "Connected ";
+        }
+      }
+
+      for (const track of localStream.getTracks()) {
+        pc.addTrack(track, localStream);
+      }
+
+      ws.onmessage = async event => {
+        const { type, data } = JSON.parse(event.data);
+
+        switch (type) {
+          case "sdp_answer":
+            console.log("Received SDP answer:", data);
+            await pc.setRemoteDescription(data);
+            break;
+          case "ice_candidate":
+            console.log("Recieved ICE candidate:", data);
+            await pc.addIceCandidate(data);
+            break;
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      console.log("Sent SDP offer:", offer)
+      ws.send(JSON.stringify({ type: "sdp_offer", data: offer }));
+    };
+
+    const connect = () => {
+      connStatus.innerHTML = "Connecting..."
+      const ws = new WebSocket(url.value);
+      ws.onopen = _ => connectRTC(ws);
+      ws.onclose = event => {
+        connStatus.innerHTML = "Disconnected"
+        button.onclick = connect;
+        button.innerHTML = "Connect";
+        console.log("WebSocket connection was terminated:", event);
+      }
+    }
+
+    button.onclick = connect;
+  </script>
+
+</body>
+
+</html>
