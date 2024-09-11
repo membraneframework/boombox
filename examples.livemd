@@ -41,7 +41,7 @@ unless File.exists?("#{input_dir}/bun.mp4") do
 end
 
 assets_url =
-  "https://raw.githubusercontent.com/membraneframework-labs/boombox/dev/boombox_examples_data"
+  "https://raw.githubusercontent.com/membraneframework-labs/boombox/master/boombox_examples_data"
 
 for asset <- ["hls", "webrtc_from_browser", "webrtc_to_browser"],
     path = "#{data_dir}/#{asset}.html",
