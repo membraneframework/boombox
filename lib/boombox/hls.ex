@@ -34,7 +34,9 @@ defmodule Boombox.HLS do
             storage: %Membrane.HTTPAdaptiveStream.Storages.FileStorage{
               directory: directory
             },
-            hls_mode: hls_mode
+            hls_mode: hls_mode,
+            mp4_parameters_in_band?: true,
+            target_window_duration: Membrane.Time.seconds(20)
           }
         ),
         Enum.map(track_builders, fn
