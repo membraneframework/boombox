@@ -2,7 +2,7 @@ defmodule Boombox do
   @moduledoc """
   Boombox is a tool for audio and video streaming.
 
-  See `t:input/0` and `t:output/0` for supported protocols.
+  See `run/1` for details and [examples.livemd](examples.livemd) for examples.
   """
 
   require Membrane.Time
@@ -35,6 +35,21 @@ defmodule Boombox do
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{input: input(), output: output()}
 
+  @doc """
+  Runs boombox with given input and output.
+
+  ## Example
+
+  ```
+  Boombox.run(input: "rtmp://localhost:5432", output: "index.m3u8")
+  ```
+
+  See `t:input/0` and `t:output/0` for available outputs and [examples.livemd](examples.livemd)
+  for examples.
+
+  If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
+  as the first argument.
+  """
   @spec run(Enumerable.t(), input: input(), output: output()) :: :ok | Enumerable.t()
   def run(stream \\ nil, opts) do
     opts_keys = [:input, :output]
@@ -66,6 +81,20 @@ defmodule Boombox do
     end
   end
 
+  @doc """
+  Runs boombox with CLI arguments.
+
+  ## Example
+  ```
+  # boombox.exs
+  Mix.install([:boombox])
+  Boombox.run_cli()
+  ```
+
+  ```sh
+  elixir boombox.exs -i "rtmp://localhost:5432" -o "index.m3u8"
+  ```
+  """
   @spec run_cli([String.t()]) :: :ok
   def run_cli(argv \\ System.argv()) do
     case Boombox.Utils.CLI.parse_argv(argv) do

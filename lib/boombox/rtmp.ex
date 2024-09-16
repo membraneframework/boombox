@@ -29,7 +29,7 @@ defmodule Boombox.RTMP do
       port: port,
       use_ssl?: use_ssl?,
       handle_new_client: handle_new_client,
-      client_timeout: 1_000
+      client_timeout: 60_000
     }
 
     {:ok, _server} =

@@ -6,6 +6,9 @@
 
 Boombox is a high-level tool for audio & video streaming tool based on the [Membrane Framework](https://membrane.stream).
 
+See [examples.livemd](examples.livemd) for examples.
+
+## Usage
 
 The code below receives a stream via RTMP and sends it over HLS:
 
@@ -15,14 +18,14 @@ Boombox.run(input: "rtmp://localhost:5432", output: "index.m3u8")
 
 you can use CLI interface too:
 
-```
+```sh
 boombox -i "rtmp://localhost:5432" -o "index.m3u8"
 ```
 
 And the code below generates a video with bouncing Membrane logo and sends it over WebRTC:
 
 ```elixir
-Mix.install([{:boombox, github: "membraneframework-labs/boombox"}, :req, :image])
+Mix.install([:boombox, :req, :image])
 
 overlay =
   Req.get!("https://avatars.githubusercontent.com/u/25247695?s=200&v=4").body
@@ -54,22 +57,23 @@ end)
 To receive WebRTC/HLS from boombox in a browser or send WebRTC from a browser to boombox
 you can use simple HTML examples in the `boombox_examples_data` folder, for example
 
-```
-wget https://raw.githubusercontent.com/membraneframework-labs/boombox/dev/boombox_examples_data/webrtc_to_browser.html
+```sh
+wget https://raw.githubusercontent.com/membraneframework/boombox/v0.1.0/boombox_examples_data/webrtc_to_browser.html
 open webrtc_to_browser.html
 ```
 
-For more examples, see `examples.livemd`.
+For more examples, see [examples.livemd](examples.livemd).
 
-### Supported formats
+## Supported formats & protocols
 
-format | direction
----|---
-MP4 | input, output
-WebRTC | input, output 
-RTMP | input
-HLS | output
-Elixir Stream | input, output
+| format | direction |
+|---|---|
+| MP4 | input, output |
+| WebRTC | input, output |
+| RTMP | input |
+| RTSP | input |
+| HLS | output |
+| Elixir Stream | input, output |
 
 ## Installation
 
@@ -83,15 +87,15 @@ to your dependencies or `Mix.install`.
 
 to use via CLI, run the following:
 
-```
-wget https://raw.githubusercontent.com/membraneframework-labs/boombox/dev/bin/boombox
+```sh
+wget https://raw.githubusercontent.com/membraneframework/boombox/v0.1.0/bin/boombox
 chmod u+x boombox
 ./boombox
 ```
 
 Make sure you have [Elixir](https://elixir-lang.org/) installed. The first call to `boombox` will install it in a default directory in the system. The directory can be set with `MIX_INSTALL_DIR` env variable if preferred.
 
-## CLI API
+## CLI
 
 The CLI API is similar to the Elixir API, for example:
 
@@ -101,14 +105,14 @@ Boombox.run(input: "file.mp4", output: {:webrtc, "ws://localhost:8830"})
 
 is equivalent to:
 
-```
+```sh
 ./boombox -i file.mp4 -o --webrtc ws://localhost:8830
 ```
 
 It's also possible to pass an `.exs` script:
 
-```
-./boombox -S script.exs
+```sh
+./boombox -s script.exs
 ```
 
 In the script you can call `Boombox.run(...)` and execute other Elixir code.
