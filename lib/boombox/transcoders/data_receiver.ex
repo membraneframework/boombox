@@ -38,17 +38,19 @@ defmodule Boombox.Transcoders.DataReceiver do
   end
 
   @impl true
-  def handle_stream_format(:input, stream_format, _ctx, state) do
-    {actions, state} =
-      if is_output_linked(state) do
-        {[stream_format: {state.output_pad_ref, stream_format}], state}
-      else
-        queue = TimestampQueue.push_stream_format(state.queue, :input, stream_format)
-        {[], %{state | queue: queue}}
-      end
+  def handle_stream_format(:input, stream_format, _ctx, state) when is_output_linked(state) do
+    actions = [
+      notify_parent: {:input_stream_format, stream_format},
+      stream_format: {state.output_pad_ref, stream_format}
+    ]
 
-    actions = actions ++ [notify_parent: {:input_stream_format, stream_format}]
     {actions, state}
+  end
+
+  @impl true
+  def handle_stream_format(:input, stream_format, _ctx, state) do
+    queue = TimestampQueue.push_stream_format(state.queue, :input, stream_format)
+    {[notify_parent: {:input_stream_format, stream_format}], %{state | queue: queue}}
   end
 
   @impl true
