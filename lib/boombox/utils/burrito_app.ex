@@ -1,4 +1,4 @@
-if Code.ensure_loaded!(Burrito) do
+if Code.ensure_loaded?(Burrito) do
   defmodule Boombox.Utils.BurritoApp do
     @moduledoc false
 
