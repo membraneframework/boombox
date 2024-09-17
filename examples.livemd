@@ -6,15 +6,10 @@ Logger.configure(level: :info)
 # For ffmpeg and ffplay commands to work on Mac Livebook Desktop
 System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 
-# In case of problems installing EXLA, you can remove it and comment out the Nx backend config.
-# Examples should still work, except for speech to text.
-Mix.install([
-  {:boombox, github: "membraneframework-labs/boombox", branch: "webrtc-keyframe-interval"},
-  :kino,
-  :nx,
-  :exla,
-  :bumblebee
-])
+# In case of problems installing Nx/EXLA/Bumblebee,
+# you can remove them and the Nx backend config below.
+# Examples that don't mention them should still work.
+Mix.install([:boombox, :kino, :nx, :exla, :bumblebee])
 
 Nx.global_default_backend(EXLA.Backend)
 ```
@@ -41,7 +36,7 @@ unless File.exists?("#{input_dir}/bun.mp4") do
 end
 
 assets_url =
-  "https://raw.githubusercontent.com/membraneframework-labs/boombox/master/boombox_examples_data"
+  "https://raw.githubusercontent.com/membraneframework/boombox/master/boombox_examples_data"
 
 for asset <- ["hls", "webrtc_from_browser", "webrtc_to_browser"],
     path = "#{data_dir}/#{asset}.html",
@@ -120,7 +115,7 @@ t =
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## WebRTC to HLS
+## Broadcast WebRTC via HLS
 
 Visit http://localhost:1234/webrtc_from_browser.html to send the stream and http://localhost:1234/hls.html to receive it
 
@@ -280,12 +275,59 @@ end)
 
 <!-- livebook:{"branch_parent_index":0} -->
 
+## Not hot dog
+
+Inspired by Silicon Valley's [Not hot dog app](https://youtu.be/vIci3C4JkL0?si=jIa3Atu-QNgFld9h&t=60), and [Evadne Wu's talk](https://youtu.be/GFxUgbfQ3w0?si=7Y7kyid0GN_qffiB).
+
+To send the stream, visit http://localhost:1234/webrtc_from_browser.html.
+
+```elixir
+model_name = "google/vit-base-patch16-224"
+{:ok, resnet} = Bumblebee.load_model({:hf, model_name})
+{:ok, featurizer} = Bumblebee.load_featurizer({:hf, model_name})
+serving = Bumblebee.Vision.image_classification(resnet, featurizer)
+:ok
+```
+
+```elixir
+frame = Kino.Frame.new()
+Kino.render(frame)
+
+Boombox.run(
+  input: {:webrtc, "ws://localhost:8829"},
+  output: {:stream, video: :image, audio: false}
+)
+|> Stream.take_every(10)
+|> Stream.map(fn frame ->
+  tensor =
+    frame.payload
+    |> Image.thumbnail!(224)
+    |> Image.embed!(224, 224)
+    |> Image.to_nx!()
+
+  hot_dog =
+    Nx.Serving.run(serving, tensor).predictions
+    |> Enum.find(fn p -> String.contains?(p.label, "hotdog") end)
+
+  if hot_dog do
+    "## ✅ Hotdog"
+  else
+    "## ❌ Not hotdog"
+  end
+end)
+|> Enum.each(fn text -> Kino.Frame.render(frame, Kino.Markdown.new(text)) end)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
 ## Forward RTMP via WebRTC
 
 To receive the stream, visit http://localhost:1234/webrtc_to_browser.html
 
+**Note**: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
+
 ```elixir
-uri = "rtmp://localhost:5432"
+uri = "rtmp://localhost:5434"
 
 t =
   Task.async(fn ->
@@ -293,7 +335,6 @@ t =
   end)
 
 {_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
-
 Task.await(t)
 ```
 
@@ -345,7 +386,7 @@ System.shell("ffplay #{out_dir}/mp4_webrtc_mp4.mp4")
 
 To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below.
 
-Note: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
+**Note**: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
 
 ```elixir
 Boombox.run(input: "#{input_dir}/bun.mp4", output: {:webrtc, "ws://localhost:8830"})
@@ -357,7 +398,7 @@ Boombox.run(input: "#{input_dir}/bun.mp4", output: {:webrtc, "ws://localhost:883
 
 To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below.
 
-Note: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
+**Note**: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
 
 ```elixir
 Boombox.run(
