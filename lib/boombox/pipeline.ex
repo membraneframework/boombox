@@ -286,8 +286,8 @@ defmodule Boombox.Pipeline do
 
   @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
-  defp create_input({:webrtc, signaling}, _ctx, _state) do
-    Boombox.WebRTC.create_input(signaling)
+  defp create_input({:webrtc, signaling}, _ctx, state) do
+    Boombox.WebRTC.create_input(signaling, state.output)
   end
 
   defp create_input({:mp4, location, opts}, _ctx, _state) do

@@ -5,14 +5,21 @@ defmodule Boombox.WebRTC do
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
 
-  @spec create_input(Boombox.webrtc_signaling()) :: Wait.t()
-  def create_input(signaling) do
+  @spec create_input(Boombox.webrtc_signaling(), Boombox.output()) :: Wait.t()
+  def create_input(signaling, output) do
     signaling = resolve_signaling(signaling)
+
+    keyframe_interval =
+      case output do
+        {:webrtc, _signaling} -> nil
+        _other -> Membrane.Time.seconds(2)
+      end
 
     spec =
       child(:webrtc_input, %Membrane.WebRTC.Source{
         signaling: signaling,
-        video_codec: :h264
+        video_codec: :h264,
+        keyframe_interval: keyframe_interval
       })
 
     %Wait{actions: [spec: spec]}
