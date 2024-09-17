@@ -50,7 +50,7 @@ defmodule Boombox do
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
   """
-  @spec run(Enumerable.t(), input: input(), output: output()) :: :ok | Enumerable.t()
+  @spec run(Enumerable.t() | nil, input: input(), output: output()) :: :ok | Enumerable.t()
   def run(stream \\ nil, opts) do
     opts_keys = [:input, :output]
     opts = Keyword.validate!(opts, opts_keys) |> Map.new(fn {k, v} -> {k, parse_opt!(k, v)} end)
