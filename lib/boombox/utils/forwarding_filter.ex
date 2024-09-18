@@ -55,7 +55,7 @@ defmodule Boombox.Utils.ForwardingFilter do
   @impl true
   def handle_stream_format(_input_pad_ref, stream_format, _ctx, state)
       when is_output_linked(state) do
-    {[stream_format: {state.output, stream_format}]}
+    {[stream_format: {state.output_pad_ref, stream_format}]}
   end
 
   @impl true
