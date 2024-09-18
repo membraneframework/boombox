@@ -5,8 +5,8 @@ defmodule Boombox.Transcoders.Audio do
 
   require Membrane.Logger
 
-  alias Membrane.Funnel
   alias Boombox.Transcoders.DataReceiver
+  alias Membrane.Funnel
 
   def_input_pad :input,
     accepted_format: any_of(Membrane.AAC, Membrane.Opus)
