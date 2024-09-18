@@ -11,11 +11,11 @@ defmodule Boombox.Utils.ForwardingFilter do
   alias Membrane.TimestampQueue
 
   def_input_pad :input,
-    accepted_format: any_of(Membrane.AAC, Membrane.Opus),
+    accepted_format: _any,
     availability: :on_request
 
   def_output_pad :output,
-    accepted_format: any_of(Membrane.AAC, Membrane.Opus),
+    accepted_format: _any,
     availability: :on_request
 
   defguardp is_input_linked(state) when state.input_pad_ref != nil
@@ -33,7 +33,7 @@ defmodule Boombox.Utils.ForwardingFilter do
   @impl true
   def handle_pad_added(Pad.ref(direction, _id) = pad_ref, ctx, state) do
     same_direction_pads_number =
-      cts.pads
+      ctx.pads
       |> Enum.count(fn {_pad_ref, pad_data} -> pad_data.direction == direction end)
 
     if same_direction_pads_number > 1 do
