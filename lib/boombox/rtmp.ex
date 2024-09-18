@@ -48,8 +48,7 @@ defmodule Boombox.RTMP do
 
     track_builders = [
       {:audio, nil, get_child(:rtmp_in_aac_decoder)},
-      {:video, nil, get_child(:rtmp_source) |> via_out(:video)
-    }
+      {:video, nil, get_child(:rtmp_source) |> via_out(:video)}
     ]
 
     # track_builders = %{

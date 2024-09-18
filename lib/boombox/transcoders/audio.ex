@@ -15,6 +15,7 @@ defmodule Boombox.Transcoders.Audio do
     accepted_format: any_of(Membrane.AAC, Membrane.Opus)
 
   @type stream_format :: Membrane.AAC.t() | Membrane.Opus.t()
+  @type stream_format_module :: Membrane.AAC | Membrane.Opus
 
   @opus_sample_rate 48_000
 
@@ -28,8 +29,8 @@ defmodule Boombox.Transcoders.Audio do
                 `:input` pad.
                 """
               ],
-              output_stream_format: [
-                spec: stream_format(),
+              output_stream_format_module: [
+                spec: stream_format_module(),
                 description: """
                 Format of the output stream.
 
@@ -53,13 +54,14 @@ defmodule Boombox.Transcoders.Audio do
   end
 
   @impl true
-  def handle_child_notification({:input_stream_format, stream_format}, :data_receiver, _ctx, state) do
-    state =
-      with %{input_stream_format: nil} <- state do
-        %{state | input_stream_format: stream_format}
-      end
-
-    maybe_link_input_with_output(state)
+  def handle_child_notification(
+        {:input_stream_format, stream_format},
+        :data_receiver,
+        _ctx,
+        state
+      ) do
+    %{state | input_stream_format: stream_format}
+    |> maybe_link_input_with_output()
   end
 
   @impl true
@@ -67,15 +69,17 @@ defmodule Boombox.Transcoders.Audio do
     {[], state}
   end
 
-  defp maybe_link_input_with_output(state) when state.input_linked_with_output? or state.input_stream_format == nil do
+  defp maybe_link_input_with_output(state)
+       when state.input_linked_with_output? or state.input_stream_format == nil do
     {[], state}
   end
 
   defp maybe_link_input_with_output(state) do
-    spec = link_input_with_output(
-      state.input_stream_format,
-      state.output_stream_format
-    )
+    spec =
+      link_input_with_output(
+        state.input_stream_format,
+        state.output_stream_format_module
+      )
 
     state = %{state | input_linked_with_output?: true}
     {[spec: spec], state}
@@ -118,7 +122,7 @@ defmodule Boombox.Transcoders.Audio do
     |> get_child(:output_funnel)
   end
 
-  defp link_input_with_output(input_format, output_format) do
-    raise "Cannot transcode #{inspect(input_format)} to #{inspect(output_format)} yet"
+  defp link_input_with_output(input_format, output_format_module) do
+    raise "Cannot transcode #{inspect(input_format)} to #{inspect(output_format_module)} yet"
   end
 end

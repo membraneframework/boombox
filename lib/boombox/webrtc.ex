@@ -84,7 +84,7 @@ defmodule Boombox.WebRTC do
           # |> child(:webrtc_out_opus_encoder, Membrane.Opus.Encoder)
           |> child(:audio_transcoder, %Boombox.Transcoders.Audio{
             input_stream_format: format,
-            output_stream_format: Membrane.Opus
+            output_stream_format_module: Membrane.Opus
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])

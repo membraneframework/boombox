@@ -51,7 +51,7 @@ defmodule Boombox.MP4 do
             # |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
             |> child(:audio_transcoder, %Boombox.Transcoders.Audio{
               input_stream_format: format,
-              output_stream_format: Membrane.AAC
+              output_stream_format_module: Membrane.AAC
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
