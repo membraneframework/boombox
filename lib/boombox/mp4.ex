@@ -17,40 +17,46 @@ defmodule Boombox.MP4 do
   @spec handle_input_tracks(Membrane.MP4.Demuxer.ISOM.new_tracks_t()) :: Ready.t()
   def handle_input_tracks(tracks) do
     track_builders =
-      Enum.map(tracks, fn
-        {id, %Membrane.AAC{} = format} ->
+      Map.new(tracks, fn
+        {id, %Membrane.AAC{}} ->
           spec =
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
             |> child(:mp4_in_aac_parser, Membrane.AAC.Parser)
 
-          {:audio, format, spec}
+          {:audio, spec}
 
-        {id, %Membrane.H264{} = format} ->
+        {id, %Membrane.H264{}} ->
           spec = get_child(:mp4_demuxer) |> via_out(Pad.ref(:output, id))
-          {:video, format, spec}
+          {:video, spec}
       end)
 
-    %Ready{track_builders: track_builders}
+    track_formats =
+      Map.new(tracks, fn
+        {_id, %Membrane.AAC{} = format} -> {:audio, format}
+        {_id, %Membrane.H264{} = format} -> {:video, format}
+      end)
+
+    %Ready{track_builders: track_builders, track_formats: track_formats}
   end
 
   @spec link_output(
           String.t(),
           Boombox.Pipeline.track_builders(),
+          Boombox.Pipeline.track_formats(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(location, track_builders, spec_builder) do
+  def link_output(location, track_builders, track_formats, spec_builder) do
     spec =
       [
         spec_builder,
         child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
         |> child(:mp4_file_sink, %Membrane.File.Sink{location: location}),
         Enum.map(track_builders, fn
-          {:audio, format, builder} ->
+          {:audio, builder} ->
             builder
-            # |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
             |> child(:audio_transcoder, %Boombox.Transcoders.Audio{
-              input_stream_format: format,
+              input_stream_format: track_formats.audio,
               output_stream_format_module: Membrane.AAC
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
@@ -60,7 +66,7 @@ defmodule Boombox.MP4 do
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:mp4_muxer)
 
-          {:video, _format, builder} ->
+          {:video, builder} ->
             builder
             |> child(:mp4_out_h264_parser, %Membrane.H264.Parser{output_stream_structure: :avc3})
             |> via_in(Pad.ref(:input, :video))

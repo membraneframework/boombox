@@ -46,16 +46,13 @@ defmodule Boombox.RTMP do
       |> child(:rtmp_in_aac_decoder, Membrane.AAC.FDK.Decoder)
     ]
 
-    track_builders = [
-      {:audio, nil, get_child(:rtmp_in_aac_decoder)},
-      {:video, nil, get_child(:rtmp_source) |> via_out(:video)}
-    ]
+    track_builders = %{
+      audio: get_child(:rtmp_in_aac_decoder),
+      video: get_child(:rtmp_source) |> via_out(:video)
+    }
 
-    # track_builders = %{
-    #   # audio: get_child(:rtmp_in_aac_decoder),
-    #   video: get_child(:rtmp_source) |> via_out(:video)
-    # }
+    track_formats = %{audio: nil, video: nil}
 
-    %Ready{spec_builder: spec, track_builders: track_builders}
+    %Ready{spec_builder: spec, track_builders: track_builders, track_formats: track_formats}
   end
 end

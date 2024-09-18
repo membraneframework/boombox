@@ -27,17 +27,19 @@ defmodule Boombox.WebRTC do
             get_child(:webrtc_input)
             |> via_out(Pad.ref(:output, id))
 
-          {:audio, nil, spec}
+          {:audio, spec}
 
         %{kind: :video, id: id} ->
           spec =
             get_child(:webrtc_input)
             |> via_out(Pad.ref(:output, id))
 
-          {:video, nil, spec}
+          {:video, spec}
       end)
 
-    %Ready{track_builders: track_builders}
+    track_formats = Enum.map(tracks, & {&1.kind, nil})
+
+    %Ready{track_builders: track_builders, track_formats: track_formats}
   end
 
   @spec create_output(Boombox.webrtc_opts()) :: Ready.t()
@@ -56,41 +58,33 @@ defmodule Boombox.WebRTC do
 
   @spec link_output(Boombox.Pipeline.track_builders()) :: Wait.t()
   def link_output(track_builders) do
-    # tracks = Bunch.KVEnum.keys(track_builders)
-    tracks = Enum.map(track_builders, &elem(&1, 0))
+    tracks = Bunch.KVEnum.keys(track_builders)
     %Wait{actions: [notify_child: {:webrtc_output, {:add_tracks, tracks}}]}
   end
 
   @spec handle_output_tracks_negotiated(
           Boombox.Pipeline.track_builders(),
+          Boombox.Pipeline.track_formats(),
           Membrane.ChildrenSpec.t(),
           Membrane.WebRTC.Sink.new_tracks()
         ) :: Ready.t()
-  def handle_output_tracks_negotiated(track_builders, spec_builder, tracks) do
+  def handle_output_tracks_negotiated(track_builders, track_formats, spec_builder, tracks) do
     tracks = Map.new(tracks, &{&1.kind, &1.id})
 
     spec = [
       spec_builder,
       Enum.map(track_builders, fn
-        {:audio, format, builder} ->
+        {:audio, builder} ->
           builder
-          # |> child(:webrtc_out_resampler, %Membrane.FFmpeg.SWResample.Converter{
-          #   output_stream_format: %Membrane.RawAudio{
-          #     sample_format: :s16le,
-          #     sample_rate: 48_000,
-          #     channels: 2
-          #   }
-          # })
-          # |> child(:webrtc_out_opus_encoder, Membrane.Opus.Encoder)
           |> child(:audio_transcoder, %Boombox.Transcoders.Audio{
-            input_stream_format: format,
+            input_stream_format: track_formats[:audio],
             output_stream_format_module: Membrane.Opus
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
           |> get_child(:webrtc_output)
 
-        {:video, _format, builder} ->
+        {:video, builder} ->
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
           |> child(:webrtc_out_h264_parser, %Membrane.H264.Parser{

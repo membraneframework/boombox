@@ -29,17 +29,23 @@ defmodule Boombox.Pipeline do
           optional(:video) => Membrane.ChildrenSpec.t()
         }
 
+  @type track_formats :: %{
+    optional(:audio) => struct(),
+    optional(:video) => struct()
+}
+
   defmodule Ready do
     @moduledoc false
 
     @type t :: %__MODULE__{
             actions: [Membrane.Pipeline.Action.t()],
             track_builders: Boombox.Pipeline.track_builders() | nil,
+            track_formats: Boombox.Pipeline.track_formats() | nil,
             spec_builder: Membrane.ChildrenSpec.t() | nil,
             eos_info: term
           }
 
-    defstruct actions: [], track_builders: nil, spec_builder: [], eos_info: nil
+    defstruct actions: [], track_builders: nil, track_formats: nil, spec_builder: [], eos_info: nil
   end
 
   defmodule Wait do
@@ -59,6 +65,7 @@ defmodule Boombox.Pipeline do
                   actions_acc: [],
                   spec_builder: [],
                   track_builders: nil,
+                  track_formats: nil,
                   last_result: nil,
                   eos_info: nil
                 ]
@@ -87,6 +94,7 @@ defmodule Boombox.Pipeline do
             actions_acc: [Membrane.Pipeline.Action.t()],
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.Pipeline.track_builders() | nil,
+            track_formats: Boombox.Pipeline.track_formats() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
             eos_info: term()
           }
@@ -126,6 +134,7 @@ defmodule Boombox.Pipeline do
 
     Boombox.WebRTC.handle_output_tracks_negotiated(
       state.track_builders,
+      state.track_formats,
       state.spec_builder,
       tracks
     )
@@ -207,13 +216,13 @@ defmodule Boombox.Pipeline do
          ctx,
          %{
            status: :input_ready,
-           last_result: %Ready{track_builders: track_builders, spec_builder: spec_builder}
+           last_result: %Ready{} = ready
          } = state
        )
        when track_builders != nil do
-    state = %{state | track_builders: track_builders, spec_builder: spec_builder}
+    state = %{state | track_builders: ready.track_builders, track_formats: ready.track_formats, spec_builder: ready.spec_builder}
 
-    link_output(state.output, track_builders, spec_builder, ctx)
+    link_output(state.output, track_builders, track_formats, spec_builder, ctx)
     |> do_proceed(:output_linked, :awaiting_output_link, ctx, state)
   end
 
@@ -278,16 +287,17 @@ defmodule Boombox.Pipeline do
   @spec link_output(
           Boombox.output(),
           track_builders(),
+          track_formats(),
           Membrane.ChildrenSpec.t(),
           Membrane.Pipeline.CallbackContext.t()
         ) ::
           Ready.t() | Wait.t()
-  defp link_output({:webrtc, _signaling}, track_builders, _spec_builder, _ctx) do
+  defp link_output({:webrtc, _signaling}, track_builders, _track_formats, _spec_builder, _ctx) do
     Boombox.WebRTC.link_output(track_builders)
   end
 
-  defp link_output({:file, :mp4, location}, track_builders, spec_builder, _ctx) do
-    Boombox.MP4.link_output(location, track_builders, spec_builder)
+  defp link_output({:file, :mp4, location}, track_builders, track_formats, spec_builder, _ctx) do
+    Boombox.MP4.link_output(location, track_builders, track_formats, spec_builder)
   end
 
   defp parse_input(input) when is_binary(input) do
