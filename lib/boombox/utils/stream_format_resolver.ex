@@ -13,4 +13,9 @@ defmodule Boombox.Utils.StreamFormatResolver do
 
     {actions, state}
   end
+
+  @impl true
+  def handle_buffer(:input, buffer, _ctx, state) do
+    {[buffer: {:output, buffer}], state}
+  end
 end

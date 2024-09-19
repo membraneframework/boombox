@@ -104,6 +104,7 @@ defmodule Boombox.Utils.ForwardingFilter do
 
   defp maybe_flush_queue(ctx, state)
        when ctx.playback == :playing and is_input_linked(state) and is_output_linked(state) do
+    # IO.inspect("FLUSHING QUEUE")
     {_suggested_actions, items, queue} = TimestampQueue.flush_and_close(state.queue)
 
     actions =
@@ -115,4 +116,6 @@ defmodule Boombox.Utils.ForwardingFilter do
 
     {actions, %{state | queue: queue}}
   end
+
+  defp maybe_flush_queue(_ctx, state), do: {[], state}
 end

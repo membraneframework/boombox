@@ -82,7 +82,8 @@ defmodule Boombox.RTSP do
             get_child(:rtsp_source)
             |> via_out(Membrane.Pad.ref(:output, ssrc))
             |> child(:rtsp_in_aac_parser, Membrane.AAC.Parser)
-            |> child(:rtsp_in_aac_decoder, Membrane.AAC.FDK.Decoder)
+
+          # |> child(:rtsp_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
           {[], Map.put(track_builders, :audio, audio_spec)}
 

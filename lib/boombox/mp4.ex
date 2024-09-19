@@ -33,7 +33,8 @@ defmodule Boombox.MP4 do
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
             |> child(:mp4_in_aac_parser, Membrane.AAC.Parser)
-            |> child(:mp4_in_aac_decoder, Membrane.AAC.FDK.Decoder)
+
+          # |> child(:mp4_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
           {:audio, spec}
 
@@ -62,7 +63,10 @@ defmodule Boombox.MP4 do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
+            # |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
+            |> child(:mp4_audio_transcoding_bin, %Boombox.Utils.TranscodingBin{
+              output_stream_format_module: Membrane.AAC
+            })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
               output_config: :esds

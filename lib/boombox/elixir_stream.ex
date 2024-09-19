@@ -3,6 +3,8 @@ defmodule Boombox.ElixirStream do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
+
+  alias __MODULE__.{Sink, Source}
   alias Boombox.Pipeline.Ready
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
