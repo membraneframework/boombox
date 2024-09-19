@@ -13,12 +13,6 @@ defmodule Boombox.Utils.TranscodingBin do
 
   @opus_sample_rate 48_000
 
-  defguardp is_opus_stream_format(format)
-            when is_struct(format) and
-                   (format.__struct__ == Opus or
-                      (format.__struct__ == RemoteStream and format.type == :packetized and
-                         format.content_format == Opus))
-
   def_input_pad :input,
     accepted_format:
       any_of(AAC, Opus, %RemoteStream{content_format: Opus, type: :packetized}, RawAudio)
@@ -117,7 +111,11 @@ defmodule Boombox.Utils.TranscodingBin do
     |> get_child(:output_funnel)
   end
 
-  defp maybe_plug_decoder(builder, opus) when is_opus_stream_format(opus) do
+  defp maybe_plug_decoder(builder, %Opus{}) do
+    builder |> child(:opus_decoder, Opus.Decoder)
+  end
+
+  defp maybe_plug_decoder(builder, %RemoteStream{content_format: Opus, type: :packetized}) do
     builder |> child(:opus_decoder, Opus.Decoder)
   end
 
@@ -129,7 +127,8 @@ defmodule Boombox.Utils.TranscodingBin do
     builder
   end
 
-  defp maybe_plug_resampler(builder, %{sample_rate: sample_rate} = input_format, Opus) when sample_rate != @opus_sample_rate do
+  defp maybe_plug_resampler(builder, %{sample_rate: sample_rate} = input_format, Opus)
+       when sample_rate != @opus_sample_rate do
     builder
     |> child(:resampler, %Membrane.FFmpeg.SWResample.Converter{
       output_stream_format: %RawAudio{
