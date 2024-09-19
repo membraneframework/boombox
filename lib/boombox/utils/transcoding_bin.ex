@@ -109,29 +109,28 @@ defmodule Boombox.Utils.TranscodingBin do
     |> get_child(:output_funnel)
   end
 
-  defp link_input_with_output(opus, RawAudio) when is_opus_stream_format(opus) do
+  defp link_input_with_output(input_format, output_format_module) do
     get_child(:forwarding_filter)
-    |> child(:opus_decoder, Opus.Decoder)
+    |> maybe_plug_decoder(input_format)
+    |> maybe_plug_resampler(input_format, output_format_module)
+    |> maybe_plug_encoder(output_format_module)
     |> get_child(:output_funnel)
   end
 
-  defp link_input_with_output(opus, AAC) when is_opus_stream_format(opus) do
-    get_child(:forwarding_filter)
-    |> child(:opus_decoder, Opus.Decoder)
-    |> child(:aac_encoder, AAC.FDK.Encoder)
-    |> get_child(:output_funnel)
+  defp maybe_plug_decoder(builder, opus) when is_opus_stream_format(opus) do
+    builder |> child(:opus_decoder, Opus.Decoder)
   end
 
-  defp link_input_with_output(%AAC{sample_rate: @opus_sample_rate}, Opus) do
-    get_child(:forwarding_filter)
-    |> child(:aac_decoder, AAC.FDK.Decoder)
-    |> child(:opus_encoder, Opus.Encoder)
-    |> get_child(:output_funnel)
+  defp maybe_plug_decoder(builder, %AAC{}) do
+    builder |> child(:aac_decoder, AAC.FDK.Decoder)
   end
 
-  defp link_input_with_output(%AAC{} = input_format, Opus) do
-    get_child(:forwarding_filter)
-    |> child(:aac_decoder, AAC.FDK.Decoder)
+  defp maybe_plug_decoder(builder, %RawAudio{}) do
+    builder
+  end
+
+  defp maybe_plug_resampler(builder, %{sample_rate: sample_rate} = input_format, Opus) when sample_rate != @opus_sample_rate do
+    builder
     |> child(:resampler, %Membrane.FFmpeg.SWResample.Converter{
       output_stream_format: %RawAudio{
         sample_format: :s16le,
@@ -139,42 +138,21 @@ defmodule Boombox.Utils.TranscodingBin do
         channels: input_format.channels
       }
     })
-    |> child(:opus_encoder, Opus.Encoder)
-    |> get_child(:output_funnel)
   end
 
-  defp link_input_with_output(%AAC{} = input_format, RawAudio) do
-    get_child(:forwarding_filter)
-    |> child(:aac_decoder, AAC.FDK.Decoder)
-    |> get_child(:output_funnel)
+  defp maybe_plug_resampler(builder, _input_format, _output_format_module) do
+    builder
   end
 
-  defp link_input_with_output(%RawAudio{sample_rate: @opus_sample_rate}, Opus) do
-    get_child(:forwarding_filter)
-    |> child(:opus_encoder, Opus.Encoder)
-    |> get_child(:output_funnel)
+  defp maybe_plug_encoder(builder, Opus) do
+    builder |> child(:opus_encoder, Opus.Encoder)
   end
 
-  defp link_input_with_output(%RawAudio{} = input_format, Opus) do
-    get_child(:forwarding_filter)
-    |> child(:resampler, %Membrane.FFmpeg.SWResample.Converter{
-      output_stream_format: %{
-        input_format
-        | sample_format: :s16le,
-          sample_rate: @opus_sample_rate
-      }
-    })
-    |> child(:opus_encoder, Opus.Encoder)
-    |> get_child(:output_funnel)
+  defp maybe_plug_encoder(builder, AAC) do
+    builder |> child(:aac_encoder, AAC.FDK.Encoder)
   end
 
-  defp link_input_with_output(%RawAudio{}, AAC) do
-    get_child(:forwarding_filter)
-    |> child(:aac_encoder, AAC.FDK.Encoder)
-    |> get_child(:output_funnel)
-  end
-
-  defp link_input_with_output(input_format, output_format_module) do
-    raise "Cannot transcode #{inspect(input_format)} to #{inspect(output_format_module)} yet"
+  defp maybe_plug_encoder(builder, RawAudio) do
+    builder
   end
 end
