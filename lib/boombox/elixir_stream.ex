@@ -55,6 +55,9 @@ defmodule Boombox.ElixirStream do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
+            |> child(:mp4_audio_transcoding_bin, %Boombox.Utils.TranscodingBin{
+              output_stream_format_module: Membrane.RawAudio
+            })
             |> then(&maybe_plug_resampler(&1, options))
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:elixir_stream_sink)

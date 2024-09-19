@@ -6,17 +6,24 @@ defmodule Boombox.Utils.TranscodingBin do
   require Membrane.Logger
 
   alias Boombox.Utils.{ForwardingFilter, StreamFormatResolver}
-  alias Membrane.{AAC, Funnel, Opus, RemoteStream}
+  alias Membrane.{AAC, Funnel, Opus, RawAudio, RemoteStream}
 
-  def_input_pad :input,
-    accepted_format: any_of(AAC, Opus, %RemoteStream{content_format: Opus})
-
-  def_output_pad :output, accepted_format: any_of(AAC, Opus)
-
-  @type stream_format :: AAC.t() | Opus.t() | RemoteStream.t()
-  @type stream_format_module :: AAC | Opus
+  @type stream_format :: AAC.t() | Opus.t() | RemoteStream.t() | RawAudio.t()
+  @type stream_format_module :: AAC | Opus | RawAudio
 
   @opus_sample_rate 48_000
+
+  defguardp is_opus_stream_format(format)
+            when is_struct(format) and
+                   (format.__struct__ == Opus or
+                      (format.__struct__ == RemoteStream and format.type == :packetized and
+                         format.content_format == Opus))
+
+  def_input_pad :input,
+    accepted_format:
+      any_of(AAC, Opus, %RemoteStream{content_format: Opus, type: :packetized}, RawAudio)
+
+  def_output_pad :output, accepted_format: any_of(AAC, Opus, RawAudio)
 
   def_options input_stream_format: [
                 spec: stream_format(),
@@ -102,14 +109,13 @@ defmodule Boombox.Utils.TranscodingBin do
     |> get_child(:output_funnel)
   end
 
-  defp link_input_with_output(%Opus{}, AAC) do
+  defp link_input_with_output(opus, RawAudio) when is_opus_stream_format(opus) do
     get_child(:forwarding_filter)
     |> child(:opus_decoder, Opus.Decoder)
-    |> child(:aac_encoder, AAC.FDK.Encoder)
     |> get_child(:output_funnel)
   end
 
-  defp link_input_with_output(%RemoteStream{type: :packetized, content_format: Opus}, AAC) do
+  defp link_input_with_output(opus, AAC) when is_opus_stream_format(opus) do
     get_child(:forwarding_filter)
     |> child(:opus_decoder, Opus.Decoder)
     |> child(:aac_encoder, AAC.FDK.Encoder)
@@ -127,13 +133,44 @@ defmodule Boombox.Utils.TranscodingBin do
     get_child(:forwarding_filter)
     |> child(:aac_decoder, AAC.FDK.Decoder)
     |> child(:resampler, %Membrane.FFmpeg.SWResample.Converter{
-      output_stream_format: %Membrane.RawAudio{
+      output_stream_format: %RawAudio{
         sample_format: :s16le,
         sample_rate: @opus_sample_rate,
         channels: input_format.channels
       }
     })
     |> child(:opus_encoder, Opus.Encoder)
+    |> get_child(:output_funnel)
+  end
+
+  defp link_input_with_output(%AAC{} = input_format, RawAudio) do
+    get_child(:forwarding_filter)
+    |> child(:aac_decoder, AAC.FDK.Decoder)
+    |> get_child(:output_funnel)
+  end
+
+  defp link_input_with_output(%RawAudio{sample_rate: @opus_sample_rate}, Opus) do
+    get_child(:forwarding_filter)
+    |> child(:opus_encoder, Opus.Encoder)
+    |> get_child(:output_funnel)
+  end
+
+  defp link_input_with_output(%RawAudio{} = input_format, Opus) do
+    get_child(:forwarding_filter)
+    |> child(:resampler, %Membrane.FFmpeg.SWResample.Converter{
+      output_stream_format: %{
+        input_format
+        | sample_format: :s16le,
+          sample_rate: @opus_sample_rate
+      }
+    })
+    |> child(:opus_encoder, Opus.Encoder)
+    |> get_child(:output_funnel)
+  end
+
+  defp link_input_with_output(%RawAudio{}, AAC) do
+    get_child(:forwarding_filter)
+    |> child(:aac_encoder, AAC.FDK.Encoder)
     |> get_child(:output_funnel)
   end
 
