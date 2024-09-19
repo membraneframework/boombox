@@ -94,7 +94,7 @@ defmodule Boombox.Utils.TranscodingBin do
     {[spec: spec], state}
   end
 
-  defp link_input_with_output(%format{}, format) do
+  defp link_input_with_output(%format_module{}, format_module) do
     Membrane.Logger.debug("""
     This bin will only forward buffers, as the input stream format is the same as the output stream format.
     """)
