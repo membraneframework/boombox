@@ -80,7 +80,7 @@ For more examples, see [examples.livemd](examples.livemd).
 To use Boombox as an Elixir library, add
 
 ```elixir
-{:boombox, github: "membraneframework-labs/boombox"}
+{:boombox, "~> 0.1.0"}
 ```
 
 to your dependencies or `Mix.install`.
