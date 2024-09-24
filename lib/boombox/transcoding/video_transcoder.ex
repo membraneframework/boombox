@@ -1,12 +1,100 @@
 defmodule Boombox.Transcoding.VideoTranscoder do
   @moduledoc false
-  alias Membrane.VP8
+  use Membrane.Bin
+
   alias Membrane.H264
   alias Membrane.RawVideo
-  use Membrane.Bin
+  alias Membrane.VP8
 
   def_input_pad :input, accepted_format: any_of(RawVideo, H264, VP8)
   def_output_pad :output, accepted_format: any_of(RawVideo, H264, VP8)
+
+  @type stream_format :: H264.t() | VP8.t() | RawVideo.t()
+
+  def_options input_stream_format: [
+                spec: stream_format(),
+                default: nil,
+                description: """
+                Format of the input stream.
+
+                If set to nil, bin will resolve it based on the input stream format coming via the \
+                `:input` pad.
+                """
+              ],
+              output_stream_format: [
+                spec: stream_format(),
+                description: """
+                Format of the output stream.
+                """
+              ]
+
+  @impl true
+  def handle_init(_ctx, opts) do
+    spec = [
+      bin_input()
+      |> child(:stream_format_resolver, StreamFormatResolver)
+      |> child(:forwarding_filter, ForwardingFilter),
+      child(:output_funnel, Funnel)
+      |> bin_output()
+    ]
+
+    state =
+      Map.from_struct(opts)
+      |> Map.put(:input_linked_with_output?, false)
+
+    {link_actions, state} = maybe_link_input_with_output(state)
+    {[spec: spec] ++ link_actions, state}
+  end
+
+  @impl true
+  def handle_init(_ctx, opts) do
+    spec = [
+      bin_input()
+      |> child(:stream_format_resolver, StreamFormatResolver)
+      |> child(:forwarding_filter, ForwardingFilter),
+      child(:output_funnel, Funnel)
+      |> bin_output()
+    ]
+
+    state =
+      Map.from_struct(opts)
+      |> Map.put(:input_linked_with_output?, false)
+
+    {link_actions, state} = maybe_link_input_with_output(state)
+    {[spec: spec] ++ link_actions, state}
+  end
+
+  @impl true
+  def handle_child_notification(
+        {:stream_format, stream_format},
+        :stream_format_resolver,
+        _ctx,
+        state
+      ) do
+    %{state | input_stream_format: stream_format}
+    |> maybe_link_input_with_output()
+  end
+
+  @impl true
+  def handle_child_notification(_notification, _element, _ctx, state) do
+    {[], state}
+  end
+
+  defp maybe_link_input_with_output(state)
+       when state.input_linked_with_output? or state.input_stream_format == nil do
+    {[], state}
+  end
+
+  defp maybe_link_input_with_output(state) do
+    spec =
+      link_input_with_output(
+        state.input_stream_format,
+        state.output_stream_format
+      )
+
+    state = %{state | input_linked_with_output?: true}
+    {[spec: spec], state}
+  end
 
   defp link_input_with_output(%H264{} = input_format, %H264{} = output_format)
        when input_format.stream_structure != output_format.stream_structure or
