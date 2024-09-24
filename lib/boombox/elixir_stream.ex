@@ -6,6 +6,7 @@ defmodule Boombox.ElixirStream do
 
   alias __MODULE__.{Sink, Source}
   alias Boombox.Pipeline.Ready
+  alias Boombox.Transcoding.AudioTranscoder
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
@@ -55,7 +56,7 @@ defmodule Boombox.ElixirStream do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_audio_transcoding_bin, %Boombox.Utils.TranscodingBin{
+            |> child(:mp4_audio_transcoder, %AudioTranscoder{
               output_stream_format_module: Membrane.RawAudio
             })
             |> then(&maybe_plug_resampler(&1, options))

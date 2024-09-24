@@ -1,4 +1,5 @@
-defmodule Boombox.Utils.StreamFormatResolver do
+defmodule Boombox.Transcoding.StreamFormatResolver do
+  @moduledoc false
   use Membrane.Filter
 
   def_input_pad :input, accepted_format: _any

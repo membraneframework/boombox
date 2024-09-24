@@ -5,6 +5,7 @@ defmodule Boombox.HLS do
 
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.Ready
+  alias Boombox.Transcoding.AudioTranscoder
   alias Membrane.Time
 
   @spec link_output(
@@ -43,7 +44,7 @@ defmodule Boombox.HLS do
           {:audio, builder} ->
             builder
             # |> child(:hls_out_aac_encoder, Membrane.AAC.FDK.Encoder)
-            |> child(:mp4_audio_transcoding_bin, %Boombox.Utils.TranscodingBin{
+            |> child(:mp4_audio_transcoder, %AudioTranscoder{
               output_stream_format_module: Membrane.AAC
             })
             |> via_in(Pad.ref(:input, :audio),

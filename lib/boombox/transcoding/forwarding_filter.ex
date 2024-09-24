@@ -1,11 +1,5 @@
-defmodule Boombox.Utils.ForwardingFilter do
+defmodule Boombox.Transcoding.ForwardingFilter do
   @moduledoc false
-
-  # An Element that
-  #  - is linked to the input od Transcoder
-  #  - notifies parent (Transcoder) about received stream format
-  #  - buffers incoming data, until output pad is linked
-
   use Membrane.Filter
 
   alias Membrane.TimestampQueue

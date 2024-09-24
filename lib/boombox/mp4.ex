@@ -4,6 +4,7 @@ defmodule Boombox.MP4 do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
+  alias Boombox.Transcoding.AudioTranscoder
 
   @spec create_input(String.t(), transport: :file | :http) :: Wait.t()
   def create_input(location, opts) do
@@ -64,7 +65,7 @@ defmodule Boombox.MP4 do
           {:audio, builder} ->
             builder
             # |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
-            |> child(:mp4_audio_transcoding_bin, %Boombox.Utils.TranscodingBin{
+            |> child(:mp4_audio_transcoder, %AudioTranscoder{
               output_stream_format_module: Membrane.AAC
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{

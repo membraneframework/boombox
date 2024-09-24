@@ -4,6 +4,7 @@ defmodule Boombox.WebRTC do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
+  alias Boombox.Transcoding.AudioTranscoder
 
   @spec create_input(Boombox.webrtc_signaling(), Boombox.output()) :: Wait.t()
   def create_input(signaling, output) do
@@ -90,7 +91,7 @@ defmodule Boombox.WebRTC do
           #   }
           # })
           # |> child(:webrtc_out_opus_encoder, Membrane.Opus.Encoder)
-          |> child(:mp4_audio_transcoding_bin, %Boombox.Utils.TranscodingBin{
+          |> child(:mp4_audio_transcoder, %AudioTranscoder{
             output_stream_format_module: Membrane.Opus
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)

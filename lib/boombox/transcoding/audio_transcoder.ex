@@ -1,11 +1,10 @@
-defmodule Boombox.Utils.TranscodingBin do
+defmodule Boombox.Transcoding.AudioTranscoder do
   @moduledoc false
-
   use Membrane.Bin
 
   require Membrane.Logger
 
-  alias Boombox.Utils.{ForwardingFilter, StreamFormatResolver}
+  alias Boombox.Transcoding.{ForwardingFilter, StreamFormatResolver}
   alias Membrane.{AAC, Funnel, Opus, RawAudio, RemoteStream}
 
   @type stream_format :: AAC.t() | Opus.t() | RemoteStream.t() | RawAudio.t()
