@@ -4,7 +4,10 @@ defmodule Boombox.MP4 do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
-  alias Boombox.Transcoding.AudioTranscoder
+  alias Boombox.Transcoding.{AudioTranscoder, VideoTranscoder}
+  alias Membrane.H264
+  alias Membrane.RawVideo
+  alias Membrane.VP8
 
   @spec create_input(String.t(), transport: :file | :http) :: Wait.t()
   def create_input(location, opts) do
@@ -34,8 +37,6 @@ defmodule Boombox.MP4 do
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
             |> child(:mp4_in_aac_parser, Membrane.AAC.Parser)
-
-          # |> child(:mp4_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
           {:audio, spec}
 
@@ -77,7 +78,22 @@ defmodule Boombox.MP4 do
 
           {:video, builder} ->
             builder
-            |> child(:mp4_out_h264_parser, %Membrane.H264.Parser{output_stream_structure: :avc3})
+            # |> child(:mp4_out_h264_parser, %Membrane.H264.Parser{output_stream_structure: :avc3})
+            |> child(:mp4_video_transcoder, %VideoTranscoder{
+              output_stream_format: fn
+                %H264{stream_structure: :annexb} = h264 ->
+                  %{h264 | stream_structure: :avc3, alignment: :au}
+
+                %H264{} = h264 ->
+                  %{h264 | alignment: :au}
+
+                %RawVideo{} ->
+                  %H264{stream_structure: :avc3, alignment: :au}
+
+                %VP8{} ->
+                  %H264{stream_structure: :avc3, alignment: :au}
+              end
+            })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)
         end)

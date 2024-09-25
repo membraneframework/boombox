@@ -6,7 +6,7 @@ defmodule Boombox.ElixirStream do
 
   alias __MODULE__.{Sink, Source}
   alias Boombox.Pipeline.Ready
-  alias Boombox.Transcoding.AudioTranscoder
+  alias Boombox.Transcoding.{AudioTranscoder, VideoTranscoder}
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
@@ -65,9 +65,12 @@ defmodule Boombox.ElixirStream do
 
           {:video, builder} ->
             builder
-            |> child(%Membrane.H264.Parser{output_stream_structure: :annexb})
-            |> child(Membrane.H264.FFmpeg.Decoder)
-            |> child(%Membrane.FFmpeg.SWScale.Converter{format: :RGB})
+            |> child(:elixir_stream_video_transcoder, %VideoTranscoder{
+              output_stream_format: Membrane.RawVideo
+            })
+            |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
+              format: :RGB
+            })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:elixir_stream_sink)
         end),

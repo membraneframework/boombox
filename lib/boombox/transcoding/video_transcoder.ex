@@ -2,6 +2,8 @@ defmodule Boombox.Transcoding.VideoTranscoder do
   @moduledoc false
   use Membrane.Bin
 
+  alias Boombox.Transcoding.{ForwardingFilter, StreamFormatResolver}
+  alias Membrane.Funnel
   alias Membrane.H264
   alias Membrane.RawVideo
   alias Membrane.VP8
@@ -10,6 +12,8 @@ defmodule Boombox.Transcoding.VideoTranscoder do
   def_output_pad :output, accepted_format: any_of(RawVideo, H264, VP8)
 
   @type stream_format :: H264.t() | VP8.t() | RawVideo.t()
+  @type stream_format_module :: H264 | VP8 | RawVideo
+  @type stream_format_resolver :: (stream_format() -> stream_format() | stream_format_module())
 
   def_options input_stream_format: [
                 spec: stream_format(),
@@ -22,29 +26,11 @@ defmodule Boombox.Transcoding.VideoTranscoder do
                 """
               ],
               output_stream_format: [
-                spec: stream_format(),
+                spec: stream_format() | stream_format_module() | stream_format_resolver(),
                 description: """
                 Format of the output stream.
                 """
               ]
-
-  @impl true
-  def handle_init(_ctx, opts) do
-    spec = [
-      bin_input()
-      |> child(:stream_format_resolver, StreamFormatResolver)
-      |> child(:forwarding_filter, ForwardingFilter),
-      child(:output_funnel, Funnel)
-      |> bin_output()
-    ]
-
-    state =
-      Map.from_struct(opts)
-      |> Map.put(:input_linked_with_output?, false)
-
-    {link_actions, state} = maybe_link_input_with_output(state)
-    {[spec: spec] ++ link_actions, state}
-  end
 
   @impl true
   def handle_init(_ctx, opts) do
@@ -86,22 +72,39 @@ defmodule Boombox.Transcoding.VideoTranscoder do
   end
 
   defp maybe_link_input_with_output(state) do
+    state =
+      %{state | input_linked_with_output?: true}
+      |> resolve_output_stream_format()
+
     spec =
       link_input_with_output(
         state.input_stream_format,
         state.output_stream_format
       )
 
-    state = %{state | input_linked_with_output?: true}
     {[spec: spec], state}
   end
 
-  defp link_input_with_output(%H264{} = input_format, %H264{} = output_format)
-       when input_format.stream_structure != output_format.stream_structure or
-              input_format.alignment != output_format.alignment do
+  defp resolve_output_stream_format(%{output_stream_format: format} = state)
+       when is_struct(format) do
+    state
+  end
+
+  defp resolve_output_stream_format(%{output_stream_format: format_module} = state)
+       when is_atom(format_module) do
+    %{state | output_stream_format: struct(format_module)}
+  end
+
+  defp resolve_output_stream_format(%{output_stream_format: format_resolver} = state)
+       when is_function(format_resolver) do
+    %{state | output_stream_format: format_resolver.(state.input_stream_format)}
+    |> resolve_output_stream_format()
+  end
+
+  defp link_input_with_output(%H264{}, %H264{} = output_format) do
     get_child(:forwarding_filter)
     |> child(:h264_parser, %H264.Parser{
-      output_stream_structure: output_format.stream_structure,
+      output_stream_structure: stream_structure_type(output_format),
       output_alignment: output_format.alignment
     })
     |> get_child(:output_funnel)
@@ -169,12 +172,19 @@ defmodule Boombox.Transcoding.VideoTranscoder do
        when h264.stream_structure != :annexb or h264.alignment != :au do
     builder
     |> child(:h264_input_parser, %H264.Parser{
-      output_stream_structure: h264.stream_structure,
+      output_stream_structure: stream_structure_type(h264),
       output_alignment: h264.alignment
     })
   end
 
   defp maybe_plug_output_parser(builder, _output_format) do
     builder
+  end
+
+  defp stream_structure_type(%H264{stream_structure: stream_structure}) do
+    case stream_structure do
+      type when type in [:annexb, :avc1, :avc3] -> type
+      {type, _dcr} when type in [:avc1, :avc3] -> type
+    end
   end
 end

@@ -101,6 +101,7 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", kinds: [:video])
   end
 
+  @tag :dupa
   @tag :webrtc2
   async_test "mp4 -> webrtc -> webrtc -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
