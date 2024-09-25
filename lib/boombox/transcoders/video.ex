@@ -5,13 +5,14 @@ defmodule Boombox.Transcoders.Video do
   alias Boombox.Transcoders.Helpers.{ForwardingFilter, StreamFormatResolver}
   alias Membrane.Funnel
   alias Membrane.H264
+  alias Membrane.H265
   alias Membrane.RawVideo
   alias Membrane.VP8
 
   def_input_pad :input, accepted_format: any_of(RawVideo, H264, VP8)
   def_output_pad :output, accepted_format: any_of(RawVideo, H264, VP8)
 
-  @type stream_format :: H264.t() | VP8.t() | RawVideo.t()
+  @type stream_format :: H264.t() | H265.t() | VP8.t() | RawVideo.t()
   @type stream_format_module :: H264 | VP8 | RawVideo
   @type stream_format_resolver :: (stream_format() -> stream_format() | stream_format_module())
 
@@ -128,8 +129,28 @@ defmodule Boombox.Transcoders.Video do
     })
   end
 
+  defp maybe_plug_input_parser(builder, %H264{}) do
+    builder
+    |> child(:h264_input_parser, %H264.Parser{
+      output_stream_structure: :annexb,
+      output_alignment: :au
+    })
+  end
+
+  defp maybe_plug_input_parser(builder, %H265{}) do
+    builder
+    |> child(:h264_input_parser, %H265.Parser{
+      output_stream_structure: :annexb,
+      output_alignment: :au
+    })
+  end
+
   defp maybe_plug_input_parser(builder, _input_format) do
     builder
+  end
+
+  defp maybe_plug_decoder(builder, %H265{}) do
+    builder |> child(:h265_decoder, %H265.FFmpeg.Decoder{})
   end
 
   defp maybe_plug_decoder(builder, %H264{}) do
@@ -159,8 +180,7 @@ defmodule Boombox.Transcoders.Video do
     builder
   end
 
-  defp maybe_plug_output_parser(builder, %H264{} = h264)
-       when h264.stream_structure != :annexb or h264.alignment != :au do
+  defp maybe_plug_output_parser(builder, %H264{} = h264) do
     builder
     |> child(:h264_input_parser, %H264.Parser{
       output_stream_structure: stream_structure_type(h264),

@@ -53,6 +53,7 @@ defmodule Boombox.Mixfile do
       {:membrane_vpx_plugin, "~> 0.2.0"},
       {:membrane_h26x_plugin, "~> 0.10.0"},
       {:membrane_h264_ffmpeg_plugin, "~> 0.32.0"},
+      {:membrane_h265_ffmpeg_plugin, "~> 0.4.1"},
       {:membrane_mp4_plugin, "~> 0.35.2"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.18.5"},
