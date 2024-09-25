@@ -1,4 +1,4 @@
-defmodule Boombox.Transcoding.StreamFormatResolver do
+defmodule Boombox.Transcoders.Helpers.StreamFormatResolver do
   @moduledoc false
   use Membrane.Filter
 

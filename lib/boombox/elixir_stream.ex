@@ -6,7 +6,7 @@ defmodule Boombox.ElixirStream do
 
   alias __MODULE__.{Sink, Source}
   alias Boombox.Pipeline.Ready
-  alias Boombox.Transcoding.{AudioTranscoder, VideoTranscoder}
+  alias Boombox.Transcoders
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
@@ -56,7 +56,7 @@ defmodule Boombox.ElixirStream do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_audio_transcoder, %AudioTranscoder{
+            |> child(:mp4_audio_transcoder, %Transcoders.Audio{
               output_stream_format_module: Membrane.RawAudio
             })
             |> then(&maybe_plug_resampler(&1, options))
@@ -65,7 +65,7 @@ defmodule Boombox.ElixirStream do
 
           {:video, builder} ->
             builder
-            |> child(:elixir_stream_video_transcoder, %VideoTranscoder{
+            |> child(:elixir_stream_video_transcoder, %Transcoders.Video{
               output_stream_format: Membrane.RawVideo
             })
             |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{

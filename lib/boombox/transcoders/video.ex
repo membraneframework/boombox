@@ -1,8 +1,8 @@
-defmodule Boombox.Transcoding.VideoTranscoder do
+defmodule Boombox.Transcoders.Video do
   @moduledoc false
   use Membrane.Bin
 
-  alias Boombox.Transcoding.{ForwardingFilter, StreamFormatResolver}
+  alias Boombox.Transcoders.Helpers.{ForwardingFilter, StreamFormatResolver}
   alias Membrane.Funnel
   alias Membrane.H264
   alias Membrane.RawVideo

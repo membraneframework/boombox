@@ -1,4 +1,4 @@
-defmodule Boombox.Transcoding.ForwardingFilter do
+defmodule Boombox.Transcoders.Helpers.ForwardingFilter do
   @moduledoc false
   use Membrane.Filter
 

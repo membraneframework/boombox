@@ -5,7 +5,7 @@ defmodule Boombox.HLS do
 
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.Ready
-  alias Boombox.Transcoding.{AudioTranscoder, VideoTranscoder}
+  alias Boombox.Transcoders
   alias Membrane.H264
   alias Membrane.Time
 
@@ -44,7 +44,7 @@ defmodule Boombox.HLS do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_audio_transcoder, %AudioTranscoder{
+            |> child(:mp4_audio_transcoder, %Transcoders.Audio{
               output_stream_format_module: Membrane.AAC
             })
             |> via_in(Pad.ref(:input, :audio),
@@ -54,7 +54,7 @@ defmodule Boombox.HLS do
 
           {:video, builder} ->
             builder
-            |> child(:hls_video_transcoder, %VideoTranscoder{
+            |> child(:hls_video_transcoder, %Transcoders.Video{
               output_stream_format: %H264{alignment: :au, stream_structure: :avc3}
             })
             |> via_in(Pad.ref(:input, :video),

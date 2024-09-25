@@ -1,10 +1,10 @@
-defmodule Boombox.Transcoding.AudioTranscoder do
+defmodule Boombox.Transcoders.Audio do
   @moduledoc false
   use Membrane.Bin
 
   require Membrane.Logger
 
-  alias Boombox.Transcoding.{ForwardingFilter, StreamFormatResolver}
+  alias Boombox.Transcoders.Helpers.{ForwardingFilter, StreamFormatResolver}
   alias Membrane.{AAC, Funnel, Opus, RawAudio, RemoteStream}
 
   @type stream_format :: AAC.t() | Opus.t() | RemoteStream.t() | RawAudio.t()
@@ -20,21 +20,10 @@ defmodule Boombox.Transcoding.AudioTranscoder do
 
   def_options input_stream_format: [
                 spec: stream_format(),
-                default: nil,
-                description: """
-                Format of the input stream.
-
-                If set to nil, bin will resolve it based on the input stream format coming via the \
-                `:input` pad.
-                """
+                default: nil
               ],
               output_stream_format_module: [
-                spec: stream_format_module(),
-                description: """
-                Format of the output stream.
-
-                Input stream will be transcoded, if it doesn't match the output stream format.
-                """
+                spec: stream_format_module()
               ]
 
   @impl true
