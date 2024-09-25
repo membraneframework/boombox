@@ -15,6 +15,7 @@ defmodule BoomboxTest do
   @bbb_mp4 "test/fixtures/bun10s.mp4"
   @bbb_mp4_a "test/fixtures/bun10s_a.mp4"
   @bbb_mp4_v "test/fixtures/bun10s_v.mp4"
+  @bbb_mp4_h265  "test/fixtures/bun10s_h265.mp4"
 
   @moduletag :tmp_dir
 
@@ -23,6 +24,13 @@ defmodule BoomboxTest do
     output = Path.join(tmp, "output.mp4")
     Boombox.run(input: @bbb_mp4, output: output)
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  @tag :file_h265_file_mp4
+  async_test "mp4 file (H265) -> mp4 file (H264)", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: @bbb_mp4_h265, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_h265_to_h264.mp4")
   end
 
   @tag :file_file_file_mp4

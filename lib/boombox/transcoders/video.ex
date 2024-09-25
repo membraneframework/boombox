@@ -9,11 +9,11 @@ defmodule Boombox.Transcoders.Video do
   alias Membrane.RawVideo
   alias Membrane.VP8
 
-  def_input_pad :input, accepted_format: any_of(RawVideo, H264, VP8)
+  def_input_pad :input, accepted_format: any_of(RawVideo, H264, H265, VP8)
   def_output_pad :output, accepted_format: any_of(RawVideo, H264, VP8)
 
   @type stream_format :: H264.t() | H265.t() | VP8.t() | RawVideo.t()
-  @type stream_format_module :: H264 | VP8 | RawVideo
+  @type stream_format_module :: H264 | VP8 | H265 | RawVideo
   @type stream_format_resolver :: (stream_format() -> stream_format() | stream_format_module())
 
   def_options input_stream_format: [
@@ -139,7 +139,7 @@ defmodule Boombox.Transcoders.Video do
 
   defp maybe_plug_input_parser(builder, %H265{}) do
     builder
-    |> child(:h264_input_parser, %H265.Parser{
+    |> child(:h265_input_parser, %H265.Parser{
       output_stream_structure: :annexb,
       output_alignment: :au
     })
@@ -182,7 +182,7 @@ defmodule Boombox.Transcoders.Video do
 
   defp maybe_plug_output_parser(builder, %H264{} = h264) do
     builder
-    |> child(:h264_input_parser, %H264.Parser{
+    |> child(:h264_output_parser, %H264.Parser{
       output_stream_structure: stream_structure_type(h264),
       output_alignment: h264.alignment
     })

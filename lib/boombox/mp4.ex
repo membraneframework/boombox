@@ -6,8 +6,9 @@ defmodule Boombox.MP4 do
   alias Boombox.Pipeline.{Ready, Wait}
   alias Boombox.Transcoders
   alias Membrane.H264
-  alias Membrane.RawVideo
-  alias Membrane.VP8
+  alias Membrane.H265
+
+  defguardp is_h264_or_h265(format) when is_struct(format) and format.__struct__ in [H264, H265]
 
   @spec create_input(String.t(), transport: :file | :http) :: Wait.t()
   def create_input(location, opts) do
@@ -40,7 +41,7 @@ defmodule Boombox.MP4 do
 
           {:audio, spec}
 
-        {id, %Membrane.H264{}} ->
+        {id, video_format} when is_h264_or_h265(video_format) ->
           spec =
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
@@ -85,10 +86,7 @@ defmodule Boombox.MP4 do
                 %H264{} = h264 ->
                   %{h264 | alignment: :au}
 
-                %RawVideo{} ->
-                  %H264{stream_structure: :avc3, alignment: :au}
-
-                %VP8{} ->
+                _not_h264 ->
                   %H264{stream_structure: :avc3, alignment: :au}
               end
             })
