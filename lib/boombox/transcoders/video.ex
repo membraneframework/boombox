@@ -68,12 +68,7 @@ defmodule Boombox.Transcoders.Video do
       %{state | input_linked_with_output?: true}
       |> resolve_output_stream_format()
 
-    spec =
-      link_input_with_output(
-        state.input_stream_format,
-        state.output_stream_format
-      )
-
+    spec = link_input_with_output(state.input_stream_format, state.output_stream_format)
     {[spec: spec], state}
   end
 
@@ -107,88 +102,59 @@ defmodule Boombox.Transcoders.Video do
     This bin will only forward buffers, as the input stream format is the same type as the output stream format.
     """)
 
-    get_child(:forwarding_filter)
-    |> get_child(:output_funnel)
+    get_child(:forwarding_filter) |> get_child(:output_funnel)
   end
 
   defp link_input_with_output(input_format, output_format) do
     get_child(:forwarding_filter)
-    |> maybe_plug_input_parser(input_format)
-    |> maybe_plug_decoder(input_format)
-    |> maybe_plug_encoder(output_format)
-    |> maybe_plug_output_parser(output_format)
+    |> maybe_plug_parser_and_decoder(input_format)
+    |> maybe_plug_encoder_and_parser(output_format)
     |> get_child(:output_funnel)
   end
 
-  defp maybe_plug_input_parser(builder, %H264{} = h264)
-       when h264.stream_structure != :annexb or h264.alignment != :au do
+  defp maybe_plug_parser_and_decoder(builder, %H264{}) do
     builder
     |> child(:h264_input_parser, %H264.Parser{
       output_stream_structure: :annexb,
       output_alignment: :au
     })
+    |> child(:h264_decoder, %H264.FFmpeg.Decoder{})
   end
 
-  defp maybe_plug_input_parser(builder, %H264{}) do
-    builder
-    |> child(:h264_input_parser, %H264.Parser{
-      output_stream_structure: :annexb,
-      output_alignment: :au
-    })
-  end
-
-  defp maybe_plug_input_parser(builder, %H265{}) do
+  defp maybe_plug_parser_and_decoder(builder, %H265{}) do
     builder
     |> child(:h265_input_parser, %H265.Parser{
       output_stream_structure: :annexb,
       output_alignment: :au
     })
+    |> child(:h265_decoder, %H265.FFmpeg.Decoder{})
   end
 
-  defp maybe_plug_input_parser(builder, _input_format) do
-    builder
-  end
-
-  defp maybe_plug_decoder(builder, %H265{}) do
-    builder |> child(:h265_decoder, %H265.FFmpeg.Decoder{})
-  end
-
-  defp maybe_plug_decoder(builder, %H264{}) do
-    builder |> child(:h264_decoder, %H264.FFmpeg.Decoder{})
-  end
-
-  defp maybe_plug_decoder(buidler, %VP8{}) do
+  defp maybe_plug_parser_and_decoder(buidler, %VP8{}) do
     # todo: maybe specify framerate in decoder options
     buidler |> child(:vp8_decoder, %VP8.Decoder{})
   end
 
-  defp maybe_plug_decoder(builder, %RawVideo{}) do
+  defp maybe_plug_parser_and_decoder(builder, %RawVideo{}) do
     builder
   end
 
-  defp maybe_plug_encoder(builder, %H264{}) do
+  defp maybe_plug_encoder_and_parser(builder, %H264{} = h264) do
     # todo: specify different preset in eg. mp4
-    builder |> child(:h264_encoder, %H264.FFmpeg.Encoder{preset: :ultrafast})
-  end
-
-  defp maybe_plug_encoder(builder, %VP8{}) do
-    # todo: check if no option is required
-    builder |> child(:vp8_encoder, %VP8.Encoder{})
-  end
-
-  defp maybe_plug_encoder(builder, %RawVideo{}) do
     builder
-  end
-
-  defp maybe_plug_output_parser(builder, %H264{} = h264) do
-    builder
+    |> child(:h264_encoder, %H264.FFmpeg.Encoder{preset: :ultrafast})
     |> child(:h264_output_parser, %H264.Parser{
       output_stream_structure: stream_structure_type(h264),
       output_alignment: h264.alignment
     })
   end
 
-  defp maybe_plug_output_parser(builder, _output_format) do
+  defp maybe_plug_encoder_and_parser(builder, %VP8{}) do
+    # todo: check if no option is required
+    builder |> child(:vp8_encoder, %VP8.Encoder{})
+  end
+
+  defp maybe_plug_encoder_and_parser(builder, %RawVideo{}) do
     builder
   end
 
