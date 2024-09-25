@@ -17,19 +17,10 @@ defmodule Boombox.Transcoders.Video do
 
   def_options input_stream_format: [
                 spec: stream_format(),
-                default: nil,
-                description: """
-                Format of the input stream.
-
-                If set to nil, bin will resolve it based on the input stream format coming via the \
-                `:input` pad.
-                """
+                default: nil
               ],
               output_stream_format: [
-                spec: stream_format() | stream_format_module() | stream_format_resolver(),
-                description: """
-                Format of the output stream.
-                """
+                spec: stream_format() | stream_format_module() | stream_format_resolver()
               ]
 
   @impl true
