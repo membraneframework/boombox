@@ -15,7 +15,7 @@ defmodule BoomboxTest do
   @bbb_mp4 "test/fixtures/bun10s.mp4"
   @bbb_mp4_a "test/fixtures/bun10s_a.mp4"
   @bbb_mp4_v "test/fixtures/bun10s_v.mp4"
-  @bbb_mp4_h265  "test/fixtures/bun10s_h265.mp4"
+  @bbb_mp4_h265 "test/fixtures/bun10s_h265.mp4"
 
   @moduletag :tmp_dir
 
