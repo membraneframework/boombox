@@ -2,7 +2,7 @@ defmodule Boombox.Transcoders.Video do
   @moduledoc false
   use Membrane.Bin
 
-  alias Boombox.Transcoders.Helpers.{ForwardingFilter, StreamFormatResolver}
+  alias Boombox.Transcoders.Helpers.ForwardingFilter
   alias Membrane.Funnel
   alias Membrane.H264
   alias Membrane.H265
@@ -28,7 +28,6 @@ defmodule Boombox.Transcoders.Video do
   def handle_init(_ctx, opts) do
     spec = [
       bin_input()
-      |> child(:stream_format_resolver, StreamFormatResolver)
       |> child(:forwarding_filter, ForwardingFilter),
       child(:output_funnel, Funnel)
       |> bin_output()
@@ -43,12 +42,7 @@ defmodule Boombox.Transcoders.Video do
   end
 
   @impl true
-  def handle_child_notification(
-        {:stream_format, stream_format},
-        :stream_format_resolver,
-        _ctx,
-        state
-      ) do
+  def handle_child_notification({:stream_format, stream_format}, :forwarding_filter, _ctx, state) do
     %{state | input_stream_format: stream_format}
     |> maybe_link_input_with_output()
   end

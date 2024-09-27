@@ -4,7 +4,7 @@ defmodule Boombox.Transcoders.Audio do
 
   require Membrane.Logger
 
-  alias Boombox.Transcoders.Helpers.{ForwardingFilter, StreamFormatResolver}
+  alias Boombox.Transcoders.Helpers.ForwardingFilter
   alias Membrane.{AAC, Funnel, Opus, RawAudio, RemoteStream}
 
   @type stream_format :: AAC.t() | Opus.t() | RemoteStream.t() | RawAudio.t()
@@ -30,7 +30,6 @@ defmodule Boombox.Transcoders.Audio do
   def handle_init(_ctx, opts) do
     spec = [
       bin_input()
-      |> child(:stream_format_resolver, StreamFormatResolver)
       |> child(:forwarding_filter, ForwardingFilter),
       child(:output_funnel, Funnel)
       |> bin_output()
@@ -45,12 +44,7 @@ defmodule Boombox.Transcoders.Audio do
   end
 
   @impl true
-  def handle_child_notification(
-        {:stream_format, stream_format},
-        :stream_format_resolver,
-        _ctx,
-        state
-      ) do
+  def handle_child_notification({:stream_format, stream_format}, :forwarding_filter, _ctx, state) do
     %{state | input_stream_format: stream_format}
     |> maybe_link_input_with_output()
   end

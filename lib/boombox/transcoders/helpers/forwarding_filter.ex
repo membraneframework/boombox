@@ -49,13 +49,16 @@ defmodule Boombox.Transcoders.Helpers.ForwardingFilter do
   @impl true
   def handle_stream_format(_input_pad_ref, stream_format, _ctx, state)
       when is_output_linked(state) do
-    {[stream_format: {state.output_pad_ref, stream_format}]}
+    {[
+       stream_format: {state.output_pad_ref, stream_format},
+       notify_parent: {:stream_format, stream_format}
+     ], state}
   end
 
   @impl true
   def handle_stream_format(input_pad_ref, stream_format, _ctx, state) do
     queue = TimestampQueue.push_stream_format(state.queue, input_pad_ref, stream_format)
-    {[], %{state | queue: queue}}
+    {[notify_parent: {:stream_format, stream_format}], %{state | queue: queue}}
   end
 
   @impl true
