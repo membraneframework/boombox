@@ -77,7 +77,7 @@ defmodule Boombox.RTSP do
 
           {[], Map.put(track_builders, :video, video_spec)}
 
-        %{rtpmap: %{encoding: "MP4A-LATM"}} ->
+        %{rtpmap: %{encoding: "mpeg4-generic", type: :audio}} ->
           audio_spec =
             get_child(:rtsp_source)
             |> via_out(Membrane.Pad.ref(:output, ssrc))
