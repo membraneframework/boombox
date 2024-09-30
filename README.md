@@ -66,14 +66,16 @@ For more examples, see [examples.livemd](examples.livemd).
 
 ## Supported formats & protocols
 
-| format | direction |
-|---|---|
-| MP4 | input, output |
-| WebRTC | input, output |
-| RTMP | input |
-| RTSP | input |
-| HLS | output |
-| Elixir Stream | input, output |
+| format | input | output |
+|---|---|---|
+| MP4 | `"*.mp4"` | `"*.mp4"` |
+| WebRTC | `{:webrtc, signaling}` | `{:webrtc, signaling}` |
+| RTMP | `"rtmp://*"` | _not supported_ |
+| RTSP | `"rtsp://*"` | _not supported_ |
+| HLS | _not supported_ | `"*.m3u8"` |
+| `Enumerable.t()` | `{:stream, opts}` | `{:stream, opts}` |
+
+For the full list of input and output options, see [`Boombox.run/2`](https://hexdocs.pm/boombox/Boombox.html#run/2)
 
 ## Installation
 
