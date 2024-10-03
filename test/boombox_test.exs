@@ -232,75 +232,46 @@ defmodule BoomboxTest do
     end)
   end
 
-  @tag :rtsp_mp4_video
-  async_test "rtsp video -> mp4", %{tmp_dir: tmp} do
-    rtp_server_port = 30_003
+  @tag :rtsp_mp4
+  async_test "rtsp -> mp4", %{tmp_dir: tmp} do
     rtsp_port = 8554
     output = Path.join(tmp, "output.mp4")
 
-    {:ok, _server} =
-      Membrane.RTSP.Server.start_link(
-        handler: Membrane.Support.RTSP.Server.Handler,
-        handler_config: %{fixture_path: @bbb_mp4},
-        address: {127, 0, 0, 1},
-        port: rtsp_port,
-        udp_rtp_port: rtp_server_port,
-        udp_rtcp_port: rtp_server_port + 1
-      )
+    Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
 
-    Boombox.run(input: "rtsp://localhost:#{rtsp_port}/livestream", output: output)
-    Compare.compare(output, "test/fixtures/ref_bun10s_rtsp.mp4", kinds: [:video])
+    Boombox.run(input: "rtsp://localhost:#{rtsp_port}/", output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_rtsp_aac.mp4")
   end
 
-  @tag :rtsp_hls_video
-  async_test "rtsp video -> hls", %{tmp_dir: tmp} do
-    rtp_server_port = 30_005
+  @tag :rtsp_hls
+  async_test "rtsp -> hls", %{tmp_dir: tmp} do
     rtsp_port = 8555
-
-    {:ok, _server} =
-      Membrane.RTSP.Server.start_link(
-        handler: Membrane.Support.RTSP.Server.Handler,
-        handler_config: %{fixture_path: @bbb_mp4},
-        address: {127, 0, 0, 1},
-        port: rtsp_port,
-        udp_rtp_port: rtp_server_port,
-        udp_rtcp_port: rtp_server_port + 1
-      )
-
+    Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
     manifest_filename = Path.join(tmp, "index.m3u8")
-    Boombox.run(input: "rtsp://localhost:#{rtsp_port}/livestream", output: manifest_filename)
-    ref_path = "test/fixtures/ref_bun10s_aac_hls"
-    Compare.compare(tmp, ref_path, kinds: [:video], format: :hls)
+    Boombox.run(input: "rtsp://localhost:#{rtsp_port}/", output: manifest_filename)
+    ref_path = "test/fixtures/ref_bun10s_rtsp_aac_hls"
+    Compare.compare(tmp, ref_path, format: :hls)
   end
 
-  @tag :rtsp_webrtc_mp4_video
-  async_test "rtsp video -> webrtc -> mp4", %{tmp_dir: tmp} do
-    rtp_server_port = 30_007
+  @tag :rtsp_webrtc_mp4
+  async_test "rtsp -> webrtc -> mp4", %{tmp_dir: tmp} do
     rtsp_port = 8556
     output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.SignalingChannel.new()
 
-    {:ok, _server} =
-      Membrane.RTSP.Server.start_link(
-        handler: Membrane.Support.RTSP.Server.Handler,
-        handler_config: %{fixture_path: @bbb_mp4_v},
-        address: {127, 0, 0, 1},
-        port: rtsp_port,
-        udp_rtp_port: rtp_server_port,
-        udp_rtcp_port: rtp_server_port + 1
-      )
+    Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
 
     t =
       Task.async(fn ->
         Boombox.run(
-          input: "rtsp://localhost:#{rtsp_port}/livestream",
+          input: "rtsp://localhost:#{rtsp_port}/",
           output: {:webrtc, signaling}
         )
       end)
 
     Boombox.run(input: {:webrtc, signaling}, output: output)
     Task.await(t)
-    Compare.compare(output, "test/fixtures/ref_bun10s_rtsp.mp4", kinds: [:video])
+    Compare.compare(output, "test/fixtures/ref_bun10s_rtsp_opus_aac.mp4")
   end
 
   @tag :mp4_elixir_rotate_mp4
@@ -403,7 +374,8 @@ defmodule BoomboxTest do
         |> child(Membrane.Realtimer)
         |> child(:audio_parser, %Membrane.AAC.Parser{
           out_encapsulation: :none,
-          output_config: :esds
+          output_config: :esds,
+          audio_specific_config: nil
         })
         |> via_in(Pad.ref(:audio, 0))
         |> get_child(:rtmp_sink),
