@@ -1,4 +1,5 @@
-# Boombox
+![boombox_horizontal](https://github.com/user-attachments/assets/3e0adc4e-9702-47c3-b3ac-561c0575c17b)
+
 
 [![Hex.pm](https://img.shields.io/hexpm/v/boombox.svg)](https://hex.pm/packages/boombox)
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/boombox)
