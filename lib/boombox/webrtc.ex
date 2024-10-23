@@ -6,6 +6,8 @@ defmodule Boombox.WebRTC do
   alias Boombox.Pipeline.{Ready, Wait}
   alias Boombox.Transcoders
   alias Membrane.H264
+  alias Membrane.RawVideo
+  alias Membrane.VP8
 
   @spec create_input(Boombox.webrtc_signaling(), Boombox.output()) :: Wait.t()
   def create_input(signaling, output) do
