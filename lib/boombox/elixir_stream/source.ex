@@ -1,4 +1,4 @@
-defmodule Source do
+defmodule Boombox.ElixirStream.Source do
   @moduledoc false
   use Membrane.Source
 

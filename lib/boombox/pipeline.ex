@@ -62,7 +62,9 @@ defmodule Boombox.Pipeline do
                   track_builders: nil,
                   last_result: nil,
                   eos_info: nil,
-                  rtsp_state: nil
+                  rtsp_state: nil,
+                  pending_new_tracks: %{input: [], output: []},
+                  webrtc_output_state: nil
                 ]
 
     @typedoc """
@@ -92,7 +94,8 @@ defmodule Boombox.Pipeline do
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
             eos_info: term(),
             rtsp_state: Boombox.RTSP.rtsp_state() | nil,
-            parent: pid()
+            parent: pid(),
+            webrtc_output_state: Boombox.WebRTC.webrtc_output_state() | nil
           }
   end
 

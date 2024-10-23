@@ -4,10 +4,10 @@
 #EXT-X-MEDIA-SEQUENCE:0
 #EXT-X-DISCONTINUITY-SEQUENCE:0
 #EXT-X-MAP:URI="muxed_header_g3cFdmlkZW8_part_0.mp4"
-#EXTINF:4.80365593,
+#EXTINF:4.804,
 muxed_segment_0_g3cFdmlkZW8.m4s
-#EXTINF:4.288194112,
+#EXTINF:4.2875,
 muxed_segment_1_g3cFdmlkZW8.m4s
-#EXTINF:0.924473961,
+#EXTINF:0.914,
 muxed_segment_2_g3cFdmlkZW8.m4s
 #EXT-X-ENDLIST

@@ -47,10 +47,9 @@ defmodule Boombox.RTMP do
       child(:rtmp_source, %RTMP.SourceBin{client_ref: client_ref})
       |> via_out(:audio)
       |> child(:rtmp_in_aac_parser, Membrane.AAC.Parser)
-      |> child(:rtmp_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
     track_builders = %{
-      audio: get_child(:rtmp_in_aac_decoder),
+      audio: get_child(:rtmp_in_aac_parser),
       video: get_child(:rtmp_source) |> via_out(:video)
     }
 
