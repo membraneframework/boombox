@@ -93,7 +93,11 @@ defmodule Boombox.WebRTC do
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
           |> child(:webrtc_video_transcoder, %Transcoders.Video{
-            output_stream_format: %H264{alignment: :nalu, stream_structure: :annexb}
+            output_stream_format: fn
+              %H264{} = h264 -> %H264{h264 | alignment: :nalu, stream_structure: :annexb}
+              %VP8{} = vp8 -> vp8
+              %RawVideo{} -> %H264{alignment: :nalu, stream_structure: :annexb}
+            end
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)

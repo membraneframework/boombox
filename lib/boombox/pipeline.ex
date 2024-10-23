@@ -62,7 +62,8 @@ defmodule Boombox.Pipeline do
                   track_builders: nil,
                   last_result: nil,
                   eos_info: nil,
-                  rtsp_state: nil
+                  rtsp_state: nil,
+                  pending_new_tracks: %{input: [], output: []}
                 ]
 
     @typedoc """
