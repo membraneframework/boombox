@@ -25,7 +25,8 @@ defmodule Boombox.ElixirStream do
         :audio ->
           {:audio,
            get_child(:elixir_stream_source)
-           |> via_out(Pad.ref(:output, :audio))}
+           |> via_out(Pad.ref(:output, :audio))
+           |> child(Utils.SilenceFiller)}
       end)
 
     spec_builder =

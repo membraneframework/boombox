@@ -21,8 +21,8 @@ defmodule Boombox.Packet do
               audio_channels: pos_integer()
             }
 
-  @enforce_keys [:payload, :pts, :kind]
-  defstruct @enforce_keys ++ [format: %{}]
+  @enforce_keys [:payload, :kind]
+  defstruct @enforce_keys ++ [pts: nil, format: %{}]
 
   @spec update_payload(t(), (payload() -> payload())) :: t()
   def update_payload(packet, fun) do
