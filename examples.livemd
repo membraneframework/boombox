@@ -169,7 +169,11 @@ end)
 
 ## Talk to Chat GPT
 
-The module below is a simple interface to the OpenAI realtime audio API. It accepts PCM audio (1 channel, 24kHz, s16le) and responds in the same format. Thanks to that, we don't need to do text to speech nor speech to text. This results in very low latency and simple logic.
+This example let's you perform a natural conversation with Chat GPT using voice. Boombox is used to deliver audio between the browser and server. It uses WebRTC, which is probably the best option for this use case.
+
+The module below is a simple interface to the OpenAI realtime audio API. It accepts PCM audio (1 channel, 24kHz, s16le) and responds in the same format. Thanks to that, we don't need to do speech to text nor text to speech. This results in very low latency and simple logic.
+
+If you prefer open source solutions, there's [Ultravox](https://github.com/fixie-ai/ultravox), but while it accepts audio, it outputs text for now, so you'd need TTS. If there's anything else we should link here, please open a PR.
 
 ```elixir
 defmodule OpenAIWebSocket do
@@ -177,10 +181,11 @@ defmodule OpenAIWebSocket do
   require Logger
 
   def start_link(opts) do
+    # OpenAI API docs: https://platform.openai.com/docs/guides/realtime
     WebSockex.start_link(
       "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
       __MODULE__,
-      %{is_done: true, response: <<>>},
+      %{response: <<>>},
       extra_headers: [
         {"Authorization", "Bearer " <> opts[:token]},
         {"OpenAI-Beta", "realtime=v1"}
@@ -195,6 +200,7 @@ defmodule OpenAIWebSocket do
   end
 
   def get_response_chunk(ws, chunk_byte_size) do
+    # There's no 'call' in WebSockex, so we just send and receive
     send(ws, {:get_response_chunk, chunk_byte_size, self()})
 
     receive do
@@ -207,34 +213,37 @@ defmodule OpenAIWebSocket do
     case Jason.decode!(frame) do
       %{"type" => "response.audio.delta", "delta" => delta} ->
         audio_payload = Base.decode64!(delta)
-        response = if state.is_done, do: audio_payload, else: state.response <> audio_payload
-        {:ok, %{state | response: response, is_done: false}}
+        # Buffer the response audio
+        response = state.response <> audio_payload
+        {:ok, %{state | response: response}}
 
-      %{"type" => "response.audio.done"} ->
-        {:ok, %{state | is_done: true}}
+      %{"type" => "input_audio_buffer.speech_started"} ->
+        # If the user speaks, they may interrupt the current response,
+        # so we drop it and wait for a new one.
+        {:ok, %{state | response: <<>>}}
 
       %{"type" => "response.audio_transcript.done", "transcript" => transcript} ->
         Logger.info("AI transcription: #{transcript}")
         {:ok, state}
 
-      %{} ->
+      %{} = _event ->
         {:ok, state}
     end
   end
 
   @impl true
-  def handle_frame(_frame, state) do
-    {:ok, state}
-  end
+  def handle_frame(_frame, state), do: {:ok, state}
 
   @impl true
   def handle_info({:get_response_chunk, size, pid}, state) do
     case state.response do
       <<chunk::binary-size(size), rest::binary>> ->
+        # If we have enough data, send it back
         send(pid, {:response_chunk, chunk})
         {:ok, %{state | response: rest}}
 
       chunk ->
+        # Otherwise, send what we have, padded with silence
         silence = <<0::size(size - byte_size(chunk))-unit(8)>>
         send(pid, {:response_chunk, chunk <> silence})
         {:ok, %{state | response: <<>>}}
@@ -243,25 +252,34 @@ defmodule OpenAIWebSocket do
 end
 ```
 
-In the cell below, we receive stream from the browser via WebRTC, feed it to the API, receive response and send it back to the browser. You need to add the Open AI API token as a `OPEN_AI_TOKEN` secret in Livebook for this to wok. After running this cell, visit http://localhost:1234/talk_to_llm.html
+In the cell below, we receive stream from the browser via WebRTC, feed it to the API, receive response and send it back to the browser. You need to add the Open AI API token as a `OPEN_AI_TOKEN` secret in Livebook for this to wok. To connect via WebRTC, visit http://localhost:1234/talk_to_llm.html after running this cell
 
 ```elixir
 {:ok, ws} = OpenAIWebSocket.start_link(token: System.fetch_env!("LB_OPEN_AI_TOKEN"))
 
+# Ingress part
 Task.start_link(fn ->
   Boombox.run(
+    # Connect to the browser via WebRTC, using WebSocket for session establishment
     input: {:webrtc, "ws://localhost:8829"},
-    output:
-      {:stream,
-       video: false, audio: :binary, audio_format: :s16le, audio_channels: 1, audio_rate: 24_000}
+    output: {
+      :stream,
+      # Audio format that the OpenAI API expects 
+      video: false, audio: :binary, audio_format: :s16le, audio_channels: 1, audio_rate: 24_000
+    }
   )
   |> Enum.each(fn packet -> OpenAIWebSocket.send_audio(ws, packet.payload) end)
 end)
 
+# Egress part
+
+# We send 20 millisecond chunks to Boombox
 chunk_duration_ms = 20
+# Samples per second * bytes per sample * chunk duration in seconds
 chunk_byte_size = trunc(24_000 * 2 * chunk_duration_ms / 1_000)
 
 Stream.interval(chunk_duration_ms)
+# This emits the current time in milliseconds (0, 20, 40, 60...) every 20ms
 |> Stream.map(&(&1 * chunk_duration_ms))
 |> Stream.map(fn time ->
   response_chunk = OpenAIWebSocket.get_response_chunk(ws, chunk_byte_size)
@@ -270,11 +288,13 @@ Stream.interval(chunk_duration_ms)
     payload: response_chunk,
     kind: :audio,
     pts: Membrane.Time.milliseconds(time),
+    # Audio format that the OpenAI API outputs
     format: %{audio_format: :s16le, audio_channels: 1, audio_rate: 24_000}
   }
 end)
 |> Boombox.run(
   input: {:stream, audio: :binary, video: false},
+  # Connect to the browser via WebRTC, using WebSocket for session establishment
   output: {:webrtc, "ws://localhost:8830"}
 )
 ```
@@ -520,5 +540,3 @@ Boombox.run(
   output: {:webrtc, "ws://localhost:8830"}
 )
 ```
-
-<!-- livebook:{"offset":15167,"stamp":{"token":"XCP.Dw5MASYJ85K2MZPc4YdDgKMLHiSmhXAlzPRStv1wAxNkqROzJbevX2-F8BJfmiTZ9cqxYu0rAz8cI01OXbUuNuYdOFp_ba-BoQP15Yopk9pLQgiHURctXA","version":2}} -->
