@@ -46,11 +46,10 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.1"},
-      # {:membrane_webrtc_plugin, "~> 0.22.0"},
       {
         :membrane_webrtc_plugin,
-         github: "membraneframework/membrane_webrtc_plugin",
-         branch: "support-various-video-codecs-in-source"
+        github: "membraneframework/membrane_webrtc_plugin",
+        branch: "support-various-video-codecs-in-source"
       },
       {:membrane_opus_plugin, "~> 0.20.3"},
       {:membrane_aac_plugin, "~> 0.18.0"},

@@ -8,7 +8,7 @@ defmodule Boombox.MP4 do
   alias Membrane.H264
   alias Membrane.H265
 
-  defguardp is_h264_or_h265(format) when is_struct(format) and format.__struct__ in [H264, H265]
+  defguardp is_h26x(format) when is_struct(format) and format.__struct__ in [H264, H265]
 
   @spec create_input(String.t(), transport: :file | :http) :: Wait.t()
   def create_input(location, opts) do
@@ -41,7 +41,7 @@ defmodule Boombox.MP4 do
 
           {:audio, spec}
 
-        {id, video_format} when is_h264_or_h265(video_format) ->
+        {id, video_format} when is_h26x(video_format) ->
           spec =
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
