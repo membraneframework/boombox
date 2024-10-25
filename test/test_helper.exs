@@ -1,2 +1,2 @@
-# ExUnit.start(capture_log: true)
-ExUnit.start()
+ExUnit.start(capture_log: true)
+# ExUnit.start()
