@@ -49,9 +49,8 @@ defmodule Boombox.Mixfile do
       # {:membrane_webrtc_plugin, "~> 0.22.0"},
       {
         :membrane_webrtc_plugin,
-        #  github: "membraneframework/membrane_webrtc_plugin",
-        #  branch: "support-various-video-codecs-in-source"},
-        path: "../membrane_webrtc_plugin"
+         github: "membraneframework/membrane_webrtc_plugin",
+         branch: "support-various-video-codecs-in-source"
       },
       {:membrane_opus_plugin, "~> 0.20.3"},
       {:membrane_aac_plugin, "~> 0.18.0"},
@@ -60,7 +59,6 @@ defmodule Boombox.Mixfile do
       {:membrane_h26x_plugin, "~> 0.10.0"},
       {:membrane_h264_ffmpeg_plugin, "~> 0.32.0"},
       {:membrane_h265_ffmpeg_plugin, "~> 0.4.2"},
-      # {:membrane_h265_ffmpeg_plugin,    github: "membraneframework-labs/membrane_h265_ffmpeg_plugin", branch: "release-0.4.2"},
       {:membrane_mp4_plugin, "~> 0.35.2"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.18.5"},
