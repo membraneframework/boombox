@@ -6,10 +6,10 @@ defmodule Boombox.WebRTC do
   alias Boombox.Pipeline.{Ready, State, Wait}
   alias Boombox.Transcoders
   alias Membrane.H264
-  alias Membrane.RawVideo
   alias Membrane.VP8
 
-  @type output_webrtc_state :: %{negotiated_video_codecs: [:vp8 | :h264]}
+  @type output_webrtc_state :: %{negotiated_video_codecs: [:vp8 | :h264] | nil}
+  @type webrtc_sink_new_tracks :: [%{id: term, kind: :audio | :video}]
 
   @spec create_input(Boombox.webrtc_signaling(), Boombox.output(), State.t()) :: Wait.t()
   def create_input(signaling, output, state) do
@@ -70,7 +70,7 @@ defmodule Boombox.WebRTC do
     %Ready{track_builders: track_builders}
   end
 
-  @spec create_output(Boombox.webrtc_signaling(), State.t()) :: {Wait.t(), State.t()}
+  @spec create_output(Boombox.webrtc_signaling(), State.t()) :: {Ready.t() | Wait.t(), State.t()}
   def create_output(signaling, state) do
     signaling = resolve_signaling(signaling)
     startup_tracks = if webrtc_input?(state), do: [:audio, :video], else: []
@@ -84,24 +84,28 @@ defmodule Boombox.WebRTC do
 
     state = %{state | output_webrtc_state: %{negotiated_video_codecs: nil}}
 
-    if webrtc_input?(state) do
-      {%Wait{actions: [spec: spec]}, state}
-    else
-      {%Ready{actions: [spec: spec]}, state}
-    end
+    status =
+      if webrtc_input?(state),
+        do: %Wait{actions: [spec: spec]},
+        else: %Ready{actions: [spec: spec]}
+
+    {status, state}
   end
 
-  @spec handle_output_video_codecs_negotiated([:h264 | :vp8], State.t()) :: {Ready.t(), State.t()}
+  @spec handle_output_video_codecs_negotiated([:h264 | :vp8], State.t()) ::
+          {Ready.t() | Wait.t(), State.t()}
   def handle_output_video_codecs_negotiated(codecs, state) do
     state = put_in(state.output_webrtc_state.negotiated_video_codecs, codecs)
-    if webrtc_input?(state) do
-      {%Ready{}, state}
-    else
-      {%Wait{}, state}
-    end
+    status = if webrtc_input?(state), do: %Ready{}, else: %Wait{}
+    {status, state}
   end
 
-  # @spec link_output(Boombox.Pipeline.track_builders()) :: Wait.t()
+  @spec link_output(
+          Boombox.Pipeline.track_builders(),
+          Membrane.ChildrenSpec.t(),
+          webrtc_sink_new_tracks(),
+          State.t()
+        ) :: Ready.t() | Wait.t()
   def link_output(track_builders, spec_builder, tracks, state) do
     if webrtc_input?(state) do
       do_link_output(track_builders, spec_builder, tracks, state)
@@ -111,14 +115,18 @@ defmodule Boombox.WebRTC do
     end
   end
 
-  # @spec handle_output_new_tracks(
-  #         Boombox.Pipeline.track_builders(),
-  #         Membrane.ChildrenSpec.t(),
-  #         Membrane.WebRTC.Sink.new_tracks(),
-  #         boolean()
-  #       ) :: Ready.t()
+  @spec handle_output_tracks_negotiated(
+          Boombox.Pipeline.track_builders(),
+          Membrane.ChildrenSpec.t(),
+          webrtc_sink_new_tracks(),
+          State.t()
+        ) :: Ready.t() | no_return()
   def handle_output_tracks_negotiated(track_builders, spec_builder, tracks, state) do
-    if webrtc_input?(state), do: raise("It cannot be :(")
+    if webrtc_input?(state) do
+      raise """
+      Currently ICE restart is not supported in Boombox instances having WebRTC input and output.
+      """
+    end
 
     do_link_output(track_builders, spec_builder, tracks, state)
   end
@@ -140,17 +148,27 @@ defmodule Boombox.WebRTC do
 
         {:video, builder} ->
           negotiated_codecs = state.output_webrtc_state.negotiated_video_codecs
-          vp8? = :vp8 in negotiated_codecs
-          h264? = :h264 in negotiated_codecs
+          vp8_negotiated? = :vp8 in negotiated_codecs
+          h264_negotiated? = :h264 in negotiated_codecs
 
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
           |> child(:webrtc_video_transcoder, %Transcoders.Video{
             output_stream_format: fn
-              %H264{} = h264 when h264? -> %H264{h264 | alignment: :nalu, stream_structure: :annexb}
-              %VP8{} = vp8 when vp8? -> vp8
-              _format when h264? -> %H264{alignment: :nalu, stream_structure: :annexb}
-              format when vp8? -> %VP8{width: format.width, height: format.height}
+              %H264{} = h264 when h264_negotiated? ->
+                %H264{h264 | alignment: :nalu, stream_structure: :annexb}
+
+              %VP8{} = vp8 when vp8_negotiated? ->
+                vp8
+
+              _format when h264_negotiated? ->
+                %H264{alignment: :nalu, stream_structure: :annexb}
+
+              %{width: width, height: height} when vp8_negotiated? ->
+                %VP8{width: width, height: height}
+
+              _format when vp8_negotiated? ->
+                VP8
             end
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])

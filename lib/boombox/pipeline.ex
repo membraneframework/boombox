@@ -345,8 +345,6 @@ defmodule Boombox.Pipeline do
     ]
 
     Boombox.WebRTC.link_output(track_builders, spec_builder, tracks, state)
-
-    # Boombox.WebRTC.handle_output_tracks_negotiated(track_builders, spec_builder, tracks)
   end
 
   defp link_output({:mp4, location}, track_builders, spec_builder, _ctx, _state) do
