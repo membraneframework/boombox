@@ -169,7 +169,7 @@ end)
 
 ## Talk to Chat GPT
 
-This example let's you perform a natural conversation with Chat GPT using voice. Boombox is used to deliver audio between the browser and server. It uses WebRTC, which is probably the best option for this use case.
+This example lets you perform a natural conversation with Chat GPT using voice. Boombox is used to deliver audio between the browser and server. It uses WebRTC, which is probably the best option for this case.
 
 The module below is a simple interface to the OpenAI realtime audio API. It accepts PCM audio (1 channel, 24kHz, s16le) and responds in the same format. Thanks to that, we don't need to do speech to text nor text to speech. This results in very low latency and simple logic.
 
@@ -252,7 +252,7 @@ defmodule OpenAIWebSocket do
 end
 ```
 
-In the cell below, we receive stream from the browser via WebRTC, feed it to the API, receive response and send it back to the browser. You need to add the Open AI API token as a `OPEN_AI_TOKEN` secret in Livebook for this to wok. To connect via WebRTC, visit http://localhost:1234/talk_to_llm.html after running this cell
+In the cell below, we receive stream from the browser via WebRTC, feed it to the API, receive response and send it back to the browser. You need to add the Open AI API token as a `OPEN_AI_TOKEN` secret in Livebook for this to work. To connect via WebRTC, visit http://localhost:1234/talk_to_llm.html after running this cell
 
 ```elixir
 {:ok, ws} = OpenAIWebSocket.start_link(token: System.fetch_env!("LB_OPEN_AI_TOKEN"))
