@@ -1,7 +1,8 @@
-defmodule Boombox.Transcoders.Video do
+defmodule Membrane.Boombox.Transcoder do
   @moduledoc false
   use Membrane.Bin
 
+  require Membrane.Boombox.Transcoder
   alias Boombox.Transcoders.Helpers.ForwardingFilter
   alias Membrane.Funnel
   alias Membrane.H264
@@ -9,20 +10,36 @@ defmodule Boombox.Transcoders.Video do
   alias Membrane.RawVideo
   alias Membrane.VP8
 
-  alias Membrane.{AAC, Opus, RawAudio, RemoteStream}
+  defguard is_video_format(format)
+           when is_struct(format) and
+                  (format.__struct__ in [AAC, Opus, RawAudio] or
+                     (format.__struct__ == RemoteStream and format.content_format == Opus and
+                        format.type == :packetized))
 
-  def_input_pad :input, accepted_format: any_of(RawVideo, H264, H265, VP8)
-  def_output_pad :output, accepted_format: any_of(RawVideo, H264, VP8)
+  defguard is_audio_format(format)
+           when is_struct(format) and format.__struct__ in [RawVideo, H264, H265, VP8]
 
-  @type stream_format :: H264.t() | H265.t() | VP8.t() | RawVideo.t()
-  @type stream_format_module :: H264 | VP8 | H265 | RawVideo
+  def_input_pad :input,
+    accepted_format: format when is_audio_format(format) or is_video_format(format)
+
+  def_output_pad :output,
+    accepted_format: format when is_audio_format(format) or is_video_format(format)
+
+  @type stream_format ::
+          H264.t()
+          | H265.t()
+          | VP8.t()
+          | RawVideo.t()
+          | AAC.t()
+          | Opus.t()
+          | RemoteStream.t()
+          | RawAudio.t()
+
+  @type stream_format_module :: H264 | VP8 | H265 | RawVideo | AAC | Opus | RawAudio
+
   @type stream_format_resolver :: (stream_format() -> stream_format() | stream_format_module())
 
-  def_options input_stream_format: [
-                spec: stream_format(),
-                default: nil
-              ],
-              output_stream_format: [
+  def_options output_stream_format: [
                 spec: stream_format() | stream_format_module() | stream_format_resolver()
               ]
 
@@ -36,26 +53,28 @@ defmodule Boombox.Transcoders.Video do
     ]
 
     state =
-      Map.from_struct(opts)
-      |> Map.put(:input_linked_with_output?, false)
+      opts
+      |> Map.from_struct()
+      |> Map.put(:input_stream_format, nil)
 
-    {link_actions, state} = maybe_link_input_with_output(state)
-    {[spec: spec] ++ link_actions, state}
+    {[spec: spec], state}
   end
 
   @impl true
-  def handle_child_notification({:stream_format, stream_format}, :forwarding_filter, _ctx, state) do
-    %{state | input_stream_format: stream_format}
-    |> maybe_link_input_with_output()
+  def handle_child_notification({:stream_format, format}, :forwarding_filter, _ctx, state) do
+    state = %{state | input_stream_format: format}
+
+    actions =
+      cond do
+        is_audio_format(format) -> Audio.link_actions(state)
+        is_video_format(format) -> Video.link_actions(state)
+      end
+
+    {actions, state}
   end
 
   @impl true
   def handle_child_notification(_notification, _element, _ctx, state) do
-    {[], state}
-  end
-
-  defp maybe_link_input_with_output(state)
-       when state.input_linked_with_output? or state.input_stream_format == nil do
     {[], state}
   end
 
@@ -68,20 +87,18 @@ defmodule Boombox.Transcoders.Video do
     {[spec: spec], state}
   end
 
-  defp resolve_output_stream_format(%{output_stream_format: format} = state)
-       when is_struct(format) do
-    state
-  end
+  defp resolve_output_stream_format(%{output_stream_format: format} = state) do
+    cond do
+      is_struct(format) ->
+        state
 
-  defp resolve_output_stream_format(%{output_stream_format: format_module} = state)
-       when is_atom(format_module) do
-    %{state | output_stream_format: struct(format_module)}
-  end
+      is_module(format) ->
+        %{state | output_stream_format: struct(format)}
 
-  defp resolve_output_stream_format(%{output_stream_format: format_resolver} = state)
-       when is_function(format_resolver) do
-    %{state | output_stream_format: format_resolver.(state.input_stream_format)}
-    |> resolve_output_stream_format()
+      is_function(format) ->
+        %{state | output_stream_format: format.(state.input_stream_format)}
+        |> resolve_output_stream_format()
+    end
   end
 
   defp link_input_with_output(%H264{}, %H264{} = output_format) do
