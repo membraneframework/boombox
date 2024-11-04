@@ -143,17 +143,17 @@ defmodule BoomboxTest do
 
     parent_process_pid = self()
 
-    new_client_callback = fn client_ref, app, stream_key ->
+    handle_new_client = fn client_ref, app, stream_key ->
       send(parent_process_pid, {:client_ref, client_ref, app, stream_key})
+      Membrane.RTMP.Source.ClientHandlerImpl
     end
 
     {:ok, server} =
       Membrane.RTMPServer.start_link(
-        handler: %Membrane.RTMP.Source.ClientHandlerImpl{controlling_process: self()},
         port: port,
         use_ssl?: use_ssl?,
-        new_client_callback: new_client_callback,
-        client_timeout: 1_000
+        handle_new_client: handle_new_client,
+        client_timeout: Membrane.Time.seconds(5)
       )
 
     p = send_rtmp(url)
