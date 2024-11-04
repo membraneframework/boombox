@@ -9,7 +9,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 # In case of problems installing Nx/EXLA/Bumblebee,
 # you can remove them and the Nx backend config below.
 # Examples that don't mention them should still work.
-Mix.install([:boombox, :kino, :nx, :exla, :bumblebee, :websockex, {:membrane_simple_rtsp_server, github: "membraneframework-labs/membrane_simple_rtsp_server", branch: "create-server"}])
+Mix.install([:boombox, :kino, :nx, :exla, :bumblebee, :websockex, :membrane_simple_rtsp_server])
 
 Nx.global_default_backend(EXLA.Backend)
 ```
