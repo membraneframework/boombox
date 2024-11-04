@@ -4,7 +4,6 @@ defmodule Boombox.MP4 do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
-  alias Boombox.Transcoders
   alias Membrane.H264
   alias Membrane.H265
 
@@ -66,8 +65,8 @@ defmodule Boombox.MP4 do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_audio_transcoder, %Transcoders.Audio{
-              output_stream_format_module: Membrane.AAC
+            |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+              output_stream_format: Membrane.AAC
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
@@ -78,7 +77,7 @@ defmodule Boombox.MP4 do
 
           {:video, builder} ->
             builder
-            |> child(:mp4_video_transcoder, %Transcoders.Video{
+            |> child(:mp4_video_transcoder, %Boombox.Transcoder{
               output_stream_format: fn
                 %H264{stream_structure: :annexb} = h264 ->
                   %{h264 | stream_structure: :avc3, alignment: :au}

@@ -4,7 +4,7 @@ defmodule Boombox.WebRTC do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, State, Wait}
-  alias Boombox.Transcoders
+  # alias Boombox.Transcoders
   alias Membrane.H264
   alias Membrane.VP8
 
@@ -139,8 +139,8 @@ defmodule Boombox.WebRTC do
       Enum.map(track_builders, fn
         {:audio, builder} ->
           builder
-          |> child(:mp4_audio_transcoder, %Transcoders.Audio{
-            output_stream_format_module: Membrane.Opus
+          |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+            output_stream_format: Membrane.Opus
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
@@ -153,7 +153,7 @@ defmodule Boombox.WebRTC do
 
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
-          |> child(:webrtc_video_transcoder, %Transcoders.Video{
+          |> child(:webrtc_video_transcoder, %Boombox.Transcoder{
             output_stream_format: fn
               %H264{} = h264 when h264_negotiated? ->
                 %H264{h264 | alignment: :nalu, stream_structure: :annexb}

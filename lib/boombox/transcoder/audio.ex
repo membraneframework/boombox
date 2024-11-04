@@ -1,4 +1,4 @@
-defmodule Membrane.Boombox.Transcoder.Audio do
+defmodule Boombox.Transcoder.Audio do
   @moduledoc false
   use Membrane.Bin
 
@@ -7,15 +7,24 @@ defmodule Membrane.Boombox.Transcoder.Audio do
   import Membrane.ChildrenSpec
   alias Membrane.{AAC, Funnel, Opus, RawAudio, RemoteStream}
 
+    defguard is_audio_format(format)
+           when is_struct(format) and
+                  (format.__struct__ in [AAC, Opus, RawAudio] or
+                     (format.__struct__ == RemoteStream and format.content_format == Opus and
+                        format.type == :packetized))
 
-  defguard is_audio_format(format)
-           when is_struct(format) and format.__struct__ in [RawVideo, H264, H265, VP8]
 
-  def plug_transcoding(buidler, input_format, output_format) when is_audio_format(input_format) and is_audio_format(output_format) do
+  @opus_sample_rate 48_000
+
+  @behaviour Boombox.Transcoder
+
+  @impl Boombox.Transcoder
+  def plug_transcoding(builder, input_format, output_format)
+      when is_audio_format(input_format) and is_audio_format(output_format) do
     do_plug_transcoding(builder, input_format, output_format)
   end
 
-  defp do_plug_transcoding(buidler, %format_module{}, format_module) do
+  defp do_plug_transcoding(builder, %format_module{}, format_module) do
     Membrane.Logger.debug("""
     This bin will only forward buffers, as the input stream format is the same as the output stream format.
     """)
@@ -23,15 +32,15 @@ defmodule Membrane.Boombox.Transcoder.Audio do
     builder
   end
 
-  defp do_plug_transcoding(buidler, %RemoteStream{content_format: Opus}, Opus) do
+  defp do_plug_transcoding(builder, %RemoteStream{content_format: Opus}, Opus) do
     builder |> child(:opus_parser, Opus.Parser)
   end
 
-  defp do_plug_transcoding(buidler, input_format, output_format_module) do
+  defp do_plug_transcoding(builder, input_format, output_format) do
     builder
     |> maybe_plug_decoder(input_format)
-    |> maybe_plug_resampler(input_format, output_format_module)
-    |> maybe_plug_encoder(output_format_module)
+    |> maybe_plug_resampler(input_format, output_format)
+    |> maybe_plug_encoder(output_format)
   end
 
   defp maybe_plug_decoder(builder, %Opus{}) do
@@ -50,7 +59,7 @@ defmodule Membrane.Boombox.Transcoder.Audio do
     builder
   end
 
-  defp maybe_plug_resampler(builder, %{sample_rate: sample_rate} = input_format, Opus)
+  defp maybe_plug_resampler(builder, %{sample_rate: sample_rate} = input_format, %Opus{})
        when sample_rate != @opus_sample_rate do
     builder
     |> child(:resampler, %Membrane.FFmpeg.SWResample.Converter{
@@ -62,19 +71,19 @@ defmodule Membrane.Boombox.Transcoder.Audio do
     })
   end
 
-  defp maybe_plug_resampler(builder, _input_format, _output_format_module) do
+  defp maybe_plug_resampler(builder, _input_format, _output_format) do
     builder
   end
 
-  defp maybe_plug_encoder(builder, Opus) do
+  defp maybe_plug_encoder(builder, %Opus{}) do
     builder |> child(:opus_encoder, Opus.Encoder)
   end
 
-  defp maybe_plug_encoder(builder, AAC) do
+  defp maybe_plug_encoder(builder, %AAC{}) do
     builder |> child(:aac_encoder, AAC.FDK.Encoder)
   end
 
-  defp maybe_plug_encoder(builder, RawAudio) do
+  defp maybe_plug_encoder(builder, %RawAudio{}) do
     builder
   end
 end
