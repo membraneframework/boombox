@@ -157,7 +157,7 @@ defmodule Support.Compare do
     |> then(&:math.sqrt(Enum.sum(&1) / length(&1)))
   end
 
-  defp get_h26x_parser_and_decoder(h26x) when h26x  in [Membrane.H264, Membrane.H265] do
+  defp get_h26x_parser_and_decoder(h26x) when h26x in [Membrane.H264, Membrane.H265] do
     parser = h26x |> Module.concat(Parser) |> struct!(output_stream_structure: :annexb)
     decoder = h26x |> Module.concat(FFmpeg.Decoder)
     {parser, decoder}
