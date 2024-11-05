@@ -69,11 +69,13 @@ defmodule Support.Compare do
           |> child(Membrane.AAC.FDK.Decoder)
           |> child(:ref_audio_bufs, GetBuffers)
 
-        {id, %Membrane.H264{}} ->
+        {id, %h26x{}} when h26x in [Membrane.H264, Membrane.H265] ->
+          {parser, decoder} = get_h26x_parser_and_decoder(h26x)
+
           get_child(:ref_demuxer)
           |> via_out(Pad.ref(:output, id))
-          |> child(%Membrane.H264.Parser{output_stream_structure: :annexb})
-          |> child(Membrane.H264.FFmpeg.Decoder)
+          |> child(parser)
+          |> child(decoder)
           |> child(:ref_video_bufs, GetBuffers)
       end)
 
@@ -92,13 +94,15 @@ defmodule Support.Compare do
           |> child(Membrane.AAC.FDK.Decoder)
           |> child(:sub_audio_bufs, GetBuffers)
 
-        {id, %Membrane.H264{}} ->
+        {id, %h26x{}} when h26x in [Membrane.H264, Membrane.H265] ->
           assert :video in kinds
+
+          {parser, decoder} = get_h26x_parser_and_decoder(h26x)
 
           get_child(:sub_demuxer)
           |> via_out(Pad.ref(:output, id))
-          |> child(%Membrane.H264.Parser{output_stream_structure: :annexb})
-          |> child(Membrane.H264.FFmpeg.Decoder)
+          |> child(parser)
+          |> child(decoder)
           |> child(:sub_video_bufs, GetBuffers)
       end)
 
@@ -151,5 +155,11 @@ defmodule Support.Compare do
       (b1 - b2) ** 2
     end)
     |> then(&:math.sqrt(Enum.sum(&1) / length(&1)))
+  end
+
+  defp get_h26x_parser_and_decoder(h26x) when h26x  in [Membrane.H264, Membrane.H265] do
+    parser = h26x |> Module.concat(Parser) |> struct!(output_stream_structure: :annexb)
+    decoder = h26x |> Module.concat(FFmpeg.Decoder)
+    {parser, decoder}
   end
 end

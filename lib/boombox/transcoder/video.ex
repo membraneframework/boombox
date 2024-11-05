@@ -86,8 +86,8 @@ defmodule Boombox.Transcoder.Video do
   defp maybe_plug_encoder_and_parser(builder, %H265{} = h265) do
     # todo: specify different preset in eg. mp4
     builder
-    |> child(:h264_encoder, %H265.FFmpeg.Encoder{preset: :ultrafast})
-    |> child(:h264_output_parser, %H265.Parser{
+    |> child(:h265_encoder, %H265.FFmpeg.Encoder{preset: :ultrafast})
+    |> child(:h265_output_parser, %H265.Parser{
       output_stream_structure: stream_structure_type(h265),
       output_alignment: h265.alignment
     })
