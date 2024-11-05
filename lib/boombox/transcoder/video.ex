@@ -2,9 +2,8 @@ defmodule Boombox.Transcoder.Video do
   @moduledoc false
 
   import Membrane.ChildrenSpec
-  alias Membrane.{H264, H265, RawVideo, VP8}
-
   require Membrane.Logger
+  alias Membrane.{ChildrenSpec, H264, H265, RawVideo, VP8}
 
   @type video_stream_format :: VP8.t() | H264.t() | H265.t() | RawVideo.t()
 

@@ -2,11 +2,9 @@ defmodule Boombox.Transcoder.Audio do
   @moduledoc false
   use Membrane.Bin
 
-  require Membrane.Logger
-
   import Membrane.ChildrenSpec
-  alias Membrane.ChildrenSpec
-  alias Membrane.{AAC, Funnel, Opus, RawAudio, RemoteStream}
+  require Membrane.Logger
+  alias Membrane.{AAC, ChildrenSpec, Opus, RawAudio, RemoteStream}
 
   @opus_sample_rate 48_000
 

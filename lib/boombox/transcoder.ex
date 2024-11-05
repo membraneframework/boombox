@@ -2,6 +2,9 @@ defmodule Boombox.Transcoder do
   @moduledoc false
   use Membrane.Bin
 
+  require __MODULE__.Audio
+  require __MODULE__.Video
+
   alias __MODULE__.{Audio, ForwardingFilter, Video}
 
   alias Membrane.ChildrenSpec
@@ -11,8 +14,6 @@ defmodule Boombox.Transcoder do
   alias Membrane.RawVideo
   alias Membrane.VP8
 
-  require Audio
-  require Video
 
   @callback plug_transcoding(
               builder :: ChildrenSpec.Builder.t(),
