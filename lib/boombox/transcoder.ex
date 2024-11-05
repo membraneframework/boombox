@@ -7,19 +7,11 @@ defmodule Boombox.Transcoder do
 
   alias __MODULE__.{Audio, ForwardingFilter, Video}
 
-  alias Membrane.ChildrenSpec
   alias Membrane.Funnel
   alias Membrane.H264
   alias Membrane.H265
   alias Membrane.RawVideo
   alias Membrane.VP8
-
-
-  @callback plug_transcoding(
-              builder :: ChildrenSpec.Builder.t(),
-              input_format :: struct(),
-              output_format :: struct()
-            ) :: ChildrenSpec.Builder.t()
 
   @type stream_format ::
           H264.t()
