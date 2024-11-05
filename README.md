@@ -1,4 +1,4 @@
-# Boombox
+![boombox_transaprent](https://github.com/user-attachments/assets/1c5f25a2-cc27-4349-ae72-91315d43d6a1)
 
 [![Hex.pm](https://img.shields.io/hexpm/v/boombox.svg)](https://hex.pm/packages/boombox)
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/boombox)
@@ -66,21 +66,23 @@ For more examples, see [examples.livemd](examples.livemd).
 
 ## Supported formats & protocols
 
-| format | direction |
-|---|---|
-| MP4 | input, output |
-| WebRTC | input, output |
-| RTMP | input |
-| RTSP | input |
-| HLS | output |
-| Elixir Stream | input, output |
+| format | input | output |
+|---|---|---|
+| MP4 | `"*.mp4"` | `"*.mp4"` |
+| WebRTC | `{:webrtc, signaling}` | `{:webrtc, signaling}` |
+| RTMP | `"rtmp://*"` | _not supported_ |
+| RTSP | `"rtsp://*"` | _not supported_ |
+| HLS | _not supported_ | `"*.m3u8"` |
+| `Enumerable.t()` | `{:stream, opts}` | `{:stream, opts}` |
+
+For the full list of input and output options, see [`Boombox.run/2`](https://hexdocs.pm/boombox/Boombox.html#run/2)
 
 ## Installation
 
 To use Boombox as an Elixir library, add
 
 ```elixir
-{:boombox, github: "membraneframework-labs/boombox"}
+{:boombox, "~> 0.1.0"}
 ```
 
 to your dependencies or `Mix.install`.
@@ -119,7 +121,11 @@ In the script you can call `Boombox.run(...)` and execute other Elixir code.
 
 The first run of the CLI may take longer than usual, as the necessary artifacts are installed in the system.
 
-## Copyright and License
+## Authors
+
+Boombox is created by Software Mansion.
+
+Since 2012 [Software Mansion](https://swmansion.com/?utm_source=git&utm_medium=readme&utm_campaign=boombox) is a software agency with experience in building web and mobile apps as well as complex multimedia solutions. We are Core React Native Contributors and experts in live streaming and broadcasting technologies. We can help you build your next dream product – [Hire us](https://swmansion.com/contact/projects).
 
 Copyright 2024, [Software Mansion](https://swmansion.com/?utm_source=git&utm_medium=readme&utm_campaign=boombox)
 
