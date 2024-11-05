@@ -6,12 +6,7 @@ defmodule Boombox.Transcoder do
   require __MODULE__.Video
 
   alias __MODULE__.{Audio, ForwardingFilter, Video}
-
-  alias Membrane.Funnel
-  alias Membrane.H264
-  alias Membrane.H265
-  alias Membrane.RawVideo
-  alias Membrane.VP8
+  alias Membrane.{AAC, Funnel, H264, H265, Opus, RawAudio, RawVideo, RemoteStream, VP8}
 
   @type stream_format ::
           H264.t()
@@ -23,7 +18,7 @@ defmodule Boombox.Transcoder do
           | RemoteStream.t()
           | RawAudio.t()
 
-  @type stream_format_module :: H264 | VP8 | H265 | RawVideo | AAC | Opus | RawAudio
+  @type stream_format_module :: H264 | H265 | VP8 | RawVideo | AAC | Opus | RawAudio
 
   @type stream_format_resolver :: (stream_format() -> stream_format() | stream_format_module())
 

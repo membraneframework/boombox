@@ -11,16 +11,17 @@ defmodule Boombox.Transcoder.Video do
            when is_struct(format) and format.__struct__ in [VP8, H264, H265, RawVideo]
 
   @spec plug_video_transcoding(
-          ChildrenSpec.Builder.t(),
+          ChildrenSpec.builder(),
           video_stream_format(),
           video_stream_format()
-        ) :: ChildrenSpec.Builder.t()
+        ) :: ChildrenSpec.builder()
   def plug_video_transcoding(builder, input_format, output_format)
       when is_video_format(input_format) and is_video_format(output_format) do
-    do_plug_transcoding(builder, input_format, output_format)
+    do_plug_video_transcoding(builder, input_format, output_format)
   end
 
-  defp do_plug_transcoding(builder, %h26x{}, %h26x{} = output_format) when h26x in [H264, H265] do
+  defp do_plug_video_transcoding(builder, %h26x{}, %h26x{} = output_format)
+       when h26x in [H264, H265] do
     parser =
       h26x
       |> Module.concat(Parser)
@@ -32,7 +33,7 @@ defmodule Boombox.Transcoder.Video do
     builder |> child(:h264_parser, parser)
   end
 
-  defp do_plug_transcoding(builder, %format_module{}, %format_module{}) do
+  defp do_plug_video_transcoding(builder, %format_module{}, %format_module{}) do
     Membrane.Logger.debug("""
     This bin will only forward buffers, as the input stream format is the same type as the output stream format.
     """)
@@ -40,7 +41,7 @@ defmodule Boombox.Transcoder.Video do
     builder
   end
 
-  defp do_plug_transcoding(builder, input_format, output_format) do
+  defp do_plug_video_transcoding(builder, input_format, output_format) do
     builder
     |> maybe_plug_parser_and_decoder(input_format)
     |> maybe_plug_encoder_and_parser(output_format)

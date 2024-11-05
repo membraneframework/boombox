@@ -17,16 +17,16 @@ defmodule Boombox.Transcoder.Audio do
                         format.type == :packetized))
 
   @spec plug_audio_transcoding(
-          ChildrenSpec.Builder.t(),
+          ChildrenSpec.builder(),
           audio_stream_format() | RemoteStream.t(),
           audio_stream_format()
-        ) :: ChildrenSpec.Builder.t()
+        ) :: ChildrenSpec.builder()
   def plug_audio_transcoding(builder, input_format, output_format)
       when is_audio_format(input_format) and is_audio_format(output_format) do
-    do_plug_transcoding(builder, input_format, output_format)
+    do_plug_audio_transcoding(builder, input_format, output_format)
   end
 
-  defp do_plug_transcoding(builder, %format_module{}, %format_module{}) do
+  defp do_plug_audio_transcoding(builder, %format_module{}, %format_module{}) do
     Membrane.Logger.debug("""
     This bin will only forward buffers, as the input stream format is the same as the output stream format.
     """)
@@ -34,11 +34,11 @@ defmodule Boombox.Transcoder.Audio do
     builder
   end
 
-  defp do_plug_transcoding(builder, %RemoteStream{content_format: Opus}, %Opus{}) do
+  defp do_plug_audio_transcoding(builder, %RemoteStream{content_format: Opus}, %Opus{}) do
     builder |> child(:opus_parser, Opus.Parser)
   end
 
-  defp do_plug_transcoding(builder, input_format, output_format) do
+  defp do_plug_audio_transcoding(builder, input_format, output_format) do
     builder
     |> maybe_plug_decoder(input_format)
     |> maybe_plug_resampler(input_format, output_format)
