@@ -58,7 +58,7 @@ defmodule Boombox.ElixirStream do
             |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
               output_stream_format: Membrane.RawAudio
             })
-            |> then(&maybe_plug_resampler(&1, options))
+            |> maybe_plug_resampler(options)
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:elixir_stream_sink)
 

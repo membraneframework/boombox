@@ -5,26 +5,30 @@ defmodule Boombox.Transcoder.Audio do
   require Membrane.Logger
 
   import Membrane.ChildrenSpec
+  alias Membrane.ChildrenSpec
   alias Membrane.{AAC, Funnel, Opus, RawAudio, RemoteStream}
 
-    defguard is_audio_format(format)
+  @opus_sample_rate 48_000
+
+  @type audio_stream_format :: AAC.t() | Opus.t() | RawAudio.t()
+
+  defguard is_audio_format(format)
            when is_struct(format) and
                   (format.__struct__ in [AAC, Opus, RawAudio] or
                      (format.__struct__ == RemoteStream and format.content_format == Opus and
                         format.type == :packetized))
 
-
-  @opus_sample_rate 48_000
-
-  @behaviour Boombox.Transcoder
-
-  @impl Boombox.Transcoder
-  def plug_transcoding(builder, input_format, output_format)
+  @spec plug_audio_transcoding(
+          ChildrenSpec.Builder.t(),
+          audio_stream_format() | RemoteStream.t(),
+          audio_stream_format()
+        ) :: ChildrenSpec.Builder.t()
+  def plug_audio_transcoding(builder, input_format, output_format)
       when is_audio_format(input_format) and is_audio_format(output_format) do
     do_plug_transcoding(builder, input_format, output_format)
   end
 
-  defp do_plug_transcoding(builder, %format_module{}, format_module) do
+  defp do_plug_transcoding(builder, %format_module{}, %format_module{}) do
     Membrane.Logger.debug("""
     This bin will only forward buffers, as the input stream format is the same as the output stream format.
     """)
@@ -32,7 +36,7 @@ defmodule Boombox.Transcoder.Audio do
     builder
   end
 
-  defp do_plug_transcoding(builder, %RemoteStream{content_format: Opus}, Opus) do
+  defp do_plug_transcoding(builder, %RemoteStream{content_format: Opus}, %Opus{}) do
     builder |> child(:opus_parser, Opus.Parser)
   end
 

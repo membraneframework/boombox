@@ -80,12 +80,15 @@ defmodule Boombox.MP4 do
             |> child(:mp4_video_transcoder, %Boombox.Transcoder{
               output_stream_format: fn
                 %H264{stream_structure: :annexb} = h264 ->
-                  %{h264 | stream_structure: :avc3, alignment: :au}
+                  %H264{h264 | stream_structure: :avc3, alignment: :au}
 
-                %H264{} = h264 ->
-                  %{h264 | alignment: :au}
+                %H265{stream_structure: :annexb} = h265 ->
+                  %H265{h265 | stream_structure: :hev1, alignment: :au}
 
-                _not_h264 ->
+                h26x when is_h26x(h26x) ->
+                  %{h26x | alignment: :au}
+
+                _not_h26x ->
                   %H264{stream_structure: :avc3, alignment: :au}
               end
             })

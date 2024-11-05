@@ -164,9 +164,6 @@ defmodule Boombox.WebRTC do
               _format when h264_negotiated? ->
                 %H264{alignment: :nalu, stream_structure: :annexb}
 
-              %{width: width, height: height} when vp8_negotiated? ->
-                %VP8{width: width, height: height}
-
               _format when vp8_negotiated? ->
                 VP8
             end

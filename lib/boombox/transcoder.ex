@@ -5,7 +5,6 @@ defmodule Boombox.Transcoder do
   alias __MODULE__.{Audio, ForwardingFilter, Video}
 
   alias Membrane.ChildrenSpec
-  # alias Boombox.Transcoders.Helpers.ForwardingFilter
   alias Membrane.Funnel
   alias Membrane.H264
   alias Membrane.H265
@@ -97,11 +96,11 @@ defmodule Boombox.Transcoder do
 
   defp plug_transcoding(builder, input_format, output_format)
        when Audio.is_audio_format(input_format) do
-    builder |> Audio.plug_transcoding(input_format, output_format)
+    builder |> Audio.plug_audio_transcoding(input_format, output_format)
   end
 
   defp plug_transcoding(builder, input_format, output_format)
        when Video.is_video_format(input_format) do
-    builder |> Video.plug_transcoding(input_format, output_format)
+    builder |> Video.plug_video_transcoding(input_format, output_format)
   end
 end

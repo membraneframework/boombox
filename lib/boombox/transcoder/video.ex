@@ -6,13 +6,17 @@ defmodule Boombox.Transcoder.Video do
 
   require Membrane.Logger
 
+  @type video_stream_format :: VP8.t() | H264.t() | H265.t() | RawVideo.t()
+
   defguard is_video_format(format)
            when is_struct(format) and format.__struct__ in [VP8, H264, H265, RawVideo]
 
-  @behaviour Boombox.Transcoder
-
-  @impl Boombox.Transcoder
-  def plug_transcoding(builder, input_format, output_format)
+  @spec plug_video_transcoding(
+          ChildrenSpec.Builder.t(),
+          video_stream_format(),
+          video_stream_format()
+        ) :: ChildrenSpec.Builder.t()
+  def plug_video_transcoding(builder, input_format, output_format)
       when is_video_format(input_format) and is_video_format(output_format) do
     do_plug_transcoding(builder, input_format, output_format)
   end
