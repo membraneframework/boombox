@@ -139,7 +139,7 @@ defmodule Support.Compare do
     Testing.Pipeline.terminate(p)
   end
 
-  @spec samples_min_square_error(binary, binary, pos_integer) :: non_neg_integer()
+  @spec samples_min_square_error(binary, binary, pos_integer) :: float()
   def samples_min_square_error(bin1, bin2, sample_size) do
     assert byte_size(bin1) == byte_size(bin2)
 
