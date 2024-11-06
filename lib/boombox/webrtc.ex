@@ -21,13 +21,13 @@ defmodule Boombox.WebRTC do
         _other -> Membrane.Time.seconds(2)
       end
 
-    {suggested_video_codec, allowed_video_codecs} =
+    {preferred_video_codec, allowed_video_codecs} =
       case state.output_webrtc_state do
         nil ->
           {:h264, [:h264, :vp8]}
 
         %{negotiated_video_codecs: []} ->
-          # suggested_video_codec will be ignored
+          # preferred_video_codec will be ignored
           {:vp8, []}
 
         %{negotiated_video_codecs: [codec]} ->
@@ -40,7 +40,7 @@ defmodule Boombox.WebRTC do
     spec =
       child(:webrtc_input, %Membrane.WebRTC.Source{
         signaling: signaling,
-        suggested_video_codec: suggested_video_codec,
+        preferred_video_codec: preferred_video_codec,
         allowed_video_codecs: allowed_video_codecs,
         keyframe_interval: keyframe_interval
       })
