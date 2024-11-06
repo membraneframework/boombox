@@ -1,6 +1,5 @@
 defmodule Boombox.Transcoder.Audio do
   @moduledoc false
-  use Membrane.Bin
 
   import Membrane.ChildrenSpec
   require Membrane.Logger

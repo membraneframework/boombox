@@ -4,7 +4,6 @@ defmodule Boombox.WebRTC do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, State, Wait}
-  # alias Boombox.Transcoders
   alias Membrane.H264
   alias Membrane.VP8
 

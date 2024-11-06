@@ -26,13 +26,10 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  @tag :xd
   @tag :file_h265_file_mp4
   async_test "mp4 file (H265) -> mp4 file (H265)", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     Boombox.run(input: @bbb_mp4_h265, output: output)
-    # System.shell("cp #{output} test/fixtures/ref_bun10s_h265.mp4")
-    # System.cmd("cp", [output, "test/fixtures/ref_bun10s_h265.mp4"])
     Compare.compare(output, "test/fixtures/ref_bun10s_h265.mp4")
   end
 
