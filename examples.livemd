@@ -516,7 +516,7 @@ System.shell("ffplay #{out_dir}/mp4_webrtc_mp4.mp4")
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## Stream MP4 to HLS via RTSP
+## Receive RTSP, broadcast via HLS
 
 To receive the stream, visit http://localhost:1234/hls.html after running the cell below
 
