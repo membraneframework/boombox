@@ -4,6 +4,7 @@ defmodule Boombox do
 
   See `run/1` for details and [examples.livemd](examples.livemd) for examples.
   """
+  alias Membrane.RTP
 
   require Membrane.Time
 
@@ -17,12 +18,32 @@ defmodule Boombox do
           | {:audio_channels, Membrane.RawAudio.channels_t()}
         ]
 
+  @type rtp_encoding_specific_params ::
+          %{
+            optional(:AAC) => [
+              bitrate_mode: RTP.AAC.Utils.mode(),
+              audio_specific_config: binary()
+            ],
+            optional(:H264) => [
+              ppss: [binary()],
+              spss: [binary()]
+            ]
+          }
+
+  @type in_rtp_opts :: [
+          {:port, :inet.port_number()}
+          | {:media_types, [:audio | :video]}
+          | {:fmt_mapping, %{RTP.payload_type_t() => {RTP.encoding_name_t(), RTP.clock_rate_t()}}}
+          | {:encoding_specific_params, rtp_encoding_specific_params()}
+        ]
+
   @type input ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
+          | {:rtp, in_rtp_opts()}
           | {:stream, in_stream_opts()}
 
   @type output ::
@@ -148,6 +169,9 @@ defmodule Boombox do
 
       {:rtsp, location} when direction == :input and is_binary(location) ->
         value
+
+      {:rtp, opts} ->
+        if Keyword.keyword?(opts), do: value
 
       {:stream, opts} ->
         if Keyword.keyword?(opts), do: value
