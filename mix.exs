@@ -46,13 +46,9 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.1"},
-      {
-        :membrane_webrtc_plugin,
-        github: "membraneframework/membrane_webrtc_plugin",
-        branch: "support-various-video-codecs-in-source"
-      },
+      {:membrane_webrtc_plugin, "~> 0.23.0"},
       {:membrane_opus_plugin, "~> 0.20.3"},
-      {:membrane_aac_plugin, "~> 0.18.0"},
+      {:membrane_aac_plugin, "~> 0.19.0"},
       {:membrane_aac_fdk_plugin, "~> 0.18.0"},
       {:membrane_vpx_plugin, "~> 0.2.0"},
       {:membrane_h26x_plugin, "~> 0.10.0"},
@@ -61,12 +57,13 @@ defmodule Boombox.Mixfile do
       {:membrane_mp4_plugin, "~> 0.35.2"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.18.5"},
-      {:membrane_rtmp_plugin, "~> 0.25.0"},
-      {:membrane_rtsp_plugin, "~> 0.3.0"},
+      {:membrane_rtmp_plugin, "~> 0.27.2"},
+      {:membrane_rtsp_plugin, "~> 0.5.0"},
       {:membrane_rtp_plugin, "~> 0.29.0"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
+      {:membrane_simple_rtsp_server, "~> 0.1.0", only: :test},
       {:image, "~> 0.54.0"},
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},

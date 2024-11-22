@@ -19,17 +19,17 @@ defmodule Boombox.RTMP do
     handle_new_client = fn client_ref, app, stream_key ->
       if app == target_app and stream_key == target_stream_key do
         send(boombox, {:rtmp_client_ref, client_ref})
+        Membrane.RTMP.Source.ClientHandlerImpl
       else
         Membrane.Logger.warning("Unexpected client connected on /#{app}/#{stream_key}")
       end
     end
 
     server_options = %{
-      handler: %RTMP.Source.ClientHandlerImpl{controlling_process: self()},
       port: port,
       use_ssl?: use_ssl?,
       handle_new_client: handle_new_client,
-      client_timeout: 60_000
+      client_timeout: Membrane.Time.seconds(60)
     }
 
     {:ok, _server} =
