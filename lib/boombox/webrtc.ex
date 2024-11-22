@@ -3,10 +3,15 @@ defmodule Boombox.WebRTC do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
-  alias Boombox.Pipeline.{Ready, Wait}
+  alias Boombox.Pipeline.{Ready, State, Wait}
+  alias Membrane.H264
+  alias Membrane.VP8
 
-  @spec create_input(Boombox.webrtc_signaling(), Boombox.output()) :: Wait.t()
-  def create_input(signaling, output) do
+  @type output_webrtc_state :: %{negotiated_video_codecs: [:vp8 | :h264] | nil}
+  @type webrtc_sink_new_tracks :: [%{id: term, kind: :audio | :video}]
+
+  @spec create_input(Boombox.webrtc_signaling(), Boombox.output(), State.t()) :: Wait.t()
+  def create_input(signaling, output, state) do
     signaling = resolve_signaling(signaling)
 
     keyframe_interval =
@@ -15,10 +20,27 @@ defmodule Boombox.WebRTC do
         _other -> Membrane.Time.seconds(2)
       end
 
+    {preferred_video_codec, allowed_video_codecs} =
+      case state.output_webrtc_state do
+        nil ->
+          {:h264, [:h264, :vp8]}
+
+        %{negotiated_video_codecs: []} ->
+          # preferred_video_codec will be ignored
+          {:vp8, []}
+
+        %{negotiated_video_codecs: [codec]} ->
+          {codec, [:h264, :vp8]}
+
+        %{negotiated_video_codecs: both} when is_list(both) ->
+          {:vp8, both}
+      end
+
     spec =
       child(:webrtc_input, %Membrane.WebRTC.Source{
         signaling: signaling,
-        video_codec: :h264,
+        preferred_video_codec: preferred_video_codec,
+        allowed_video_codecs: allowed_video_codecs,
         keyframe_interval: keyframe_interval
       })
 
@@ -33,7 +55,6 @@ defmodule Boombox.WebRTC do
           spec =
             get_child(:webrtc_input)
             |> via_out(Pad.ref(:output, id))
-            |> child(:webrtc_in_opus_decoder, Membrane.Opus.Decoder)
 
           {:audio, spec}
 
@@ -48,32 +69,68 @@ defmodule Boombox.WebRTC do
     %Ready{track_builders: track_builders}
   end
 
-  @spec create_output(Boombox.webrtc_signaling()) :: Ready.t()
-  def create_output(signaling) do
+  @spec create_output(Boombox.webrtc_signaling(), State.t()) :: {Ready.t() | Wait.t(), State.t()}
+  def create_output(signaling, state) do
     signaling = resolve_signaling(signaling)
+    startup_tracks = if webrtc_input?(state), do: [:audio, :video], else: []
 
     spec =
       child(:webrtc_output, %Membrane.WebRTC.Sink{
         signaling: signaling,
-        tracks: [],
-        video_codec: :h264
+        tracks: startup_tracks,
+        video_codec: [:vp8, :h264]
       })
 
-    %Ready{actions: [spec: spec]}
+    state = %{state | output_webrtc_state: %{negotiated_video_codecs: nil}}
+
+    status =
+      if webrtc_input?(state),
+        do: %Wait{actions: [spec: spec]},
+        else: %Ready{actions: [spec: spec]}
+
+    {status, state}
   end
 
-  @spec link_output(Boombox.Pipeline.track_builders()) :: Wait.t()
-  def link_output(track_builders) do
-    tracks = Bunch.KVEnum.keys(track_builders)
-    %Wait{actions: [notify_child: {:webrtc_output, {:add_tracks, tracks}}]}
+  @spec handle_output_video_codecs_negotiated([:h264 | :vp8], State.t()) ::
+          {Ready.t() | Wait.t(), State.t()}
+  def handle_output_video_codecs_negotiated(codecs, state) do
+    state = put_in(state.output_webrtc_state.negotiated_video_codecs, codecs)
+    status = if webrtc_input?(state), do: %Ready{}, else: %Wait{}
+    {status, state}
+  end
+
+  @spec link_output(
+          Boombox.Pipeline.track_builders(),
+          Membrane.ChildrenSpec.t(),
+          webrtc_sink_new_tracks(),
+          State.t()
+        ) :: Ready.t() | Wait.t()
+  def link_output(track_builders, spec_builder, tracks, state) do
+    if webrtc_input?(state) do
+      do_link_output(track_builders, spec_builder, tracks, state)
+    else
+      tracks = Bunch.KVEnum.keys(track_builders)
+      %Wait{actions: [notify_child: {:webrtc_output, {:add_tracks, tracks}}]}
+    end
   end
 
   @spec handle_output_tracks_negotiated(
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t(),
-          Membrane.WebRTC.Sink.new_tracks()
-        ) :: Ready.t()
-  def handle_output_tracks_negotiated(track_builders, spec_builder, tracks) do
+          webrtc_sink_new_tracks(),
+          State.t()
+        ) :: Ready.t() | no_return()
+  def handle_output_tracks_negotiated(track_builders, spec_builder, tracks, state) do
+    if webrtc_input?(state) do
+      raise """
+      Currently ICE restart is not supported in Boombox instances having WebRTC input and output.
+      """
+    end
+
+    do_link_output(track_builders, spec_builder, tracks, state)
+  end
+
+  defp do_link_output(track_builders, spec_builder, tracks, state) do
     tracks = Map.new(tracks, &{&1.kind, &1.id})
 
     spec = [
@@ -81,24 +138,34 @@ defmodule Boombox.WebRTC do
       Enum.map(track_builders, fn
         {:audio, builder} ->
           builder
-          |> child(:webrtc_out_resampler, %Membrane.FFmpeg.SWResample.Converter{
-            output_stream_format: %Membrane.RawAudio{
-              sample_format: :s16le,
-              sample_rate: 48_000,
-              channels: 2
-            }
+          |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+            output_stream_format: Membrane.Opus
           })
-          |> child(:webrtc_out_opus_encoder, Membrane.Opus.Encoder)
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
           |> get_child(:webrtc_output)
 
         {:video, builder} ->
+          negotiated_codecs = state.output_webrtc_state.negotiated_video_codecs
+          vp8_negotiated? = :vp8 in negotiated_codecs
+          h264_negotiated? = :h264 in negotiated_codecs
+
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
-          |> child(:webrtc_out_h264_parser, %Membrane.H264.Parser{
-            output_stream_structure: :annexb,
-            output_alignment: :nalu
+          |> child(:webrtc_video_transcoder, %Boombox.Transcoder{
+            output_stream_format: fn
+              %H264{} = h264 when h264_negotiated? ->
+                %H264{h264 | alignment: :nalu, stream_structure: :annexb}
+
+              %VP8{} = vp8 when vp8_negotiated? ->
+                vp8
+
+              _format when h264_negotiated? ->
+                %H264{alignment: :nalu, stream_structure: :annexb}
+
+              _format when vp8_negotiated? ->
+                VP8
+            end
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)
@@ -117,4 +184,7 @@ defmodule Boombox.WebRTC do
     {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
     {:websocket, ip: ip, port: uri.port}
   end
+
+  defp webrtc_input?(%{input: {:webrtc, _signalling}}), do: true
+  defp webrtc_input?(_state), do: false
 end

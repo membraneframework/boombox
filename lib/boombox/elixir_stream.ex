@@ -3,6 +3,8 @@ defmodule Boombox.ElixirStream do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
+
+  alias __MODULE__.{Sink, Source}
   alias Boombox.Pipeline.Ready
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
@@ -53,15 +55,21 @@ defmodule Boombox.ElixirStream do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> then(&maybe_plug_resampler(&1, options))
+            |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+              output_stream_format: Membrane.RawAudio
+            })
+            |> maybe_plug_resampler(options)
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:elixir_stream_sink)
 
           {:video, builder} ->
             builder
-            |> child(%Membrane.H264.Parser{output_stream_structure: :annexb})
-            |> child(Membrane.H264.FFmpeg.Decoder)
-            |> child(%Membrane.FFmpeg.SWScale.Converter{format: :RGB})
+            |> child(:elixir_stream_video_transcoder, %Boombox.Transcoder{
+              output_stream_format: Membrane.RawVideo
+            })
+            |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
+              format: :RGB
+            })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:elixir_stream_sink)
         end),

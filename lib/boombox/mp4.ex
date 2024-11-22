@@ -4,6 +4,10 @@ defmodule Boombox.MP4 do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, Wait}
+  alias Membrane.H264
+  alias Membrane.H265
+
+  defguardp is_h26x(format) when is_struct(format) and format.__struct__ in [H264, H265]
 
   @spec create_input(String.t(), transport: :file | :http) :: Wait.t()
   def create_input(location, opts) do
@@ -33,11 +37,10 @@ defmodule Boombox.MP4 do
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
             |> child(:mp4_in_aac_parser, Membrane.AAC.Parser)
-            |> child(:mp4_in_aac_decoder, Membrane.AAC.FDK.Decoder)
 
           {:audio, spec}
 
-        {id, %Membrane.H264{}} ->
+        {id, video_format} when is_h26x(video_format) ->
           spec =
             get_child(:mp4_demuxer)
             |> via_out(Pad.ref(:output, id))
@@ -62,7 +65,9 @@ defmodule Boombox.MP4 do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_out_aac_encoder, Membrane.AAC.FDK.Encoder)
+            |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+              output_stream_format: Membrane.AAC
+            })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
               output_config: :esds
@@ -72,7 +77,21 @@ defmodule Boombox.MP4 do
 
           {:video, builder} ->
             builder
-            |> child(:mp4_out_h264_parser, %Membrane.H264.Parser{output_stream_structure: :avc3})
+            |> child(:mp4_video_transcoder, %Boombox.Transcoder{
+              output_stream_format: fn
+                %H264{stream_structure: :annexb} = h264 ->
+                  %H264{h264 | stream_structure: :avc3, alignment: :au}
+
+                %H265{stream_structure: :annexb} = h265 ->
+                  %H265{h265 | stream_structure: :hev1, alignment: :au}
+
+                h26x when is_h26x(h26x) ->
+                  %{h26x | alignment: :au}
+
+                _not_h26x ->
+                  %H264{stream_structure: :avc3, alignment: :au}
+              end
+            })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)
         end)

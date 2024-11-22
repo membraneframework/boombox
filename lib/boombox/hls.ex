@@ -5,6 +5,7 @@ defmodule Boombox.HLS do
 
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.Ready
+  alias Membrane.H264
   alias Membrane.Time
 
   @spec link_output(
@@ -42,7 +43,9 @@ defmodule Boombox.HLS do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:hls_out_aac_encoder, Membrane.AAC.FDK.Encoder)
+            |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+              output_stream_format: Membrane.AAC
+            })
             |> via_in(Pad.ref(:input, :audio),
               options: [encoding: :AAC, segment_duration: Time.milliseconds(2000)]
             )
@@ -50,6 +53,9 @@ defmodule Boombox.HLS do
 
           {:video, builder} ->
             builder
+            |> child(:hls_video_transcoder, %Boombox.Transcoder{
+              output_stream_format: %H264{alignment: :au, stream_structure: :avc3}
+            })
             |> via_in(Pad.ref(:input, :video),
               options: [encoding: :H264, segment_duration: Time.milliseconds(2000)]
             )

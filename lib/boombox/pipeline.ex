@@ -62,7 +62,9 @@ defmodule Boombox.Pipeline do
                   track_builders: nil,
                   last_result: nil,
                   eos_info: nil,
-                  rtsp_state: nil
+                  rtsp_state: nil,
+                  pending_new_tracks: %{input: [], output: []},
+                  output_webrtc_state: nil
                 ]
 
     @typedoc """
@@ -92,7 +94,8 @@ defmodule Boombox.Pipeline do
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
             eos_info: term(),
             rtsp_state: Boombox.RTSP.rtsp_state() | nil,
-            parent: pid()
+            parent: pid(),
+            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
           }
   end
 
@@ -133,6 +136,12 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_child_notification({:negotiated_video_codecs, codecs}, :webrtc_output, ctx, state) do
+    {result, state} = Boombox.WebRTC.handle_output_video_codecs_negotiated(codecs, state)
+    proceed_result(result, ctx, state)
+  end
+
+  @impl true
   def handle_child_notification({:new_tracks, tracks}, :webrtc_output, ctx, state) do
     unless state.status == :awaiting_output_link do
       raise """
@@ -144,7 +153,8 @@ defmodule Boombox.Pipeline do
     Boombox.WebRTC.handle_output_tracks_negotiated(
       state.track_builders,
       state.spec_builder,
-      tracks
+      tracks,
+      state
     )
     |> proceed_result(ctx, state)
   end
@@ -206,6 +216,10 @@ defmodule Boombox.Pipeline do
 
   @spec proceed_result(Ready.t() | Wait.t(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Membrane.Pipeline.callback_return()
+  defp proceed_result(result, ctx, %{status: :awaiting_output} = state) do
+    do_proceed(result, :output_ready, :awaiting_output, ctx, state)
+  end
+
   defp proceed_result(result, ctx, %{status: :awaiting_input} = state) do
     do_proceed(result, :input_ready, :awaiting_input, ctx, state)
   end
@@ -215,7 +229,7 @@ defmodule Boombox.Pipeline do
   end
 
   defp proceed_result(result, ctx, %{status: :running} = state) do
-    do_proceed(result, nil, :running, ctx, state)
+    do_proceed(result, :running, :running, ctx, state)
   end
 
   defp proceed_result(_result, _ctx, state) do
@@ -227,8 +241,8 @@ defmodule Boombox.Pipeline do
   @spec proceed(Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Membrane.Pipeline.callback_return()
   defp proceed(ctx, %{status: :init} = state) do
-    create_output(state.output, ctx, state)
-    |> do_proceed(:output_ready, :awaiting_output, ctx, state)
+    {ready_or_wait, state} = create_output(state.output, ctx, state)
+    do_proceed(ready_or_wait, :output_ready, :awaiting_output, ctx, state)
   end
 
   defp proceed(ctx, %{status: :output_ready} = state) do
@@ -287,7 +301,7 @@ defmodule Boombox.Pipeline do
   @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
   defp create_input({:webrtc, signaling}, _ctx, state) do
-    Boombox.WebRTC.create_input(signaling, state.output)
+    Boombox.WebRTC.create_input(signaling, state.output, state)
   end
 
   defp create_input({:mp4, location, opts}, _ctx, _state) do
@@ -307,13 +321,13 @@ defmodule Boombox.Pipeline do
   end
 
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
-          Ready.t() | Wait.t()
-  defp create_output({:webrtc, signaling}, _ctx, _state) do
-    Boombox.WebRTC.create_output(signaling)
+          {Ready.t() | Wait.t(), State.t()}
+  defp create_output({:webrtc, signaling}, _ctx, state) do
+    Boombox.WebRTC.create_output(signaling, state)
   end
 
-  defp create_output(_output, _ctx, _state) do
-    %Ready{}
+  defp create_output(_output, _ctx, state) do
+    {%Ready{}, state}
   end
 
   @spec link_output(
@@ -324,8 +338,13 @@ defmodule Boombox.Pipeline do
           State.t()
         ) ::
           Ready.t() | Wait.t()
-  defp link_output({:webrtc, _signaling}, track_builders, _spec_builder, _ctx, _state) do
-    Boombox.WebRTC.link_output(track_builders)
+  defp link_output({:webrtc, _signaling}, track_builders, spec_builder, _ctx, state) do
+    tracks = [
+      %{kind: :audio, id: :audio_track},
+      %{kind: :video, id: :video_tracks}
+    ]
+
+    Boombox.WebRTC.link_output(track_builders, spec_builder, tracks, state)
   end
 
   defp link_output({:mp4, location}, track_builders, spec_builder, _ctx, _state) do
