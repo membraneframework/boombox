@@ -37,8 +37,6 @@ defmodule Boombox.RTP do
           State.t()
         ) :: {Wait.t() | Ready.t(), State.t()}
   def handle_new_rtp_stream(ssrc, payload_type, _extensions, state) do
-    payload_type |> IO.inspect(label: "aaaa")
-
     %{encoding_name: encoding_name, clock_rate: clock_rate} =
       PayloadFormat.get_payload_type_mapping(payload_type)
 
