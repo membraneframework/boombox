@@ -69,6 +69,7 @@ defmodule Boombox do
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
+          | {:whip, [{:uri, String.t()} | {:token, String.t()}]}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
@@ -78,6 +79,13 @@ defmodule Boombox do
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t()}
           | {:webrtc, webrtc_signaling()}
+          | {:whip,
+             [
+               {:ip, :inet.socket_address() | String.t()}
+               | {:port, :inet.port_number()}
+               | {:token, String.t()}
+               | {bandit_option :: atom(), term()}
+             ]}
           | {:hls, location :: String.t()}
           | {:rtp, out_rtp_opts()}
           | {:stream, out_stream_opts()}
@@ -189,6 +197,12 @@ defmodule Boombox do
 
       {:webrtc, uri} when is_binary(uri) ->
         value
+
+      {:whip, opts} when is_list(opts) ->
+        if Keyword.keyword?(opts) do
+          opts = parse_whip_opts(opts)
+          {:webrtc, {:whip, opts}}
+        end
 
       {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
         value
@@ -345,6 +359,17 @@ defmodule Boombox do
 
       transport ->
         raise ArgumentError, "Invalid transport: #{inspect(transport)}"
+    end
+  end
+
+  defp parse_whip_opts(opts) do
+    case opts[:ip] do
+      ip when is_binary(ip) ->
+        {:ok, ip} = :inet.parse_address(~c"#{ip}")
+        Keyword.replace(opts, :ip, ip)
+
+      _other ->
+        opts
     end
   end
 end

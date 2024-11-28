@@ -70,6 +70,7 @@ For more examples, see [examples.livemd](examples.livemd).
 |---|---|---|
 | MP4 | `"*.mp4"` | `"*.mp4"` |
 | WebRTC | `{:webrtc, signaling}` | `{:webrtc, signaling}` |
+| WHIP | `{:whip, port: 3721, token: "whip-token"}` | `{:whip, uri: "http://localhost:3721", token: "whip-token"}` |
 | RTMP | `"rtmp://*"` | _not supported_ |
 | RTSP | `"rtsp://*"` | _not supported_ |
 | RTP | `{:rtp, opts}` | _not yet supported_ |
