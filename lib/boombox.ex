@@ -18,16 +18,33 @@ defmodule Boombox do
           | {:audio_channels, Membrane.RawAudio.channels_t()}
         ]
 
+  @typedoc """
+  Some encodings can/must be accompanied with encoding specific parameters:
+    * AAC:
+      - bitrate_mode - has to be provided. Defines how the RTP stream was payloaded and should be depayloaded.
+      - audio_specific_config - has to be provided. Contains crucial information about the stream and has to be obtained from a side channel.
+    * H264:
+      - ppss and spss - optional. picture and sequence parameter sets, could be obtained from a side channel. They contain information about the encoded stream.
+  """
   @type rtp_encoding_specific_params ::
           {:AAC, [bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()]}
           | {:H264, [ppss: [binary()], spss: [binary()]]}
 
+  @typedoc """
+  For each media type the following parameters are specified:
+    * encoding - has to be provided, some encodings require additional parameters, see `rtp_encoding_specific_params/0`.
+    * payload_type, clock rate - most likely should be provided, if not, then an unofficial default will be used.
+  """
   @type rtp_media_config :: [
           encoding: RTP.encoding_name_t() | rtp_encoding_specific_params(),
           payload_type: RTP.payload_type_t(),
           clock_rate: RTP.clock_rate_t()
         ]
 
+  @typedoc """
+  In order to configure RTP input both a receiving port and media configurations must be provided.
+  At least one media type needs to be configured.
+  """
   @type in_rtp_opts :: [
           {:port, :inet.port_number()},
           {:media_config, [audio: rtp_media_config(), video: rtp_media_config()]}
