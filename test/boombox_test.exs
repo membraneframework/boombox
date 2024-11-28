@@ -354,32 +354,6 @@ defmodule BoomboxTest do
     assert Compare.samples_min_square_error(ref, pcm, 16) < 500
   end
 
-  # @tag :rtp_hls
-  # async_test "raw rtp -> hls", %{tmp_dir: tmp} do
-  # t =
-  # Task.async(fn ->
-  # Boombox.run(
-  # input:
-  # {:rtp,
-  # port: 50_001,
-  # media_types: [:video, :audio],
-  # encoding_specific_params: %{
-  # AAC: %{bitrate_mode: :hbr, audio_specific_config: Base.decode16!("1210")}
-  # }},
-  # output: Path.join(tmp, "index.m3u8")
-  # )
-  # end)
-
-  # :os.cmd(
-  # ~c"gst-launch-1.0 -q filesrc location=#{@bbb_mp4} ! qtdemux name=demux demux.video_0 ! queue ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=127.0.0.1 port=50001 demux.audio_0 ! queue ! aacparse ! rtpmp4gpay pt=127 ! udpsink host=127.0.0.1 port=50001 sync=false"
-  # )
-
-  # Process.sleep(1000)
-  # Task.shutdown(t)
-  # ref_path = "test/fixtures/ref_bun10s_rtsp_aac_hls"
-  # Compare.compare(tmp, ref_path, format: :hls)
-  # end
-
   defp send_rtmp(url) do
     p =
       Testing.Pipeline.start_link_supervised!(
