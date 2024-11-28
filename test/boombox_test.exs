@@ -73,6 +73,20 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
 
+  @tag :file_whip
+  async_test "mp4 file -> webrtc/whip -> mp4 file", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+
+    t =
+      Task.async(fn ->
+        Boombox.run(input: @bbb_mp4, output: {:whip, uri: "http://127.0.0.1:1234"})
+      end)
+
+    Boombox.run(input: {:whip, ip: "0.0.0.0", port: 1234}, output: output)
+    Task.await(t)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
+  end
+
   @tag :http_webrtc
   async_test "http mp4 -> webrtc -> mp4 file", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")

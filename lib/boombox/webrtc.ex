@@ -179,6 +179,10 @@ defmodule Boombox.WebRTC do
     signaling
   end
 
+  defp resolve_signaling({:whip, _opts} = signaling) do
+    signaling
+  end
+
   defp resolve_signaling(uri) when is_binary(uri) do
     uri = URI.new!(uri)
     {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
