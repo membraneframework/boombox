@@ -4,9 +4,9 @@ defmodule Boombox do
 
   See `run/1` for details and [examples.livemd](examples.livemd) for examples.
   """
-  alias Membrane.RTP
-
   require Membrane.Time
+
+  alias Membrane.RTP
 
   @type webrtc_signaling :: Membrane.WebRTC.SignalingChannel.t() | String.t()
   @type in_stream_opts :: [audio: :binary | boolean(), video: :image | boolean()]
@@ -19,22 +19,18 @@ defmodule Boombox do
         ]
 
   @type rtp_encoding_specific_params ::
-          %{
-            optional(:AAC) => [
-              bitrate_mode: RTP.AAC.Utils.mode(),
-              audio_specific_config: binary()
-            ],
-            optional(:H264) => [
-              ppss: [binary()],
-              spss: [binary()]
-            ]
-          }
+          {:AAC, [bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()]}
+          | {:H264, [ppss: [binary()], spss: [binary()]]}
+
+  @type rtp_media_config :: [
+          encoding: RTP.encoding_name_t() | rtp_encoding_specific_params(),
+          payload_type: RTP.payload_type_t(),
+          clock_rate: RTP.clock_rate_t()
+        ]
 
   @type in_rtp_opts :: [
-          {:port, :inet.port_number()}
-          | {:media_types, [:audio | :video]}
-          | {:fmt_mapping, %{RTP.payload_type_t() => {RTP.encoding_name_t(), RTP.clock_rate_t()}}}
-          | {:encoding_specific_params, rtp_encoding_specific_params()}
+          {:port, :inet.port_number()},
+          {:media_config, [audio: rtp_media_config(), video: rtp_media_config()]}
         ]
 
   @type input ::
