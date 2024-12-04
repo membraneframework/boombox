@@ -15,11 +15,13 @@ defmodule Boombox.RTP do
   }
 
   @type parsed_encoding_specific_params ::
-          {:AAC, %{bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()}}
-          | {:H264, %{optional(:ppss) => [binary()], optional(:spss) => [binary()]}}
+          %{bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()}
+          | %{optional(:ppss) => [binary()], optional(:spss) => [binary()]}
+          | %{}
 
   @type parsed_media_config :: %{
-          encoding: parsed_encoding_specific_params(),
+          encoding_name: RTP.encoding_name(),
+          encoding_specific_params: parsed_encoding_specific_params(),
           payload_type: RTP.payload_type_t(),
           clock_rate: RTP.clock_rate_t()
         }
@@ -31,7 +33,7 @@ defmodule Boombox.RTP do
 
   @spec create_input(Boombox.in_rtp_opts()) :: Wait.t()
   def create_input(opts) do
-    validate_options!(opts)
+    _parsed_options = validate_and_parse_options(opts)
 
     spec =
       child(:udp_source, %Membrane.UDP.Source{local_port_no: opts[:port]})
@@ -49,41 +51,37 @@ defmodule Boombox.RTP do
   def handle_new_rtp_stream(ssrc, payload_type, _extensions, state) do
     {:rtp, rtp_opts} = state.input
 
+    parsed_opts = validate_and_parse_options(rtp_opts)
+
     {media_type, media_config} =
-      Enum.find(rtp_opts, fn {_media_type, media_config} ->
-        media_config[:payload_type] == payload_type
+      Enum.find(parsed_opts.media_config, fn {_media_type, media_config} ->
+        media_config.payload_type == payload_type
       end)
 
-    {encoding_name, encoding_specific_params} =
-      case media_config[:encoding] do
-        encoding_name when is_atom(encoding_name) -> {encoding_name, []}
-        encoding_params -> encoding_params
-      end
-
-    %PayloadFormat{depayloader: depayloader} = PayloadFormat.get(encoding_name)
+    %PayloadFormat{depayloader: depayloader} = PayloadFormat.get(media_config.encoding_name)
 
     spec =
-      case encoding_name do
+      case media_config.encoding_name do
         :H264 ->
-          ppss = Keyword.get(encoding_specific_params, :ppss, [])
-          spss = Keyword.get(encoding_specific_params, :spss, [])
+          ppss = Map.get(media_config.encoding_specific_params, :ppss, [])
+          spss = Map.get(media_config.encoding_specific_params, :spss, [])
 
           get_child(:rtp_demuxer)
           |> via_out(Membrane.Pad.ref(:output, ssrc))
           |> child({:jitter_buffer, ssrc}, %Membrane.RTP.JitterBuffer{
-            clock_rate: media_config[:clock_rate]
+            clock_rate: media_config.clock_rate
           })
           |> child({:rtp_depayloader, ssrc}, depayloader)
           |> child({:rtp_in_parser, ssrc}, %Membrane.H264.Parser{ppss: ppss, spss: spss})
 
         :AAC ->
-          audio_specific_config = encoding_specific_params[:audio_specific_config]
-          bitrate_mode = encoding_specific_params[:bitrate_mode]
+          audio_specific_config = media_config.encoding_specific_params.audio_specific_config
+          bitrate_mode = media_config.encoding_specific_params.bitrate_mode
 
           get_child(:rtp_demuxer)
           |> via_out(Membrane.Pad.ref(:output, ssrc))
           |> child({:jitter_buffer, ssrc}, %Membrane.RTP.JitterBuffer{
-            clock_rate: media_config[:clock_rate]
+            clock_rate: media_config.clock_rate
           })
           |> child({:rtp_depayloader, ssrc}, struct(depayloader, mode: bitrate_mode))
           |> child({:rtp_in_parser, ssrc}, %Membrane.AAC.Parser{
@@ -108,8 +106,8 @@ defmodule Boombox.RTP do
     end
   end
 
-  @spec validate_options!(Boombox.in_rtp_opts()) :: :ok
-  defp validate_options!(opts) do
+  @spec validate_and_parse_options(Boombox.in_rtp_opts()) :: :ok
+  defp validate_and_parse_options(opts) do
     Enum.each(@required_opts, fn required_option ->
       unless Keyword.has_key?(opts, required_option) do
         raise "Required option #{inspect(required_option)} not present in passed RTP options"
@@ -120,64 +118,58 @@ defmodule Boombox.RTP do
       raise "No media configured"
     end
 
-    Enum.each(opts[:media_config], fn {_media_type, media_config} ->
-      validate_media_config!(media_config)
-    end)
+    parsed_media_config =
+      Map.new(opts[:media_config], fn {media_type, media_config} ->
+        {media_type, validate_and_parse_media_config!(media_config)}
+      end)
+
+    %{port: opts[:port], media_config: parsed_media_config}
   end
 
-  @spec validate_media_config!(Boombox.rtp_media_config()) :: :ok
-  defp validate_media_config!(media_config) do
-    encoding = validate_encoding!(media_config[:encoding])
+  @spec validate_and_parse_media_config!(Boombox.rtp_media_config()) :: parsed_media_config()
+  defp validate_and_parse_media_config!(media_config) do
+    {encoding_name, encoding_specific_params} =
+      validate_and_parse_encoding!(media_config[:encoding])
 
-    payload_format = PayloadFormat.get(encoding)
+    media_config = Keyword.put(media_config, :encoding_name, encoding_name)
 
-    {clock_rate, payload_type} =
-      case payload_format.payload_type do
-        nil ->
-          {nil, nil}
+    {_payload_format, payload_type, clock_rate} = RTP.PayloadFormat.resolve(media_config)
 
-        payload_type ->
-          case PayloadFormat.get_payload_type_mapping(payload_type) do
-            %{encoding_name: ^encoding, clock_rate: clock_rate} ->
-              {clock_rate, payload_type}
-
-            %{} ->
-              {nil, payload_type}
-          end
-      end
-
-    {:ok, parsed_media_config} =
-      Bunch.Config.parse(media_config,
-        encoding: [],
-        payload_type: fn _cfg -> if payload_type != nil, do: [default: payload_type], else: [] end,
-        clock_rate: fn _cfg -> if clock_rate != nil, do: [default: clock_rate], else: [] end
-      )
-
-    if clock_rate == nil do
-      PayloadFormat.register_payload_type_mapping(
-        parsed_media_config.payload_type,
-        encoding,
-        parsed_media_config.clock_rate
-      )
+    if payload_type == nil do
+      raise "payload_type for encoding #{inspect(encoding_name)} not provided with no default value registered"
     end
 
-    :ok
+    if clock_rate == nil do
+      raise "clock_rate for encoding #{inspect(encoding_name)} and payload_type #{inspect(payload_type)} not provided with no default value registered"
+    end
+
+    %{
+      encoding_name: encoding_name,
+      encoding_specific_params: encoding_specific_params,
+      payload_type: payload_type,
+      clock_rate: clock_rate
+    }
   end
 
-  @spec validate_encoding!(RTP.encoding_name_t() | Boombox.rtp_encoding_specific_params()) ::
-          RTP.encoding_name_t()
-  defp validate_encoding!(encoding) do
+  @spec validate_and_parse_encoding!(RTP.encoding_name() | Boombox.rtp_encoding_specific_params()) ::
+          {RTP.encoding_name(), %{}} | parsed_encoding_specific_params()
+  defp validate_and_parse_encoding!(encoding) do
     case encoding do
       nil ->
         raise "Encoding name not provided"
 
+      encoding when is_atom(encoding) ->
+        validate_and_parse_encoding!({encoding, []})
+
       {encoding, encoding_params} when is_atom(encoding) ->
         field_specs = Map.get(@required_encoding_specific_params, encoding)
-        {:ok, _encoding_params} = Bunch.Config.parse(encoding_params, field_specs)
-        encoding
 
-      encoding when is_atom(encoding) ->
-        validate_encoding!({encoding, []})
+        if field_specs != nil do
+          {:ok, encoding_params} = Bunch.Config.parse(encoding_params, field_specs)
+          {encoding, encoding_params}
+        else
+          {encoding, []}
+        end
     end
   end
 end
