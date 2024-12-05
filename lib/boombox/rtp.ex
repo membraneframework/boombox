@@ -200,7 +200,13 @@ defmodule Boombox.RTP do
         {media_type, validate_and_parse_track_config!(direction, track_config)}
       end)
 
-    %{port: opts[:port], track_configs: parsed_track_configs}
+    case direction do
+      :input ->
+        %{port: opts[:port], track_configs: parsed_track_configs}
+
+      :output ->
+        %{address: opts[:address], port: opts[:port], track_configs: parsed_track_configs}
+    end
   end
 
   @spec validate_and_parse_track_config!(:input, Boombox.rtp_track_config()) ::
