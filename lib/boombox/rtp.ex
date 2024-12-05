@@ -11,6 +11,7 @@ defmodule Boombox.RTP do
     input: [:port, :track_configs],
     output: [:address, :port, :track_configs]
   }
+
   @required_encoding_specific_params %{
     input: %{
       AAC: [bitrate_mode: [require?: true], audio_specific_config: [require?: true]],
@@ -22,7 +23,7 @@ defmodule Boombox.RTP do
     }
   }
 
-  @type parsed_encoding_specific_params ::
+  @type parsed_input_encoding_specific_params ::
           %{bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()}
           | %{optional(:ppss) => [binary()], optional(:spss) => [binary()]}
           | %{
@@ -32,22 +33,39 @@ defmodule Boombox.RTP do
             }
           | %{}
 
-  @type parsed_track_config(parsed_encoding_specific_params) :: %{
+  @type parsed_output_encoding_specific_params ::
+          %{bitrate_mode: RTP.AAC.Utils.mode()}
+          | %{}
+
+  @type parsed_input_track_config :: %{
           encoding_name: RTP.encoding_name(),
-          encoding_specific_params: parsed_encoding_specific_params,
+          encoding_specific_params: parsed_input_encoding_specific_params(),
+          payload_type: RTP.payload_type(),
+          clock_rate: RTP.clock_rate()
+        }
+
+  @type parsed_output_track_config :: %{
+          encoding_name: RTP.encoding_name(),
+          encoding_specific_params: parsed_output_encoding_specific_params(),
           payload_type: RTP.payload_type(),
           clock_rate: RTP.clock_rate()
         }
 
   @type parsed_in_opts :: %{
           port: :inet.port_number(),
-          track_configs: %{audio: parsed_track_config(), video: parsed_track_config()}
+          track_configs: %{
+            optional(:audio) => parsed_input_track_config,
+            optional(:video) => parsed_input_track_config
+          }
         }
 
   @type parsed_out_opts :: %{
           address: :inet.ip_address(),
           port: :inet.port_number(),
-          media_config: %{audio: parsed_track_config(), video: parsed_track_config()}
+          track_configs: %{
+            optional(:audio) => parsed_output_track_config,
+            optional(:video) => parsed_output_track_config
+          }
         }
 
   @spec create_input(Boombox.in_rtp_opts()) :: Ready.t()
@@ -102,7 +120,67 @@ defmodule Boombox.RTP do
     %Ready{spec_builder: spec, track_builders: track_builders}
   end
 
-  @spec link_output()
+  @spec link_output(
+          Boombox.out_rtp_opts(),
+          Boombox.Pipeline.track_builders(),
+          Membrane.ChildrenSpec.t()
+        ) :: Ready.t()
+  def link_output(opts, track_builders, spec_builder) do
+    parsed_opts = validate_and_parse_options(:output, opts)
+
+    spec = [
+      spec_builder,
+      child(:rtp_muxer, Membrane.RTP.Muxer)
+      |> child(:udp_sink, %Membrane.UDP.Sink{
+        destination_address: parsed_opts.address,
+        destination_port_no: parsed_opts.port
+      }),
+      Enum.map(track_builders, fn
+        {:audio, builder} ->
+          track_config = parsed_opts.track_configs.audio
+
+          builder
+          |> child(:rtp_audio_transcoder, %Boombox.Transcoder{
+            output_stream_format: %Membrane.AAC{encapsulation: :none}
+          })
+          |> child(:aac_payloader, %Membrane.RTP.AAC.Payloader{
+            mode: track_config.encoding_specific_params.bitrate_mode,
+            frames_per_packet: 1
+          })
+          |> via_in(:input,
+            options: [
+              encoding: :AAC,
+              payload_type: track_config.payload_type,
+              clock_rate: track_config.clock_rate
+            ]
+          )
+          |> get_child(:rtp_muxer)
+
+        {:video, builder} ->
+          track_config = parsed_opts.track_configs.video
+
+          builder
+          |> get_child(:rtp_muxer)
+          |> child(:hls_video_transcoder, %Boombox.Transcoder{
+            output_stream_format: %Membrane.H264{
+              stream_structure: :annexb,
+              alignment: :nalu
+            }
+          })
+          |> child(:h264_payloader, Membrane.RTP.H264.Payloader)
+          |> via_in(:input,
+            options: [
+              encoding: :H264,
+              payload_type: track_config.payload_type,
+              clock_rate: track_config.clock_rate
+            ]
+          )
+          |> get_child(:rtp_muxer)
+      end)
+    ]
+
+    %Ready{actions: [spec: spec]}
+  end
 
   @spec validate_and_parse_options(:input, Boombox.in_rtp_opts()) :: parsed_in_opts()
   @spec validate_and_parse_options(:output, Boombox.out_rtp_opts()) :: parsed_out_opts()
@@ -119,16 +197,19 @@ defmodule Boombox.RTP do
 
     parsed_track_configs =
       Map.new(opts[:track_configs], fn {media_type, track_config} ->
-        {media_type, validate_and_parse_track_config!(track_config)}
+        {media_type, validate_and_parse_track_config!(direction, track_config)}
       end)
 
     %{port: opts[:port], track_configs: parsed_track_configs}
   end
 
-  @spec validate_and_parse_track_config!(Boombox.rtp_track_config()) :: parsed_track_config()
-  defp validate_and_parse_track_config!(track_config) do
+  @spec validate_and_parse_track_config!(:input, Boombox.rtp_track_config()) ::
+          parsed_input_track_config()
+  @spec validate_and_parse_track_config!(:output, Boombox.rtp_track_config()) ::
+          parsed_output_track_config()
+  defp validate_and_parse_track_config!(direction, track_config) do
     {encoding_name, encoding_specific_params} =
-      validate_and_parse_encoding!(track_config[:encoding])
+      validate_and_parse_encoding!(direction, track_config[:encoding])
 
     track_config = Keyword.put(track_config, :encoding_name, encoding_name)
 
@@ -151,18 +232,24 @@ defmodule Boombox.RTP do
     }
   end
 
-  @spec validate_and_parse_encoding!(RTP.encoding_name() | Boombox.rtp_encoding_specific_params()) ::
-          {RTP.encoding_name(), %{}} | parsed_encoding_specific_params()
-  defp validate_and_parse_encoding!(encoding) do
+  @spec validate_and_parse_encoding!(
+          :input,
+          RTP.encoding_name() | Boombox.rtp_encoding_specific_params()
+        ) :: {RTP.encoding_name(), parsed_input_encoding_specific_params()}
+  @spec validate_and_parse_encoding!(
+          :output,
+          RTP.encoding_name() | Boombox.rtp_encoding_specific_params()
+        ) :: {RTP.encoding_name(), parsed_output_encoding_specific_params()}
+  defp validate_and_parse_encoding!(direction, encoding) do
     case encoding do
       nil ->
         raise "Encoding name not provided"
 
       encoding when is_atom(encoding) ->
-        validate_and_parse_encoding!({encoding, []})
+        validate_and_parse_encoding!(direction, {encoding, []})
 
       {encoding, encoding_params} when is_atom(encoding) ->
-        field_specs = Map.get(@required_encoding_specific_params, encoding, [])
+        field_specs = Map.get(@required_encoding_specific_params[direction], encoding, [])
         {:ok, encoding_params} = Bunch.Config.parse(encoding_params, field_specs)
         {encoding, encoding_params}
     end

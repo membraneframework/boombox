@@ -8,8 +8,6 @@ defmodule Boombox do
 
   alias Membrane.RTP
 
-  @type direction :: :input | :output
-
   @type webrtc_signaling :: Membrane.WebRTC.SignalingChannel.t() | String.t()
   @type in_stream_opts :: [
           {:audio, :binary | boolean()}
