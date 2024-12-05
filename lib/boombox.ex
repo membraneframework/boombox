@@ -9,7 +9,10 @@ defmodule Boombox do
   alias Membrane.RTP
 
   @type webrtc_signaling :: Membrane.WebRTC.SignalingChannel.t() | String.t()
-  @type in_stream_opts :: [audio: :binary | boolean(), video: :image | boolean()]
+  @type in_stream_opts :: [
+          {:audio, :binary | boolean()}
+          | {:video, :image | boolean()}
+        ]
   @type out_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
@@ -36,9 +39,9 @@ defmodule Boombox do
     * payload_type, clock rate - most likely should be provided, if not, then an unofficial default will be used.
   """
   @type rtp_media_config :: [
-          encoding: RTP.encoding_name() | rtp_encoding_specific_params(),
-          payload_type: RTP.payload_type(),
-          clock_rate: RTP.clock_rate()
+          {:encoding, RTP.encoding_name() | rtp_encoding_specific_params()}
+          | {:payload_type, RTP.payload_type()}
+          | {:clock_rate, RTP.clock_rate()}
         ]
 
   @typedoc """
@@ -46,8 +49,8 @@ defmodule Boombox do
   At least one media type needs to be configured.
   """
   @type in_rtp_opts :: [
-          {:port, :inet.port_number()},
-          {:media_config, [audio: rtp_media_config(), video: rtp_media_config()]}
+          {:port, :inet.port_number()}
+          | {:media_config, [audio: rtp_media_config(), video: rtp_media_config()]}
         ]
 
   @type input ::
