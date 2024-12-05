@@ -60,7 +60,7 @@ defmodule Boombox.Mixfile do
       {:membrane_rtmp_plugin, "~> 0.27.2"},
       {:membrane_rtsp_plugin, "~> 0.5.0"},
       {:membrane_rtp_plugin,
-       github: "membraneframework/membrane_rtp_plugin", branch: "rtp-demuxer", override: true},
+       github: "membraneframework/membrane_rtp_plugin", branch: "rtp-muxer", override: true},
       {:membrane_rtp_format,
        github: "membraneframework/membrane_rtp_format", branch: "resolve-function", override: true},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
