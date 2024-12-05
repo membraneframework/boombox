@@ -7,12 +7,19 @@ defmodule Boombox.RTP do
   alias Boombox.Pipeline.Ready
   alias Membrane.RTP
 
-  @required_opts [:port, :track_configs]
+  @required_opts %{
+    input: [:port, :track_configs],
+    output: [:address, :port, :track_configs]
+  }
   @required_encoding_specific_params %{
-    AAC: [bitrate_mode: [require?: true], audio_specific_config: [require?: true]],
-    OPUS: [],
-    H264: [ppss: [require?: false], spss: [require?: false]],
-    H265: [ppss: [require?: false], spss: [require?: false]]
+    input: %{
+      AAC: [bitrate_mode: [require?: true], audio_specific_config: [require?: true]],
+      H264: [ppss: [require?: false], spss: [require?: false]],
+      H265: [vpss: [require?: false], ppss: [require?: false], spss: [require?: false]]
+    },
+    output: %{
+      AAC: [bitrate_mode: [require?: true]]
+    }
   }
 
   @type parsed_encoding_specific_params ::
@@ -25,9 +32,9 @@ defmodule Boombox.RTP do
             }
           | %{}
 
-  @type parsed_track_config :: %{
+  @type parsed_track_config(parsed_encoding_specific_params) :: %{
           encoding_name: RTP.encoding_name(),
-          encoding_specific_params: parsed_encoding_specific_params(),
+          encoding_specific_params: parsed_encoding_specific_params,
           payload_type: RTP.payload_type(),
           clock_rate: RTP.clock_rate()
         }
@@ -37,9 +44,15 @@ defmodule Boombox.RTP do
           track_configs: %{audio: parsed_track_config(), video: parsed_track_config()}
         }
 
+  @type parsed_out_opts :: %{
+          address: :inet.ip_address(),
+          port: :inet.port_number(),
+          media_config: %{audio: parsed_track_config(), video: parsed_track_config()}
+        }
+
   @spec create_input(Boombox.in_rtp_opts()) :: Ready.t()
   def create_input(opts) do
-    parsed_options = validate_and_parse_options(opts)
+    parsed_options = validate_and_parse_options(:input, opts)
     payload_type_mapping = get_payload_type_mapping(parsed_options.track_configs)
 
     spec =
@@ -89,9 +102,12 @@ defmodule Boombox.RTP do
     %Ready{spec_builder: spec, track_builders: track_builders}
   end
 
-  @spec validate_and_parse_options(Boombox.in_rtp_opts()) :: parsed_in_opts()
-  defp validate_and_parse_options(opts) do
-    Enum.each(@required_opts, fn required_option ->
+  @spec link_output()
+
+  @spec validate_and_parse_options(:input, Boombox.in_rtp_opts()) :: parsed_in_opts()
+  @spec validate_and_parse_options(:output, Boombox.out_rtp_opts()) :: parsed_out_opts()
+  defp validate_and_parse_options(direction, opts) do
+    Enum.each(@required_opts[direction], fn required_option ->
       unless Keyword.has_key?(opts, required_option) do
         raise "Required option #{inspect(required_option)} not present in passed RTP options"
       end
