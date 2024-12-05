@@ -43,7 +43,7 @@ defmodule Boombox.RTSP do
     {%Wait{}, %{state | rtsp_state: rtsp_state}}
   end
 
-  @spec handle_input_track(RTP.ssrc_t(), RTSP.Source.track(), State.t()) ::
+  @spec handle_input_track(RTP.ssrc(), RTSP.Source.track(), State.t()) ::
           {Ready.t() | Wait.t(), State.t()}
   def handle_input_track(ssrc, track, state) do
     track_builders = state.rtsp_state.track_builders

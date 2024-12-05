@@ -22,8 +22,8 @@ defmodule Boombox.RTP do
   @type parsed_media_config :: %{
           encoding_name: RTP.encoding_name(),
           encoding_specific_params: parsed_encoding_specific_params(),
-          payload_type: RTP.payload_type_t(),
-          clock_rate: RTP.clock_rate_t()
+          payload_type: RTP.payload_type(),
+          clock_rate: RTP.clock_rate()
         }
 
   @type parsed_in_opts :: %{
