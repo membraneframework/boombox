@@ -8,7 +8,7 @@ defmodule Boombox.RTP.ParsingTest do
       rtp_opts =
         [
           port: 5001,
-          media_config: [
+          track_configs: [
             audio: [
               encoding:
                 {:AAC, [bitrate_mode: :hbr, audio_specific_config: Base.decode16!("1210")]},
@@ -27,7 +27,7 @@ defmodule Boombox.RTP.ParsingTest do
     end
 
     test "for minimal H264 options" do
-      rtp_opts = [port: 5001, media_config: [video: [encoding: :H264]]]
+      rtp_opts = [port: 5001, track_configs: [video: [encoding: :H264]]]
 
       assert %Wait{} = Boombox.RTP.create_input(rtp_opts)
     end
@@ -35,19 +35,19 @@ defmodule Boombox.RTP.ParsingTest do
 
   describe "Parsing RTP options fails" do
     test "for options with missing required encoding specific params" do
-      rtp_opts = [port: 5001, media_config: [audio: [encoding: :AAC]]]
+      rtp_opts = [port: 5001, track_configs: [audio: [encoding: :AAC]]]
 
       assert_raise MatchError, fn -> Boombox.RTP.create_input(rtp_opts) end
     end
 
-    test "for no media configured" do
-      rtp_opts = [port: 5001, media_config: []]
+    test "for no tracks configured" do
+      rtp_opts = [port: 5001, track_configs: []]
 
       assert_raise RuntimeError, fn -> Boombox.RTP.create_input(rtp_opts) end
     end
 
     test "for no port provided" do
-      rtp_opts = [media_config: []]
+      rtp_opts = [track_configs: []]
 
       assert_raise RuntimeError, fn -> Boombox.RTP.create_input(rtp_opts) end
     end

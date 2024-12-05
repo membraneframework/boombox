@@ -38,7 +38,7 @@ defmodule Boombox do
     * encoding - has to be provided, some encodings require additional parameters, see `rtp_encoding_specific_params/0`.
     * payload_type, clock rate - most likely should be provided, if not, then an unofficial default will be used.
   """
-  @type rtp_media_config :: [
+  @type rtp_track_config :: [
           {:encoding, RTP.encoding_name() | rtp_encoding_specific_params()}
           | {:payload_type, RTP.payload_type()}
           | {:clock_rate, RTP.clock_rate()}
@@ -50,7 +50,7 @@ defmodule Boombox do
   """
   @type in_rtp_opts :: [
           {:port, :inet.port_number()}
-          | {:media_config, [audio: rtp_media_config(), video: rtp_media_config()]}
+          | {:track_configs, [audio: rtp_track_config(), video: rtp_track_config()]}
         ]
 
   @type input ::
