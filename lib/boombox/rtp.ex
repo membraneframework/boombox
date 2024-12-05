@@ -106,7 +106,7 @@ defmodule Boombox.RTP do
     end
   end
 
-  @spec validate_and_parse_options(Boombox.in_rtp_opts()) :: :ok
+  @spec validate_and_parse_options(Boombox.in_rtp_opts()) :: parsed_in_opts()
   defp validate_and_parse_options(opts) do
     Enum.each(@required_opts, fn required_option ->
       unless Keyword.has_key?(opts, required_option) do
