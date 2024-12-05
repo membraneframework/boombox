@@ -36,9 +36,9 @@ defmodule Boombox do
     * payload_type, clock rate - most likely should be provided, if not, then an unofficial default will be used.
   """
   @type rtp_media_config :: [
-          encoding: RTP.encoding_name_t() | rtp_encoding_specific_params(),
-          payload_type: RTP.payload_type_t(),
-          clock_rate: RTP.clock_rate_t()
+          encoding: RTP.encoding_name() | rtp_encoding_specific_params(),
+          payload_type: RTP.payload_type(),
+          clock_rate: RTP.clock_rate()
         ]
 
   @typedoc """
