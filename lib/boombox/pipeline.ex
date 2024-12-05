@@ -316,8 +316,8 @@ defmodule Boombox.Pipeline do
     Boombox.RTSP.create_input(uri)
   end
 
-  defp create_input({:rtp, params}, _ctx, _state) do
-    Boombox.RTP.create_input(params)
+  defp create_input({:rtp, opts}, _ctx, _state) do
+    Boombox.RTP.create_input(opts)
   end
 
   defp create_input({:stream, params}, _ctx, state) do
@@ -357,6 +357,10 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.HLS.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.RTP.link_output(opts, track_builders, spec_builder)
   end
 
   defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
