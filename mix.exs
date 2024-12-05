@@ -64,7 +64,7 @@ defmodule Boombox.Mixfile do
        github: "membraneframework-labs/membrane_rtsp_plugin", branch: "bump-deps"},
       # {:membrane_rtsp_plugin, "~> 0.5.0"},
       {:membrane_rtp_plugin,
-       github: "membraneframework/membrane_rtp_plugin", branch: "rtp-demuxer", override: true},
+       github: "membraneframework/membrane_rtp_plugin", branch: "rtp-muxer", override: true},
       {:membrane_rtp_format, "~> 0.10.0"},
       {:membrane_rtp_aac_plugin, "~> 0.9.0"},
       {:membrane_rtp_h264_plugin, "~> 0.20.0"},
