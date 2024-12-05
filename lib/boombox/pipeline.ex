@@ -160,6 +160,17 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_child_notification(
+        {:new_rtp_stream, ssrc, payload_type, extensions},
+        :rtp_demuxer,
+        ctx,
+        state
+      ) do
+    {result, state} = Boombox.RTP.handle_new_rtp_stream(ssrc, payload_type, extensions, state)
+    proceed_result(result, ctx, state)
+  end
+
+  @impl true
   def handle_child_notification({:end_of_stream, id}, :webrtc_output, _ctx, state) do
     %{eos_info: track_ids} = state
     track_ids = List.delete(track_ids, id)
@@ -316,6 +327,10 @@ defmodule Boombox.Pipeline do
     Boombox.RTSP.create_input(uri)
   end
 
+  defp create_input({:rtp, opts}, _ctx, _state) do
+    Boombox.RTP.create_input(opts)
+  end
+
   defp create_input({:stream, params}, _ctx, state) do
     Boombox.ElixirStream.create_input(state.parent, params)
   end
@@ -353,6 +368,10 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.HLS.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.RTP.link_output(opts, track_builders, spec_builder)
   end
 
   defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
