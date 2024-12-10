@@ -7,7 +7,6 @@ defmodule Boombox.WebRTC do
   alias Boombox.Pipeline.{Ready, State, Wait}
   alias Membrane.{H264, RemoteStream, VP8}
   alias Membrane.Pipeline.CallbackContext
-  alias Membrane.WebRTC.SignalingChannel
 
   @type output_webrtc_state :: %{negotiated_video_codecs: [:vp8 | :h264] | nil}
   @type webrtc_sink_new_tracks :: [%{id: term, kind: :audio | :video}]
@@ -15,7 +14,7 @@ defmodule Boombox.WebRTC do
   @spec create_input(Boombox.webrtc_signaling(), Boombox.output(), CallbackContext.t(), State.t()) ::
           Wait.t()
   def create_input(signaling, output, ctx, state) do
-    signaling = resolve_signaling(signaling, ctx.utility_supervisor)
+    signaling = resolve_signaling(signaling, :input, ctx.utility_supervisor)
 
     keyframe_interval =
       case output do
@@ -75,7 +74,7 @@ defmodule Boombox.WebRTC do
   @spec create_output(Boombox.webrtc_signaling(), CallbackContext.t(), State.t()) ::
           {Ready.t() | Wait.t(), State.t()}
   def create_output(signaling, ctx, state) do
-    signaling = resolve_signaling(signaling, ctx.utility_supervisor)
+    signaling = resolve_signaling(signaling, :output, ctx.utility_supervisor)
     startup_tracks = if webrtc_input?(state), do: [:audio, :video], else: []
 
     spec =
@@ -91,7 +90,7 @@ defmodule Boombox.WebRTC do
       if webrtc_input?(state) do
         # let's spawn websocket server for webrtc source before the source starts
         {:webrtc, input_signaling} = state.input
-        signaling_channel = resolve_signaling(input_signaling, ctx.utility_supervisor)
+        signaling_channel = resolve_signaling(input_signaling, :input, ctx.utility_supervisor)
         state = %{state | input: {:webrtc, signaling_channel}}
 
         {%Wait{actions: [spec: spec]}, state}
@@ -189,16 +188,25 @@ defmodule Boombox.WebRTC do
     %Ready{actions: [spec: spec], eos_info: Map.values(tracks)}
   end
 
-  defp resolve_signaling(%SignalingChannel{} = signaling, _utility_supervisor) do
+  defp resolve_signaling(
+         %Membrane.WebRTC.SignalingChannel{} = signaling,
+         _direction,
+         _utility_supervisor
+       ) do
     signaling
   end
 
-
-  defp resolve_signaling({:whip, _opts} = signaling, _utility_supervisor) do
-    signaling
+  defp resolve_signaling({:whip, uri, opts}, :input, _utility_supervisor) do
+    uri = URI.new!(uri)
+    {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
+    {:whip, [ip: :any, port: uri.port] ++ opts}
   end
 
-  defp resolve_signaling(uri, utility_supervisor) when is_binary(uri) do
+  defp resolve_signaling({:whip, uri, opts}, :output, _utility_supervisor) do
+    {:whip, [uri: uri] ++ opts}
+  end
+
+  defp resolve_signaling(uri, _direction, utility_supervisor) when is_binary(uri) do
     uri = URI.new!(uri)
     {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
     opts = [ip: ip, port: uri.port]

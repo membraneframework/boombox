@@ -91,7 +91,7 @@ To send the stream, visit http://localhost:1234/webrtc_from_browser.html.
 Note: don't stop this cell to finish recording - click 'disconnect' or close the browser tab instead, so the recording is finalized properly.
 
 ```elixir
-Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
+Boombox.run(input: {:whip, port: 8829, token: "whip_it!"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
 ```
 
 ```elixir

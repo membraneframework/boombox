@@ -70,7 +70,7 @@ For more examples, see [examples.livemd](examples.livemd).
 |---|---|---|
 | MP4 | `"*.mp4"` | `"*.mp4"` |
 | WebRTC | `{:webrtc, signaling}` | `{:webrtc, signaling}` |
-| WHIP | `{:whip, port: 3721, token: "whip-token"}` | `{:whip, uri: "http://localhost:3721", token: "whip-token"}` |
+| WHIP | `{:whip, "http://*", token: "token"}` | `{:whip, "http://*", token: "token"}` |
 | RTMP | `"rtmp://*"` | _not supported_ |
 | RTSP | `"rtsp://*"` | _not supported_ |
 | RTP | `{:rtp, opts}` | _not yet supported_ |
@@ -113,7 +113,7 @@ The CLI API is a direct mapping of the Elixir API:
 For example:
 
 ```elixir
-Boombox.run(input: "file.mp4", output: {:webrtc, "ws://localhost:8830"})
+Boombox.run(input: "file.mp4", output: {:whip, "http://localhost:3721", token: "token"})
 Boombox.run(
   input:
     {:rtp,
@@ -128,7 +128,7 @@ Boombox.run(
 are equivalent to:
 
 ```sh
-./boombox -i file.mp4 -o --webrtc ws://localhost:8830
+./boombox -i file.mp4 -o --whip http://localhost:3721 --token token
 ./boombox -i --rtp --port 50001 --audio-encoding AAC --audio-specific-config a13f --aac-bitrate-mode hbr -o index.m3u8
 ```
 
