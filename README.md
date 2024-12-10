@@ -70,7 +70,7 @@ For more examples, see [examples.livemd](examples.livemd).
 |---|---|---|
 | MP4 | `"*.mp4"` | `"*.mp4"` |
 | WebRTC | `{:webrtc, signaling}` | `{:webrtc, signaling}` |
-| WHIP | `{:whip, port: 3721, token: "whip-token"}` | `{:whip, uri: "http://localhost:3721", token: "whip-token"}` |
+| WHIP | `{:whip, "http://*", token: "token"}` | `{:whip, "http://*", token: "token"}` |
 | RTMP | `"rtmp://*"` | _not supported_ |
 | RTSP | `"rtsp://*"` | _not supported_ |
 | HLS | _not supported_ | `"*.m3u8"` |
@@ -103,13 +103,13 @@ Make sure you have [Elixir](https://elixir-lang.org/) installed. The first call 
 The CLI API is similar to the Elixir API, for example:
 
 ```elixir
-Boombox.run(input: "file.mp4", output: {:webrtc, "ws://localhost:8830"})
+Boombox.run(input: "file.mp4", output: {:whip, "http://localhost:3721", token: "token"})
 ```
 
 is equivalent to:
 
 ```sh
-./boombox -i file.mp4 -o --webrtc ws://localhost:8830
+./boombox -i file.mp4 -o --whip http://localhost:3721 --token token
 ```
 
 It's also possible to pass an `.exs` script:
