@@ -1,7 +1,7 @@
 defmodule Boombox.RTP.ParsingTest do
   use ExUnit.Case
 
-  alias Boombox.Pipeline.Wait
+  alias Boombox.Pipeline.Ready
 
   describe "Parsing RTP options succeeds" do
     test "for correct AAC + H264 options" do
@@ -23,13 +23,13 @@ defmodule Boombox.RTP.ParsingTest do
           ]
         ]
 
-      assert %Wait{} = Boombox.RTP.create_input(rtp_opts)
+      assert %Ready{} = Boombox.RTP.create_input(rtp_opts)
     end
 
     test "for minimal H264 options" do
       rtp_opts = [port: 5001, track_configs: [video: [encoding: :H264]]]
 
-      assert %Wait{} = Boombox.RTP.create_input(rtp_opts)
+      assert %Ready{} = Boombox.RTP.create_input(rtp_opts)
     end
   end
 

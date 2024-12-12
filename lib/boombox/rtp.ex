@@ -4,8 +4,8 @@ defmodule Boombox.RTP do
 
   require Membrane.Pad
 
-  alias Membrane.RTP
   alias Membrane.RTP.PayloadFormat
+  alias Membrane.RTP
   alias Boombox.Pipeline.Ready
 
   @required_opts [:port, :track_configs]
