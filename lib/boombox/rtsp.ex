@@ -8,7 +8,7 @@ defmodule Boombox.RTSP do
   alias Membrane.{RTP, RTSP}
   alias Boombox.Pipeline.{Ready, State, Wait}
 
-  @type rtsp_state :: %{
+  @type state :: %{
           set_up_tracks: %{
             optional(:audio) => Membrane.RTSP.Source.track(),
             optional(:video) => Membrane.RTSP.Source.track()

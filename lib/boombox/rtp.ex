@@ -6,7 +6,7 @@ defmodule Boombox.RTP do
 
   alias Membrane.RTP
   alias Membrane.RTP.PayloadFormat
-  alias Boombox.Pipeline.{Ready, State, Wait}
+  alias Boombox.Pipeline.Ready
 
   @required_opts [:port, :track_configs]
   @required_encoding_specific_params %{
@@ -31,79 +31,54 @@ defmodule Boombox.RTP do
           track_configs: %{audio: parsed_track_config(), video: parsed_track_config()}
         }
 
-  @spec create_input(Boombox.in_rtp_opts()) :: Wait.t()
+  @spec create_input(Boombox.in_rtp_opts()) :: Ready.t()
   def create_input(opts) do
-    _parsed_options = validate_and_parse_options(opts)
+    parsed_options = validate_and_parse_options(opts)
 
     spec =
       child(:udp_source, %Membrane.UDP.Source{local_port_no: opts[:port]})
       |> child(:rtp_demuxer, Membrane.RTP.Demuxer)
 
-    %Wait{actions: [spec: spec]}
-  end
+    track_builders =
+      Map.new(parsed_options.track_configs, fn {media_type, track_config} ->
+        %PayloadFormat{depayloader: depayloader} = PayloadFormat.get(track_config.encoding_name)
 
-  @spec handle_new_rtp_stream(
-          ExRTP.Packet.uint32(),
-          ExRTP.Packet.uint7(),
-          [ExRTP.Packet.Extension.t()],
-          State.t()
-        ) :: {Wait.t() | Ready.t(), State.t()}
-  def handle_new_rtp_stream(ssrc, payload_type, _extensions, state) do
-    {:rtp, rtp_opts} = state.input
+        case track_config.encoding_name do
+          :H264 ->
+            ppss = Map.get(track_config.encoding_specific_params, :ppss, [])
+            spss = Map.get(track_config.encoding_specific_params, :spss, [])
 
-    parsed_opts = validate_and_parse_options(rtp_opts)
+            spec =
+              get_child(:rtp_demuxer)
+              |> via_out(:output, options: [stream_id: {:encoding_name, :H264}])
+              |> child(:h264_jitter_buffer, %Membrane.RTP.JitterBuffer{
+                clock_rate: track_config.clock_rate
+              })
+              |> child(:rtp_h264_depayloader, depayloader)
+              |> child(:rtp_in_h264_parser, %Membrane.H264.Parser{ppss: ppss, spss: spss})
 
-    {media_type, track_config} =
-      Enum.find(parsed_opts.track_configs, fn {_media_type, track_config} ->
-        track_config.payload_type == payload_type
+            {media_type, spec}
+
+          :AAC ->
+            audio_specific_config = track_config.encoding_specific_params.audio_specific_config
+            bitrate_mode = track_config.encoding_specific_params.bitrate_mode
+
+            spec =
+              get_child(:rtp_demuxer)
+              |> via_out(:output, options: [stream_id: {:encoding_name, :AAC}])
+              |> child(:aac_jitter_buffer, %Membrane.RTP.JitterBuffer{
+                clock_rate: track_config.clock_rate
+              })
+              |> child(:rtp_aac_depayloader, struct(depayloader, mode: bitrate_mode))
+              |> child(:rtp_in_aac_parser, %Membrane.AAC.Parser{
+                audio_specific_config: audio_specific_config
+              })
+
+            {media_type, spec}
+        end
       end)
 
-    %PayloadFormat{depayloader: depayloader} = PayloadFormat.get(track_config.encoding_name)
-
-    spec =
-      case track_config.encoding_name do
-        :H264 ->
-          ppss = Map.get(track_config.encoding_specific_params, :ppss, [])
-          spss = Map.get(track_config.encoding_specific_params, :spss, [])
-
-          get_child(:rtp_demuxer)
-          |> via_out(Membrane.Pad.ref(:output, ssrc))
-          |> child({:jitter_buffer, ssrc}, %Membrane.RTP.JitterBuffer{
-            clock_rate: track_config.clock_rate
-          })
-          |> child({:rtp_depayloader, ssrc}, depayloader)
-          |> child({:rtp_in_parser, ssrc}, %Membrane.H264.Parser{ppss: ppss, spss: spss})
-
-        :AAC ->
-          audio_specific_config = track_config.encoding_specific_params.audio_specific_config
-          bitrate_mode = track_config.encoding_specific_params.bitrate_mode
-
-          get_child(:rtp_demuxer)
-          |> via_out(Membrane.Pad.ref(:output, ssrc))
-          |> child({:jitter_buffer, ssrc}, %Membrane.RTP.JitterBuffer{
-            clock_rate: track_config.clock_rate
-          })
-          |> child({:rtp_depayloader, ssrc}, struct(depayloader, mode: bitrate_mode))
-          |> child({:rtp_in_parser, ssrc}, %Membrane.AAC.Parser{
-            audio_specific_config: audio_specific_config
-          })
-          |> child(:rtp_in_aac_decoder, Membrane.AAC.FDK.Decoder)
-      end
-
-    state =
-      if state.track_builders == nil do
-        %{state | track_builders: %{media_type => spec}}
-      else
-        Bunch.Struct.put_in(state, [:track_builders, media_type], spec)
-      end
-
-    if Enum.all?(rtp_opts[:track_configs], fn {media_type, _track_config} ->
-         Map.has_key?(state.track_builders, media_type)
-       end) do
-      {%Ready{actions: [], track_builders: state.track_builders}, state}
-    else
-      {%Wait{actions: []}, state}
-    end
+    %Ready{spec_builder: spec, track_builders: track_builders}
   end
 
   @spec validate_and_parse_options(Boombox.in_rtp_opts()) :: parsed_in_opts()
@@ -133,7 +108,8 @@ defmodule Boombox.RTP do
 
     track_config = Keyword.put(track_config, :encoding_name, encoding_name)
 
-    {_payload_format, payload_type, clock_rate} = RTP.PayloadFormat.resolve(track_config)
+    %{payload_type: payload_type, clock_rate: clock_rate} =
+      RTP.PayloadFormat.resolve(track_config)
 
     if payload_type == nil do
       raise "payload_type for encoding #{inspect(encoding_name)} not provided with no default value registered"

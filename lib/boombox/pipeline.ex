@@ -93,7 +93,7 @@ defmodule Boombox.Pipeline do
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
             eos_info: term(),
-            rtsp_state: Boombox.RTSP.rtsp_state() | nil,
+            rtsp_state: Boombox.RTSP.state() | nil,
             parent: pid(),
             output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
           }
@@ -157,17 +157,6 @@ defmodule Boombox.Pipeline do
       state
     )
     |> proceed_result(ctx, state)
-  end
-
-  @impl true
-  def handle_child_notification(
-        {:new_rtp_stream, ssrc, payload_type, extensions},
-        :rtp_demuxer,
-        ctx,
-        state
-      ) do
-    {result, state} = Boombox.RTP.handle_new_rtp_stream(ssrc, payload_type, extensions, state)
-    proceed_result(result, ctx, state)
   end
 
   @impl true
