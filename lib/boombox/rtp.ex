@@ -43,39 +43,34 @@ defmodule Boombox.RTP do
       Map.new(parsed_options.track_configs, fn {media_type, track_config} ->
         %PayloadFormat{depayloader: depayloader} = PayloadFormat.get(track_config.encoding_name)
 
-        case track_config.encoding_name do
-          :H264 ->
-            ppss = Map.get(track_config.encoding_specific_params, :ppss, [])
-            spss = Map.get(track_config.encoding_specific_params, :spss, [])
+        {depayloader, parser} =
+          case track_config.encoding_name do
+            :H264 ->
+              ppss = Map.get(track_config.encoding_specific_params, :ppss, [])
+              spss = Map.get(track_config.encoding_specific_params, :spss, [])
+              {depayloader, %Membrane.H264.Parser{ppss: ppss, spss: spss}}
 
-            spec =
-              get_child(:rtp_demuxer)
-              |> via_out(:output, options: [stream_id: {:encoding_name, :H264}])
-              |> child(:h264_jitter_buffer, %Membrane.RTP.JitterBuffer{
-                clock_rate: track_config.clock_rate
-              })
-              |> child(:rtp_h264_depayloader, depayloader)
-              |> child(:rtp_in_h264_parser, %Membrane.H264.Parser{ppss: ppss, spss: spss})
+            :AAC ->
+              audio_specific_config = track_config.encoding_specific_params.audio_specific_config
+              bitrate_mode = track_config.encoding_specific_params.bitrate_mode
 
-            {media_type, spec}
+              {struct(depayloader, mode: bitrate_mode),
+               %Membrane.AAC.Parser{audio_specific_config: audio_specific_config}}
 
-          :AAC ->
-            audio_specific_config = track_config.encoding_specific_params.audio_specific_config
-            bitrate_mode = track_config.encoding_specific_params.bitrate_mode
+            :OPUS ->
+              {depayloader, Membrane.Opus.Parser}
+          end
 
-            spec =
-              get_child(:rtp_demuxer)
-              |> via_out(:output, options: [stream_id: {:encoding_name, :AAC}])
-              |> child(:aac_jitter_buffer, %Membrane.RTP.JitterBuffer{
-                clock_rate: track_config.clock_rate
-              })
-              |> child(:rtp_aac_depayloader, struct(depayloader, mode: bitrate_mode))
-              |> child(:rtp_in_aac_parser, %Membrane.AAC.Parser{
-                audio_specific_config: audio_specific_config
-              })
+        spec =
+          get_child(:rtp_demuxer)
+          |> via_out(:output, options: [stream_id: {:encoding_name, track_config.encoding_name}])
+          |> child({:jitter_buffer, track_config.encoding_name}, %Membrane.RTP.JitterBuffer{
+            clock_rate: track_config.clock_rate
+          })
+          |> child({:rtp_depayloader, track_config.encoding_name}, depayloader)
+          |> child({:rtp_in_parser, track_config.encoding_name}, parser)
 
-            {media_type, spec}
-        end
+        {media_type, spec}
       end)
 
     %Ready{spec_builder: spec, track_builders: track_builders}
