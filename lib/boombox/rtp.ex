@@ -108,11 +108,11 @@ defmodule Boombox.RTP do
         spec =
           get_child(:rtp_demuxer)
           |> via_out(:output, options: [stream_id: {:encoding_name, track_config.encoding_name}])
-          |> child({:jitter_buffer, track_config.encoding_name}, %Membrane.RTP.JitterBuffer{
+          |> child({:jitter_buffer, media_type}, %Membrane.RTP.JitterBuffer{
             clock_rate: track_config.clock_rate
           })
-          |> child({:rtp_depayloader, track_config.encoding_name}, depayloader)
-          |> child({:rtp_in_parser, track_config.encoding_name}, parser)
+          |> child({:rtp_depayloader, media_type}, depayloader)
+          |> child({:rtp_in_parser, media_type}, parser)
 
         {media_type, spec}
       end)
@@ -135,47 +135,74 @@ defmodule Boombox.RTP do
         destination_address: parsed_opts.address,
         destination_port_no: parsed_opts.port
       }),
-      Enum.map(track_builders, fn
-        {:audio, builder} ->
-          track_config = parsed_opts.track_configs.audio
+      Enum.map(track_builders, fn {media_type, builder} ->
+        track_config = parsed_opts.track_configs[media_type]
+        %PayloadFormat{payloader: payloader} = PayloadFormat.get(track_config.encoding_name)
 
-          builder
-          |> child(:rtp_audio_transcoder, %Boombox.Transcoder{
-            output_stream_format: %Membrane.AAC{encapsulation: :none}
-          })
-          |> child(:aac_payloader, %Membrane.RTP.AAC.Payloader{
-            mode: track_config.encoding_specific_params.bitrate_mode,
-            frames_per_packet: 1
-          })
-          |> via_in(:input,
-            options: [
-              encoding: :AAC,
-              payload_type: track_config.payload_type,
-              clock_rate: track_config.clock_rate
-            ]
-          )
-          |> get_child(:rtp_muxer)
+        {output_stream_format, payloader} =
+          case track_config.encoding_name do
+            :H264 ->
+              {%Membrane.H264{stream_structure: :annexb, alignment: :nalu}, payloader}
 
-        {:video, builder} ->
-          track_config = parsed_opts.track_configs.video
+            :AAC ->
+              {%Membrane.AAC{encapsulation: :none},
+               struct(payloader,
+                 mode: track_config.encoding_specific_params.bitrate_mode,
+                 frames_per_packet: 1
+               )}
+          end
 
-          builder
-          |> get_child(:rtp_muxer)
-          |> child(:hls_video_transcoder, %Boombox.Transcoder{
-            output_stream_format: %Membrane.H264{
-              stream_structure: :annexb,
-              alignment: :nalu
-            }
-          })
-          |> child(:h264_payloader, Membrane.RTP.H264.Payloader)
-          |> via_in(:input,
-            options: [
-              encoding: :H264,
-              payload_type: track_config.payload_type,
-              clock_rate: track_config.clock_rate
-            ]
-          )
-          |> get_child(:rtp_muxer)
+        builder
+        |> child({:rtp_transcoder, media_type}, %Boombox.Transcoder{
+          output_stream_format: output_stream_format
+        })
+        |> child({:rtp_payloader, media_type}, payloader)
+        |> via_in(:input,
+          options: [
+            encoding: track_config.encoding_name,
+            payload_type: track_config.payload_type,
+            clock_rate: track_config.clock_rate
+          ]
+        )
+        |> get_child(:rtp_muxer)
+
+        # builder
+        # |> child(:rtp_audio_transcoder, %Boombox.Transcoder{
+        # output_stream_format: %Membrane.AAC{encapsulation: :none}
+        # })
+        # |> child(:aac_payloader, %Membrane.RTP.AAC.Payloader{
+        # mode: track_config.encoding_specific_params.bitrate_mode,
+        # frames_per_packet: 1
+        # })
+        # |> via_in(:input,
+        # options: [
+        # encoding: :AAC,
+        # payload_type: track_config.payload_type,
+        # clock_rate: track_config.clock_rate
+        # ]
+        # )
+        # |> get_child(:rtp_muxer)
+
+        # {:video, builder} ->
+        # track_config = parsed_opts.track_configs.video
+
+        # builder
+        # |> get_child(:rtp_muxer)
+        # |> child(:hls_video_transcoder, %Boombox.Transcoder{
+        # output_stream_format: %Membrane.H264{
+        # stream_structure: :annexb,
+        # alignment: :nalu
+        # }
+        # })
+        # |> child(:h264_payloader, Membrane.RTP.H264.Payloader)
+        # |> via_in(:input,
+        # options: [
+        # encoding: :H264,
+        # payload_type: track_config.payload_type,
+        # clock_rate: track_config.clock_rate
+        # ]
+        # )
+        # |> get_child(:rtp_muxer)
       end)
     ]
 
