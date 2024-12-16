@@ -36,7 +36,7 @@ defmodule Boombox.Transcoder do
   def handle_init(_ctx, opts) do
     spec = [
       bin_input()
-      |> child(:forwarding_filter, ForwardingFilter),
+      |> child(:forwarding_filter, %ForwardingFilter{notify_on_stream_format?: true}),
       child(:output_funnel, Funnel)
       |> bin_output()
     ]
@@ -50,7 +50,7 @@ defmodule Boombox.Transcoder do
   end
 
   @impl true
-  def handle_child_notification({:stream_format, format}, :forwarding_filter, _ctx, state) do
+  def handle_child_notification({:stream_format, _pad, format}, :forwarding_filter, _ctx, state) do
     state =
       %{state | input_stream_format: format}
       |> resolve_output_stream_format()

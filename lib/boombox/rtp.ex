@@ -70,6 +70,8 @@ defmodule Boombox.RTP do
           |> child({:rtp_depayloader, track_config.encoding_name}, depayloader)
           |> child({:rtp_in_parser, track_config.encoding_name}, parser)
 
+        # |> child(%Membrane.Debug.Filter{handle_buffer: inspect_fun})
+
         {media_type, spec}
       end)
 

@@ -2,8 +2,6 @@ defmodule Boombox.Transcoder.ForwardingFilter do
   @moduledoc false
   use Membrane.Filter
 
-  alias Membrane.TimestampQueue
-
   def_input_pad :input,
     accepted_format: _any,
     availability: :on_request
@@ -12,106 +10,123 @@ defmodule Boombox.Transcoder.ForwardingFilter do
     accepted_format: _any,
     availability: :on_request
 
-  defguardp is_input_linked(state) when state.input_pad_ref != nil
-  defguardp is_output_linked(state) when state.output_pad_ref != nil
+  def_options notify_on_stream_format?: [
+                description: """
+                If `true`, #{inspect(__MODULE__)} will send `{:stream_format, pad_ref, stream_format}` \
+                notification to parent on every stream format arrival.
+
+                Defaults to `false`.
+                """,
+                spec: boolean(),
+                default: false
+              ],
+              notify_on_event?: [
+                description: """
+                If `true`, #{inspect(__MODULE__)} will send `{:event, pad_ref, event}` notification to \
+                parent on every event arrival.
+
+                Defaults to `false`.
+                """,
+                spec: boolean(),
+                default: false
+              ]
+
+  defguardp flowing?(ctx, state)
+            when ctx.playback == :playing and state.input != nil and state.output != nil
+
+  defguardp input_demand_should_be_paused?(ctx, state)
+            when ctx.playback == :playing and state.input != nil and state.output == nil
 
   @impl true
-  def handle_init(_ctx, _opts) do
-    state = %{queue: TimestampQueue.new(), output_pad_ref: nil, input_pad_ref: nil}
+  def handle_init(_ctx, opts) do
+    state =
+      opts
+      |> Map.from_struct()
+      |> Map.merge(%{input: nil, output: nil, queue: [], input_demand_paused?: false})
+
     {[], state}
   end
 
   @impl true
-  def handle_playing(ctx, state), do: maybe_flush_queue(ctx, state)
+  def handle_pad_added(Pad.ref(direction, _ref) = pad, ctx, state) do
+    state = state |> Map.put(direction, pad)
+    handle_flowing_state_changed(ctx, state)
+  end
 
   @impl true
-  def handle_pad_added(Pad.ref(direction, _id) = pad_ref, ctx, state) do
-    same_direction_pads_number =
-      ctx.pads
-      |> Enum.count(fn {_pad_ref, pad_data} -> pad_data.direction == direction end)
+  def handle_playing(ctx, state), do: handle_flowing_state_changed(ctx, state)
 
-    if same_direction_pads_number > 1 do
-      raise """
-      #{inspect(__MODULE__)} can have only one #{inspect(direction)} pad, but it has \
-      #{same_direction_pads_number}
-      """
+  [handle_buffer: :buffer, handle_event: :event, handle_stream_format: :stream_format]
+  |> Enum.map(fn {callback, action} ->
+    @impl true
+    def unquote(callback)(pad, item, ctx, state) when flowing?(ctx, state) do
+      actions = [{unquote(action), {opposite_pad(pad, state), item}}]
+      actions = actions ++ maybe_notify_parent(unquote(action), pad, item, state)
+      {actions, state}
     end
 
-    state =
-      case direction do
-        :input -> %{state | input_pad_ref: pad_ref}
-        :output -> %{state | output_pad_ref: pad_ref}
-      end
+    @impl true
+    def unquote(callback)(pad, item, _ctx, state) do
+      state = unquote(action) |> store_in_queue(pad, item, state)
+      actions = unquote(action) |> maybe_notify_parent(pad, item, state)
+      {actions, state}
+    end
+  end)
 
-    maybe_flush_queue(ctx, state)
+  @impl true
+  def handle_end_of_stream(pad, ctx, state) when flowing?(ctx, state) do
+    {[end_of_stream: opposite_pad(pad, state)], state}
   end
 
   @impl true
-  def handle_stream_format(_input_pad_ref, stream_format, _ctx, state)
-      when is_output_linked(state) do
-    {[
-       stream_format: {state.output_pad_ref, stream_format},
-       notify_parent: {:stream_format, stream_format}
-     ], state}
+  def handle_end_of_stream(pad, _ctx, state) do
+    {[], store_in_queue(:end_of_stream, pad, nil, state)}
   end
 
-  @impl true
-  def handle_stream_format(input_pad_ref, stream_format, _ctx, state) do
-    queue = TimestampQueue.push_stream_format(state.queue, input_pad_ref, stream_format)
-    {[notify_parent: {:stream_format, stream_format}], %{state | queue: queue}}
+  defp store_in_queue(action, pad, item, state) do
+    state |> Map.update!(:queue, &[{action, pad, item} | &1])
   end
 
-  @impl true
-  def handle_buffer(_input_pad_ref, buffer, _ctx, state) when is_output_linked(state) do
-    {[buffer: {state.output_pad_ref, buffer}], state}
+  defp handle_flowing_state_changed(ctx, state) do
+    {pause_or_resume_demand, state} = manage_input_demand(ctx, state)
+    {flush_queue_actions, state} = maybe_flush_queue(ctx, state)
+    {pause_or_resume_demand ++ flush_queue_actions, state}
   end
 
-  @impl true
-  def handle_buffer(input_pad_ref, buffer, _ctx, state) do
-    {_suggested_actions, queue} = TimestampQueue.push_buffer(state.queue, input_pad_ref, buffer)
-    {[], %{state | queue: queue}}
+  defp manage_input_demand(ctx, %{input_demand_paused?: true} = state)
+       when not input_demand_should_be_paused?(ctx, state) do
+    {[resume_auto_demand: state.input], %{state | input_demand_paused?: false}}
   end
 
-  @impl true
-  def handle_event(Pad.ref(:input, _id), event, _ctx, state) when is_output_linked(state) do
-    {[forward: event], state}
+  defp manage_input_demand(ctx, %{input_demand_paused?: false} = state)
+       when input_demand_should_be_paused?(ctx, state) do
+    {[pause_auto_demand: state.input], %{state | input_demand_paused?: true}}
   end
 
-  @impl true
-  def handle_event(Pad.ref(:output, _id), event, _ctx, state) when is_input_linked(state) do
-    {[forward: event], state}
-  end
+  defp manage_input_demand(_ctx, state), do: {[], state}
 
-  @impl true
-  def handle_event(pad_ref, event, _ctx, state) do
-    queue = TimestampQueue.push_event(state.queue, pad_ref, event)
-    {[], %{state | queue: queue}}
-  end
-
-  @impl true
-  def handle_end_of_stream(_input_pad_ref, _ctx, state) when is_output_linked(state) do
-    {[end_of_stream: state.output_pad_ref], state}
-  end
-
-  @impl true
-  def handle_end_of_stream(input_pad_ref, _ctx, state) do
-    queue = TimestampQueue.push_end_of_stream(state.queue, input_pad_ref)
-    {[], %{state | queue: queue}}
-  end
-
-  defp maybe_flush_queue(ctx, state)
-       when ctx.playback == :playing and is_input_linked(state) and is_output_linked(state) do
-    {_suggested_actions, items, queue} = TimestampQueue.flush_and_close(state.queue)
-
+  defp maybe_flush_queue(ctx, state) when flowing?(ctx, state) do
     actions =
-      Enum.map(items, fn
-        {Pad.ref(:input, _id), {item_type, item}} -> {item_type, {state.output_pad_ref, item}}
-        {Pad.ref(:input, _id), :end_of_stream} -> {:end_of_stream, state.output_pad_ref}
-        {Pad.ref(:output, _id), {:event, item}} -> {:event, {state.input_pad_ref, item}}
+      state.queue
+      |> Enum.reverse()
+      |> Enum.map(fn
+        {:end_of_stream, _input, nil} -> {:end_of_stream, state.output}
+        {action, pad, item} -> {action, {opposite_pad(pad, state), item}}
       end)
 
-    {actions, %{state | queue: queue}}
+    {actions, %{state | queue: nil}}
   end
 
   defp maybe_flush_queue(_ctx, state), do: {[], state}
+
+  defp opposite_pad(Pad.ref(:input, _ref), state), do: state.output
+  defp opposite_pad(Pad.ref(:output, _ref), state), do: state.input
+
+  defp maybe_notify_parent(:event, pad, event, %{notify_on_event?: true}),
+    do: [notify_parent: {:event, pad, event}]
+
+  defp maybe_notify_parent(:stream_format, pad, format, %{notify_on_stream_format?: true}),
+    do: [notify_parent: {:stream_format, pad, format}]
+
+  defp maybe_notify_parent(_type, _pad, _item, _state), do: []
 end
