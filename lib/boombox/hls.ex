@@ -1,32 +1,6 @@
 defmodule Boombox.HLS do
   @moduledoc false
 
-  defmodule DTSer do
-    use Membrane.Filter
-
-    def_input_pad :input,
-      accepted_format: _any
-
-    def_output_pad :output,
-      accepted_format: _any
-
-    @impl true
-    def handle_init(_ctx, _opts) do
-      {[], %{dts: 0}}
-    end
-
-    @impl true
-    def handle_buffer(:input, buffer, _ctx, state) do
-      dts = if buffer.metadata.h264.key_frame?, do: buffer.pts, else: state.dts
-      buffer = %{buffer | dts: dts}
-      state = %{state | dts: buffer.dts + 1}
-      # IO.inspect(buffer.metadata)
-      # state = %{state | dts: state.dts + 40_000_000}
-
-      {[buffer: {:output, buffer}], state}
-    end
-  end
-
   import Membrane.ChildrenSpec
 
   require Membrane.Pad, as: Pad
@@ -82,8 +56,6 @@ defmodule Boombox.HLS do
             |> child(:hls_video_transcoder, %Boombox.Transcoder{
               output_stream_format: %H264{alignment: :au, stream_structure: :avc3}
             })
-            |> child(DTSer)
-            |> child(%Membrane.Debug.Filter{handle_buffer: &IO.inspect({&1.pts, &1.dts})})
             |> via_in(Pad.ref(:input, :video),
               options: [encoding: :H264, segment_duration: Time.milliseconds(2000)]
             )

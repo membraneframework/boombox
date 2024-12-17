@@ -34,10 +34,11 @@ defmodule Boombox.RTP do
   @spec create_input(Boombox.in_rtp_opts()) :: Ready.t()
   def create_input(opts) do
     parsed_options = validate_and_parse_options(opts)
+    payload_type_mapping = get_payload_type_mapping(parsed_options.track_configs)
 
     spec =
       child(:udp_source, %Membrane.UDP.Source{local_port_no: opts[:port]})
-      |> child(:rtp_demuxer, Membrane.RTP.Demuxer)
+      |> child(:rtp_demuxer, %Membrane.RTP.Demuxer{payload_type_mapping: payload_type_mapping})
 
     track_builders =
       Map.new(parsed_options.track_configs, fn {media_type, track_config} ->
@@ -69,8 +70,6 @@ defmodule Boombox.RTP do
           })
           |> child({:rtp_depayloader, track_config.encoding_name}, depayloader)
           |> child({:rtp_in_parser, track_config.encoding_name}, parser)
-
-        # |> child(%Membrane.Debug.Filter{handle_buffer: inspect_fun})
 
         {media_type, spec}
       end)
@@ -144,5 +143,14 @@ defmodule Boombox.RTP do
           {encoding, []}
         end
     end
+  end
+
+  @spec get_payload_type_mapping(%{audio: parsed_track_config(), video: parsed_track_config()}) ::
+          RTP.PayloadFormat.payload_type_mapping()
+  defp get_payload_type_mapping(track_configs) do
+    Map.new(track_configs, fn {_media_type, track_config} ->
+      {track_config.payload_type,
+       %{encoding_name: track_config.encoding_name, clock_rate: track_config.clock_rate}}
+    end)
   end
 end
