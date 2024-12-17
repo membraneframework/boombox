@@ -54,8 +54,8 @@ defmodule Boombox.RTP do
   @type parsed_in_opts :: %{
           port: :inet.port_number(),
           track_configs: %{
-            optional(:audio) => parsed_input_track_config,
-            optional(:video) => parsed_input_track_config
+            optional(:audio) => parsed_input_track_config(),
+            optional(:video) => parsed_input_track_config()
           }
         }
 
@@ -63,10 +63,12 @@ defmodule Boombox.RTP do
           address: :inet.ip_address(),
           port: :inet.port_number(),
           track_configs: %{
-            optional(:audio) => parsed_output_track_config,
-            optional(:video) => parsed_output_track_config
+            optional(:audio) => parsed_output_track_config(),
+            optional(:video) => parsed_output_track_config()
           }
         }
+
+  @type parsed_track_config :: parsed_input_track_config() | parsed_output_track_config()
 
   @spec create_input(Boombox.in_rtp_opts()) :: Ready.t()
   def create_input(opts) do
