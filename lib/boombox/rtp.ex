@@ -42,24 +42,25 @@ defmodule Boombox.RTP do
 
     track_builders =
       Map.new(parsed_options.track_configs, fn {media_type, track_config} ->
-        %PayloadFormat{depayloader: depayloader} = PayloadFormat.get(track_config.encoding_name)
-
         {depayloader, parser} =
           case track_config.encoding_name do
             :H264 ->
               ppss = Map.get(track_config.encoding_specific_params, :ppss, [])
               spss = Map.get(track_config.encoding_specific_params, :spss, [])
-              {depayloader, %Membrane.H264.Parser{ppss: ppss, spss: spss}}
+              {Membrane.RTP.H264.Depayloader, %Membrane.H264.Parser{ppss: ppss, spss: spss}}
 
             :AAC ->
               audio_specific_config = track_config.encoding_specific_params.audio_specific_config
               bitrate_mode = track_config.encoding_specific_params.bitrate_mode
 
-              {struct(depayloader, mode: bitrate_mode),
+              {%Membrane.RTP.AAC.Depayloader{mode: bitrate_mode},
                %Membrane.AAC.Parser{audio_specific_config: audio_specific_config}}
 
             :OPUS ->
-              {depayloader, Membrane.Opus.Parser}
+              {Membrane.RTP.Opus.Depayloader, Membrane.Opus.Parser}
+
+            :H265 ->
+              {Membrane.RTP.H265.Depayloader, Membrane.H265.Parser}
           end
 
         spec =

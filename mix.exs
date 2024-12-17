@@ -68,6 +68,7 @@ defmodule Boombox.Mixfile do
       # {:membrane_rtp_opus_plugin, "~> 0.10.0"},
       # {:membrane_rtp_opus_plugin,
       # github: "membraneframework/membrane_rtp_opus_plugin", branch: "rename-encoding-name"},
+      # {:membrane_rtp_h265_plugin, "~> 0.5.1"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
