@@ -6,7 +6,6 @@ defmodule Boombox.RTP do
 
   alias Boombox.Pipeline.Ready
   alias Membrane.RTP
-  alias Membrane.RTP.PayloadFormat
 
   @required_opts [:port, :track_configs]
   @required_encoding_specific_params %{
