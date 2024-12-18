@@ -354,6 +354,37 @@ defmodule BoomboxTest do
     assert Compare.samples_min_square_error(ref, pcm, 16) < 500
   end
 
+  @tag :rtp2
+  async_test "mp4 -> rtp -> rtp -> hls" do
+    t =
+      Task.async(fn ->
+        Boombox.run(
+          input: "aaa.mp4",
+          output:
+            {:rtp,
+             port: 50001,
+             address: {127, 0, 0, 1},
+             track_configs: [
+               audio: [encoding: {:AAC, bitrate_mode: :hbr}],
+               video: [encoding: :H264]
+             ]}
+        )
+      end)
+
+    Boombox.run(
+      input:
+        {:rtp,
+         port: 50001,
+         track_configs: [
+           audio: [
+             encoding: {:AAC, bitrate_mode: :hbr, audio_specific_config: Base.decode16!("1210")}
+           ],
+           video: [encoding: :H264]
+         ]},
+      output: "output/index.m3u8"
+    )
+  end
+
   defp send_rtmp(url) do
     p =
       Testing.Pipeline.start_link_supervised!(
