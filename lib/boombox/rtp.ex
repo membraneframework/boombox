@@ -139,26 +139,30 @@ defmodule Boombox.RTP do
       }),
       Enum.map(track_builders, fn {media_type, builder} ->
         track_config = parsed_opts.track_configs[media_type]
-        %PayloadFormat{payloader: payloader} = PayloadFormat.get(track_config.encoding_name)
 
-        {output_stream_format, payloader} =
+        {output_stream_format, parser, payloader} =
           case track_config.encoding_name do
             :H264 ->
-              {%Membrane.H264{stream_structure: :annexb, alignment: :nalu}, payloader}
+              {%Membrane.H264{stream_structure: :annexb, alignment: :nalu},
+               %Membrane.H264.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
+               Membrane.RTP.H264.Payloader}
 
             :AAC ->
               {%Membrane.AAC{encapsulation: :none},
-               struct(payloader,
+               %Membrane.AAC.Parser{out_encapsulation: :none},
+               %Membrane.RTP.AAC.Payloader{
                  mode: track_config.encoding_specific_params.bitrate_mode,
                  frames_per_packet: 1
-               )}
+               }}
           end
 
         builder
         |> child({:rtp_transcoder, media_type}, %Boombox.Transcoder{
           output_stream_format: output_stream_format
         })
+        |> child({:rtp_out_parser, media_type}, parser)
         |> child({:rtp_payloader, media_type}, payloader)
+        |> child({:realtimer, media_type}, Membrane.Realtimer)
         |> via_in(:input,
           options: [
             encoding: track_config.encoding_name,
