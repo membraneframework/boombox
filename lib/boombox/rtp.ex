@@ -187,7 +187,7 @@ defmodule Boombox.RTP do
     end)
 
     if opts[:track_configs] == [] do
-      raise "No media configured"
+      raise "No RTP media configured"
     end
 
     parsed_track_configs =
