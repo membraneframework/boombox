@@ -10,12 +10,19 @@ defmodule Boombox.RTP do
   @required_opts [:port, :track_configs]
   @required_encoding_specific_params %{
     AAC: [bitrate_mode: [require?: true], audio_specific_config: [require?: true]],
-    H264: [ppss: [require?: false], spss: [require?: false]]
+    OPUS: [],
+    H264: [ppss: [require?: false], spss: [require?: false]],
+    H265: [ppss: [require?: false], spss: [require?: false]]
   }
 
   @type parsed_encoding_specific_params ::
           %{bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()}
           | %{optional(:ppss) => [binary()], optional(:spss) => [binary()]}
+          | %{
+              optional(:vpss) => [binary()],
+              optional(:ppss) => [binary()],
+              optional(:spss) => [binary()]
+            }
           | %{}
 
   @type parsed_track_config :: %{
@@ -59,7 +66,12 @@ defmodule Boombox.RTP do
               {Membrane.RTP.Opus.Depayloader, Membrane.Opus.Parser}
 
             :H265 ->
-              {Membrane.RTP.H265.Depayloader, Membrane.H265.Parser}
+              vpss = Map.get(track_config.encoding_specific_params, :vpss, [])
+              ppss = Map.get(track_config.encoding_specific_params, :ppss, [])
+              spss = Map.get(track_config.encoding_specific_params, :spss, [])
+
+              {Membrane.RTP.H265.Depayloader,
+               %Membrane.H265.Parser{vpss: vpss, ppss: ppss, spss: spss}}
           end
 
         spec =

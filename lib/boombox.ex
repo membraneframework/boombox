@@ -26,12 +26,13 @@ defmodule Boombox do
     * AAC:
       - bitrate_mode - has to be provided. Defines how the RTP stream was payloaded and should be depayloaded.
       - audio_specific_config - has to be provided. Contains crucial information about the stream and has to be obtained from a side channel.
-    * H264:
-      - ppss and spss - optional. picture and sequence parameter sets, could be obtained from a side channel. They contain information about the encoded stream.
+    * H264 and H265:
+      - vpss (H265 only), ppss, spss - optional. Parameter sets, could be obtained from a side channel. They contain information about the encoded stream.
   """
   @type rtp_encoding_specific_params ::
           {:AAC, [bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()]}
           | {:H264, [ppss: [binary()], spss: [binary()]]}
+          | {:H265, [vpss: [binary()], ppss: [binary()], spss: [binary()]]}
 
   @typedoc """
   For each media type the following parameters are specified:
