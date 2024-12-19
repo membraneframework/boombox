@@ -9,7 +9,10 @@ defmodule Support.Compare do
 
   alias Membrane.Testing
 
-  @type compare_option :: {:kinds, [:audio | :video]} | {:format, :mp4 | :hls}
+  @type compare_option ::
+          {:kinds, [:audio | :video]}
+          | {:format, :mp4 | :hls}
+          | {:subject_terminated_early, boolean()}
 
   defmodule GetBuffers do
     @moduledoc false
@@ -37,6 +40,7 @@ defmodule Support.Compare do
   def compare(subject, reference, options \\ []) do
     kinds = options[:kinds] || [:audio, :video]
     format = options[:format] || :mp4
+    subject_terminated_early = options[:subject_terminated_early] || false
     p = Testing.Pipeline.start_link_supervised!()
 
     head_spec =
@@ -112,6 +116,13 @@ defmodule Support.Compare do
       assert_pipeline_notified(p, :sub_video_bufs, {:buffers, sub_video_bufs})
       assert_pipeline_notified(p, :ref_video_bufs, {:buffers, ref_video_bufs})
 
+      ref_video_bufs =
+        if subject_terminated_early do
+          Enum.take(ref_video_bufs, length(sub_video_bufs))
+        else
+          ref_video_bufs
+        end
+
       assert length(ref_video_bufs) == length(sub_video_bufs)
 
       Enum.zip(sub_video_bufs, ref_video_bufs)
@@ -127,6 +138,13 @@ defmodule Support.Compare do
     if :audio in kinds do
       assert_pipeline_notified(p, :sub_audio_bufs, {:buffers, sub_audio_bufs})
       assert_pipeline_notified(p, :ref_audio_bufs, {:buffers, ref_audio_bufs})
+
+      ref_audio_bufs =
+        if subject_terminated_early do
+          Enum.take(ref_audio_bufs, length(sub_audio_bufs))
+        else
+          ref_audio_bufs
+        end
 
       assert length(ref_audio_bufs) == length(sub_audio_bufs)
 
