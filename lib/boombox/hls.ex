@@ -43,7 +43,7 @@ defmodule Boombox.HLS do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+            |> child(:hls_audio_transcoder, %Boombox.Transcoder{
               output_stream_format: Membrane.AAC
             })
             |> via_in(Pad.ref(:input, :audio),
