@@ -355,34 +355,43 @@ defmodule BoomboxTest do
   end
 
   @tag :rtp2
-  async_test "mp4 -> rtp -> rtp -> hls" do
+  async_test "mp4 -> rtp -> rtp -> hls", %{tmp_dir: tmp} do
+    manifest_filename = Path.join(tmp, "index.m3u8")
+    ref_path = "test/fixtures/ref_bun10s_aac_hls"
+
     t =
       Task.async(fn ->
         Boombox.run(
-          input: "aaa.mp4",
-          output:
+          input:
             {:rtp,
              port: 50001,
-             address: {127, 0, 0, 1},
              track_configs: [
-               audio: [encoding: {:AAC, bitrate_mode: :hbr}],
+               audio: [
+                 encoding:
+                   {:AAC, bitrate_mode: :hbr, audio_specific_config: Base.decode16!("1210")}
+               ],
                video: [encoding: :H264]
-             ]}
+             ]},
+          output: manifest_filename
         )
       end)
 
     Boombox.run(
-      input:
+      input: @bbb_mp4,
+      output:
         {:rtp,
          port: 50001,
+         address: {127, 0, 0, 1},
          track_configs: [
-           audio: [
-             encoding: {:AAC, bitrate_mode: :hbr, audio_specific_config: Base.decode16!("1210")}
-           ],
+           audio: [encoding: {:AAC, bitrate_mode: :hbr}],
            video: [encoding: :H264]
-         ]},
-      output: "output/index.m3u8"
+         ]}
     )
+
+    Process.sleep(200)
+
+    Task.shutdown(t)
+    Compare.compare(tmp, ref_path, format: :hls, subject_terminated_early: true)
   end
 
   defp send_rtmp(url) do

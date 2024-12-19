@@ -199,6 +199,11 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_element_end_of_stream(:udp_rtp_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
   def handle_element_end_of_stream(:elixir_stream_sink, Pad.ref(:input, id), _ctx, state) do
     eos_info = List.delete(state.eos_info, id)
     state = %{state | eos_info: eos_info}
