@@ -15,8 +15,12 @@ defmodule Boombox.RTP do
   @required_encoding_specific_params %{
     input: %{
       AAC: [bitrate_mode: [require?: true], audio_specific_config: [require?: true]],
-      H264: [ppss: [require?: false], spss: [require?: false]],
-      H265: [vpss: [require?: false], ppss: [require?: false], spss: [require?: false]]
+      H264: [ppss: [require?: false, default: []], spss: [require?: false, default: []]],
+      H265: [
+        vpss: [require?: false, default: []],
+        ppss: [require?: false, default: []],
+        spss: [require?: false, default: []]
+      ]
     },
     output: %{
       AAC: [bitrate_mode: [require?: true]]
@@ -25,12 +29,8 @@ defmodule Boombox.RTP do
 
   @type parsed_input_encoding_specific_params ::
           %{bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()}
-          | %{optional(:ppss) => [binary()], optional(:spss) => [binary()]}
-          | %{
-              optional(:vpss) => [binary()],
-              optional(:ppss) => [binary()],
-              optional(:spss) => [binary()]
-            }
+          | %{:ppss => [binary()], :spss => [binary()]}
+          | %{:vpss => [binary()], :ppss => [binary()], :spss => [binary()]}
           | %{}
 
   @type parsed_output_encoding_specific_params ::
@@ -84,8 +84,8 @@ defmodule Boombox.RTP do
         {depayloader, parser} =
           case track_config.encoding_name do
             :H264 ->
-              ppss = Map.get(track_config.encoding_specific_params, :ppss, [])
-              spss = Map.get(track_config.encoding_specific_params, :spss, [])
+              ppss = track_config.encoding_specific_params.ppss
+              spss = track_config.encoding_specific_params.spss
               {Membrane.RTP.H264.Depayloader, %Membrane.H264.Parser{ppss: ppss, spss: spss}}
 
             :AAC ->
@@ -133,7 +133,7 @@ defmodule Boombox.RTP do
     spec = [
       spec_builder,
       child(:rtp_muxer, Membrane.RTP.Muxer)
-      |> child(:udp_sink, %Membrane.UDP.Sink{
+      |> child(:udp_rtp_sink, %Membrane.UDP.Sink{
         destination_address: parsed_opts.address,
         destination_port_no: parsed_opts.port
       }),
@@ -171,44 +171,6 @@ defmodule Boombox.RTP do
           ]
         )
         |> get_child(:rtp_muxer)
-
-        # builder
-        # |> child(:rtp_audio_transcoder, %Boombox.Transcoder{
-        # output_stream_format: %Membrane.AAC{encapsulation: :none}
-        # })
-        # |> child(:aac_payloader, %Membrane.RTP.AAC.Payloader{
-        # mode: track_config.encoding_specific_params.bitrate_mode,
-        # frames_per_packet: 1
-        # })
-        # |> via_in(:input,
-        # options: [
-        # encoding: :AAC,
-        # payload_type: track_config.payload_type,
-        # clock_rate: track_config.clock_rate
-        # ]
-        # )
-        # |> get_child(:rtp_muxer)
-
-        # {:video, builder} ->
-        # track_config = parsed_opts.track_configs.video
-
-        # builder
-        # |> get_child(:rtp_muxer)
-        # |> child(:hls_video_transcoder, %Boombox.Transcoder{
-        # output_stream_format: %Membrane.H264{
-        # stream_structure: :annexb,
-        # alignment: :nalu
-        # }
-        # })
-        # |> child(:h264_payloader, Membrane.RTP.H264.Payloader)
-        # |> via_in(:input,
-        # options: [
-        # encoding: :H264,
-        # payload_type: track_config.payload_type,
-        # clock_rate: track_config.clock_rate
-        # ]
-        # )
-        # |> get_child(:rtp_muxer)
       end)
     ]
 
