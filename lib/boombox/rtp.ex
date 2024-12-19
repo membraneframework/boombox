@@ -98,7 +98,7 @@ defmodule Boombox.RTP do
     end)
 
     if opts[:track_configs] == [] do
-      raise "No media configured"
+      raise "No RTP media configured"
     end
 
     parsed_track_configs =
@@ -146,14 +146,9 @@ defmodule Boombox.RTP do
         validate_and_parse_encoding!({encoding, []})
 
       {encoding, encoding_params} when is_atom(encoding) ->
-        field_specs = Map.get(@required_encoding_specific_params, encoding)
-
-        if field_specs != nil do
-          {:ok, encoding_params} = Bunch.Config.parse(encoding_params, field_specs)
-          {encoding, encoding_params}
-        else
-          {encoding, []}
-        end
+        field_specs = Map.get(@required_encoding_specific_params, encoding, [])
+        {:ok, encoding_params} = Bunch.Config.parse(encoding_params, field_specs)
+        {encoding, encoding_params}
     end
   end
 
