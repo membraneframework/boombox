@@ -93,7 +93,7 @@ defmodule Boombox.Pipeline do
             track_builders: Boombox.Pipeline.track_builders() | nil,
             last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
             eos_info: term(),
-            rtsp_state: Boombox.RTSP.rtsp_state() | nil,
+            rtsp_state: Boombox.RTSP.state() | nil,
             parent: pid(),
             output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
           }
@@ -314,6 +314,10 @@ defmodule Boombox.Pipeline do
 
   defp create_input({:rtsp, uri}, _ctx, _state) do
     Boombox.RTSP.create_input(uri)
+  end
+
+  defp create_input({:rtp, params}, _ctx, _state) do
+    Boombox.RTP.create_input(params)
   end
 
   defp create_input({:stream, params}, _ctx, state) do
