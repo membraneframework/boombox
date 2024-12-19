@@ -30,22 +30,9 @@ defmodule Boombox do
       - vpss (H265 only), ppss, spss - MAY be provided for RTP input. picture and sequence parameter sets, could be obtained from a side channel. They contain information about the encoded stream.
   """
   @type rtp_encoding_specific_params ::
-          {:AAC,
-           [
-             {:bitrate_mode, RTP.AAC.Utils.mode()}
-             | {:audio_specific_config, binary()}
-           ]}
-          | {:H264,
-             [
-               {:ppss, [binary()]}
-               | {:spss, [binary()]}
-             ]}
-          | {:H265,
-             [
-               {:vpss, [binary()]}
-               | {:ppss, [binary()]}
-               | {:spss, [binary()]}
-             ]}
+          {:AAC, [{:bitrate_mode, RTP.AAC.Utils.mode()} | {:audio_specific_config, binary()}]}
+          | {:H264, [{:ppss, [binary()]} | {:spss, [binary()]}]}
+          | {:H265, [{:vpss, [binary()]} | {:ppss, [binary()]} | {:spss, [binary()]}]}
 
   @typedoc """
   For each media type the following parameters are specified:
