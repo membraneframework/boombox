@@ -182,7 +182,7 @@ defmodule Boombox.WebRTC do
   defp resolve_signaling({:whip, uri, opts}, :input) do
     uri = URI.new!(uri)
     {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
-    {:whip, [ip: :any, port: uri.port] ++ opts}
+    {:whip, [ip: ip, port: uri.port] ++ opts}
   end
 
   defp resolve_signaling({:whip, uri, opts}, :output) do
