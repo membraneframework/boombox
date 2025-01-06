@@ -364,7 +364,7 @@ defmodule BoomboxTest do
         Boombox.run(
           input:
             {:rtp,
-             port: 50001,
+             port: 50_001,
              track_configs: [
                audio: [
                  encoding:
@@ -376,11 +376,13 @@ defmodule BoomboxTest do
         )
       end)
 
+    Process.sleep(500)
+
     Boombox.run(
       input: @bbb_mp4,
       output:
         {:rtp,
-         port: 50001,
+         port: 50_001,
          address: {127, 0, 0, 1},
          track_configs: [
            audio: [encoding: {:AAC, bitrate_mode: :hbr}],
@@ -388,7 +390,7 @@ defmodule BoomboxTest do
          ]}
     )
 
-    Process.sleep(200)
+    Process.sleep(500)
 
     Task.shutdown(t)
     Compare.compare(tmp, ref_path, format: :hls, subject_terminated_early: true)

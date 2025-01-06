@@ -43,24 +43,7 @@ defmodule Support.Compare do
     subject_terminated_early = options[:subject_terminated_early] || false
     p = Testing.Pipeline.start_link_supervised!()
 
-    head_spec =
-      case format do
-        :mp4 ->
-          [
-            child(%Membrane.File.Source{location: subject, seekable?: true})
-            |> child(:sub_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true}),
-            child(%Membrane.File.Source{location: reference, seekable?: true})
-            |> child(:ref_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
-          ]
-
-        :hls ->
-          [
-            child(:sub_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: subject}),
-            child(:ref_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: reference})
-          ]
-      end
-
-    Testing.Pipeline.execute_actions(p, spec: head_spec)
+    Testing.Pipeline.execute_actions(p, spec: get_source_spec(subject, reference, format))
 
     assert_pipeline_notified(p, :ref_demuxer, {:new_tracks, ref_tracks})
 
@@ -69,7 +52,7 @@ defmodule Support.Compare do
         {id, %Membrane.AAC{}} ->
           get_child(:ref_demuxer)
           |> via_out(Pad.ref(:output, id))
-          |> child(:ref_aac, Membrane.AAC.Parser)
+          |> child(Membrane.AAC.Parser)
           |> child(Membrane.AAC.FDK.Decoder)
           |> child(:ref_audio_bufs, GetBuffers)
 
@@ -173,6 +156,25 @@ defmodule Support.Compare do
       (b1 - b2) ** 2
     end)
     |> then(&:math.sqrt(Enum.sum(&1) / length(&1)))
+  end
+
+  @spec get_source_spec(String.t(), String.t(), :mp4 | :hls) :: Membrane.ChildrenSpec.t()
+  defp get_source_spec(subject, reference, format) do
+    case format do
+      :mp4 ->
+        [
+          child(%Membrane.File.Source{location: subject, seekable?: true})
+          |> child(:sub_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true}),
+          child(%Membrane.File.Source{location: reference, seekable?: true})
+          |> child(:ref_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
+        ]
+
+      :hls ->
+        [
+          child(:sub_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: subject}),
+          child(:ref_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: reference})
+        ]
+    end
   end
 
   defp get_h26x_parser_and_decoder(h26x) when h26x in [Membrane.H264, Membrane.H265] do
