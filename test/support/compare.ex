@@ -114,7 +114,7 @@ defmodule Support.Compare do
         # and subsequent runs due to transcoding.
         # The threshold here is obtained empirically and may need
         # to be adjusted, or a better metric should be used.
-        assert samples_min_square_error(sub.payload, ref.payload, 8) < 10
+        assert samples_min_squared_error(sub.payload, ref.payload, 8) < 10
       end)
     end
 
@@ -137,24 +137,22 @@ defmodule Support.Compare do
         # and subsequent runs due to transcoding.
         # The threshold here is obtained empirically and may need
         # to be adjusted, or a better metric should be used.
-        assert samples_min_square_error(sub.payload, ref.payload, 16) < 30_000
+        assert samples_min_squared_error(sub.payload, ref.payload, 16) < 30_000
       end)
     end
 
     Testing.Pipeline.terminate(p)
   end
 
-  @spec samples_min_square_error(binary, binary, pos_integer) :: float()
-  def samples_min_square_error(bin1, bin2, sample_size) do
+  @spec samples_min_squared_error(binary, binary, pos_integer) :: float()
+  def samples_min_squared_error(bin1, bin2, sample_size) do
     assert byte_size(bin1) == byte_size(bin2)
 
-    Enum.zip(
+    Enum.zip_with(
       for(<<b::size(sample_size) <- bin1>>, do: b),
-      for(<<b::size(sample_size) <- bin2>>, do: b)
+      for(<<b::size(sample_size) <- bin2>>, do: b),
+      fn b1, b2 -> (b1 - b2) ** 2 end
     )
-    |> Enum.map(fn {b1, b2} ->
-      (b1 - b2) ** 2
-    end)
     |> then(&:math.sqrt(Enum.sum(&1) / length(&1)))
   end
 

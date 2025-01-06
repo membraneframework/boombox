@@ -351,7 +351,7 @@ defmodule BoomboxTest do
       |> Enum.map_join(& &1.payload)
 
     ref = File.read!("test/fixtures/ref_bun.pcm")
-    assert Compare.samples_min_square_error(ref, pcm, 16) < 500
+    assert Compare.samples_min_squared_error(ref, pcm, 16) < 500
   end
 
   @tag :rtp2
