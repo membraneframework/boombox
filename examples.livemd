@@ -27,8 +27,7 @@ File.mkdir_p!(input_dir)
 out_dir = "#{data_dir}/output"
 File.mkdir_p!(out_dir)
 
-samples_url =
-  "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples"
+samples_url = "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples"
 
 unless File.exists?("#{input_dir}/bun.mp4") do
   %{status: 200, body: bbb_mp4} = Req.get!("#{samples_url}/big-buck-bunny/bun33s.mp4")

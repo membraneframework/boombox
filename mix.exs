@@ -46,11 +46,14 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.1"},
-      {:membrane_webrtc_plugin, "~> 0.23.0"},
+      # {:membrane_webrtc_plugin, "~> 0.23.0"},
+      {:membrane_webrtc_plugin, path: "../membrane_webrtc_plugin"},
       {:membrane_opus_plugin, "~> 0.20.3"},
       {:membrane_aac_plugin, "~> 0.19.0"},
       {:membrane_aac_fdk_plugin, "~> 0.18.0"},
-      {:membrane_vpx_plugin, "~> 0.2.0"},
+      # {:membrane_vpx_plugin, "~> 0.2.0"},
+      {:membrane_vpx_plugin,
+       github: "membraneframework/membrane_vpx_plugin", branch: "frame-size-inference"},
       {:membrane_h26x_plugin, "~> 0.10.0"},
       {:membrane_h264_ffmpeg_plugin, "~> 0.32.0"},
       {:membrane_h265_ffmpeg_plugin, "~> 0.4.2"},
