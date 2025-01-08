@@ -154,6 +154,15 @@ defmodule Boombox.RTP do
                  mode: track_config.encoding_specific_params.bitrate_mode,
                  frames_per_packet: 1
                }}
+
+            :OPUS ->
+              {Membrane.Opus, %Membrane.Opus.Parser{delimitation: :undelimit},
+               Membrane.RTP.Opus.Payloader}
+
+            :H265 ->
+              {%Membrane.H265{stream_structure: :annexb, alignment: :nalu},
+               %Membrane.H265.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
+               Membrane.RTP.H265.Payloader}
           end
 
         builder
