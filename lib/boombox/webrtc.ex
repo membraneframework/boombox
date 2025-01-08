@@ -3,15 +3,19 @@ defmodule Boombox.WebRTC do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
+  alias Membrane.WebRTC.SimpleWebSocketServer
   alias Boombox.Pipeline.{Ready, State, Wait}
   alias Membrane.{H264, RemoteStream, VP8}
+  alias Membrane.Pipeline.CallbackContext
+  alias Membrane.WebRTC.SignalingChannel
 
   @type output_webrtc_state :: %{negotiated_video_codecs: [:vp8 | :h264] | nil}
   @type webrtc_sink_new_tracks :: [%{id: term, kind: :audio | :video}]
 
-  @spec create_input(Boombox.webrtc_signaling(), Boombox.output(), State.t()) :: Wait.t()
-  def create_input(signaling, output, state) do
-    signaling = resolve_signaling(signaling)
+  @spec create_input(Boombox.webrtc_signaling(), Boombox.output(), CallbackContext.t(), State.t()) ::
+          Wait.t()
+  def create_input(signaling, output, ctx, state) do
+    signaling = resolve_signaling(signaling, ctx.utility_supervisor)
 
     keyframe_interval =
       case output do
@@ -68,9 +72,10 @@ defmodule Boombox.WebRTC do
     %Ready{track_builders: track_builders}
   end
 
-  @spec create_output(Boombox.webrtc_signaling(), State.t()) :: {Ready.t() | Wait.t(), State.t()}
-  def create_output(signaling, state) do
-    signaling = resolve_signaling(signaling)
+  @spec create_output(Boombox.webrtc_signaling(), CallbackContext.t(), State.t()) ::
+          {Ready.t() | Wait.t(), State.t()}
+  def create_output(signaling, ctx, state) do
+    signaling = resolve_signaling(signaling, ctx.utility_supervisor)
     startup_tracks = if webrtc_input?(state), do: [:audio, :video], else: []
 
     spec =
@@ -82,10 +87,17 @@ defmodule Boombox.WebRTC do
 
     state = %{state | output_webrtc_state: %{negotiated_video_codecs: nil}}
 
-    status =
-      if webrtc_input?(state),
-        do: %Wait{actions: [spec: spec]},
-        else: %Ready{actions: [spec: spec]}
+    {status, state} =
+      if webrtc_input?(state) do
+        # let's spawn websocket server for webrtc source before the source starts
+        {:webrtc, input_signaling} = state.input
+        signaling_channel = resolve_signaling(input_signaling, ctx.utility_supervisor)
+        state = %{state | input: {:webrtc, signaling_channel}}
+
+        {%Wait{actions: [spec: spec]}, state}
+      else
+        {%Ready{actions: [spec: spec]}, state}
+      end
 
     {status, state}
   end
@@ -177,14 +189,16 @@ defmodule Boombox.WebRTC do
     %Ready{actions: [spec: spec], eos_info: Map.values(tracks)}
   end
 
-  defp resolve_signaling(%Membrane.WebRTC.SignalingChannel{} = signaling) do
+  defp resolve_signaling(%SignalingChannel{} = signaling, _utility_supervisor) do
     signaling
   end
 
-  defp resolve_signaling(uri) when is_binary(uri) do
+  defp resolve_signaling(uri, utility_supervisor) when is_binary(uri) do
     uri = URI.new!(uri)
     {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
-    {:websocket, ip: ip, port: uri.port}
+    opts = [ip: ip, port: uri.port]
+
+    SimpleWebSocketServer.start_link_supervised(utility_supervisor, opts)
   end
 
   defp webrtc_input?(%{input: {:webrtc, _signalling}}), do: true
