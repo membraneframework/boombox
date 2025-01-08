@@ -4,8 +4,7 @@ defmodule Boombox.WebRTC do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.Pipeline.{Ready, State, Wait}
-  alias Membrane.H264
-  alias Membrane.VP8
+  alias Membrane.{H264, RemoteStream, VP8}
 
   @type output_webrtc_state :: %{negotiated_video_codecs: [:vp8 | :h264] | nil}
   @type webrtc_sink_new_tracks :: [%{id: term, kind: :audio | :video}]
@@ -159,6 +158,9 @@ defmodule Boombox.WebRTC do
 
               %VP8{} = vp8 when vp8_negotiated? ->
                 vp8
+
+              %RemoteStream{content_format: VP8, type: :packetized} when vp8_negotiated? ->
+                VP8
 
               _format when h264_negotiated? ->
                 %H264{alignment: :nalu, stream_structure: :annexb}
