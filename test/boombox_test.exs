@@ -351,7 +351,49 @@ defmodule BoomboxTest do
       |> Enum.map_join(& &1.payload)
 
     ref = File.read!("test/fixtures/ref_bun.pcm")
-    assert Compare.samples_min_square_error(ref, pcm, 16) < 500
+    assert Compare.samples_min_squared_error(ref, pcm, 16) < 500
+  end
+
+  @tag :rtp2
+  async_test "mp4 -> rtp -> rtp -> hls", %{tmp_dir: tmp} do
+    manifest_filename = Path.join(tmp, "index.m3u8")
+    ref_path = "test/fixtures/ref_bun10s_aac_hls"
+
+    t =
+      Task.async(fn ->
+        Boombox.run(
+          input:
+            {:rtp,
+             port: 50_001,
+             track_configs: [
+               audio: [
+                 encoding:
+                   {:AAC, bitrate_mode: :hbr, audio_specific_config: Base.decode16!("1210")}
+               ],
+               video: [encoding: :H264]
+             ]},
+          output: manifest_filename
+        )
+      end)
+
+    Process.sleep(500)
+
+    Boombox.run(
+      input: @bbb_mp4,
+      output:
+        {:rtp,
+         port: 50_001,
+         address: {127, 0, 0, 1},
+         track_configs: [
+           audio: [encoding: {:AAC, bitrate_mode: :hbr}],
+           video: [encoding: :H264]
+         ]}
+    )
+
+    Process.sleep(500)
+
+    Task.shutdown(t)
+    Compare.compare(tmp, ref_path, format: :hls, subject_terminated_early: true)
   end
 
   defp send_rtmp(url) do
