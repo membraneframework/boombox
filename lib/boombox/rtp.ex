@@ -30,13 +30,13 @@ defmodule Boombox.RTP do
   }
 
   @type parsed_input_encoding_specific_params ::
-          %{bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()}
-          | %{:ppss => [binary()], :spss => [binary()]}
-          | %{:vpss => [binary()], :ppss => [binary()], :spss => [binary()]}
+          %{aac_bitrate_mode: RTP.AAC.Utils.mode(), audio_specific_config: binary()}
+          | %{:pps => binary() | nil, :sps => binary() | nil}
+          | %{:vps => binary() | nil, :pps => binary() | nil, :sps => binary() | nil}
           | %{}
 
   @type parsed_output_encoding_specific_params ::
-          %{bitrate_mode: RTP.AAC.Utils.mode()}
+          %{aac_bitrate_mode: RTP.AAC.Utils.mode()}
           | %{}
 
   @type parsed_input_track_config :: %{

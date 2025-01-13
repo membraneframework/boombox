@@ -100,16 +100,36 @@ Make sure you have [Elixir](https://elixir-lang.org/) installed. The first call 
 
 ## CLI
 
-The CLI API is similar to the Elixir API, for example:
+The CLI API is a direct mapping of the Elixir API:
+  * `:input` and `:output` options of `Boombox.run/2` are mapped to `-i` and `-o` CLI
+  arguments respectively.
+  * Option names, like `:some_option`, are mapped to CLI arguments by replacing the colon by double hyphen and replacing all underscore with hyphens, like `--some-option`.
+  * Option values mappings depend on the option's type:
+    - String values, like `"some_value"`, are mapped to CLI arguments by stripping the quotes, like `some_value`.
+    - Atom values, like `:some_value`, are mapped to CLI arguments by stripping the leading colon, like `some_value`.
+    - Integer values are identical in elixir and CLI.
+    - Binary values, like `<<161, 63>>`, are mapped to CLI arguments as their representation as base 16 strings, like `a13f`.
+
+For example:
 
 ```elixir
 Boombox.run(input: "file.mp4", output: {:webrtc, "ws://localhost:8830"})
+Boombox.run(
+  input:
+    {:rtp,
+     audio_encoding: :AAC,
+     audio_payload_type: 123,
+     audio_specific_config: <<161, 63>>,
+     aac_bitrate_mode: :hbr},
+  output: "file.mp4"
+)
 ```
 
-is equivalent to:
+are equivalent to:
 
 ```sh
 ./boombox -i file.mp4 -o --webrtc ws://localhost:8830
+./boombox -i --rtp --audio-encoding AAC --audio-payload-type 123 --audio-specific-config a13f --aac-bitrate-mode hbr -o file.mp4
 ```
 
 It's also possible to pass an `.exs` script:
