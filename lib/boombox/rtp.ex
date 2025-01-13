@@ -8,22 +8,24 @@ defmodule Boombox.RTP do
   alias Membrane.RTP
 
   @required_opts %{
-    input: [:port, :track_configs],
-    output: [:address, :port, :track_configs]
+    input: [:port],
+    output: [:address, :port]
   }
 
-  @required_encoding_specific_params %{
+  @supported_encodings [audio: [:AAC, :Opus], video: [:H264, :H265]]
+
+  @encoding_specific_params_specs %{
     input: %{
-      AAC: [bitrate_mode: [require?: true], audio_specific_config: [require?: true]],
-      H264: [ppss: [require?: false, default: []], spss: [require?: false, default: []]],
+      AAC: [aac_bitrate_mode: [require?: true], audio_specific_config: [require?: true]],
+      H264: [pps: [require?: false, default: nil], sps: [require?: false, default: nil]],
       H265: [
-        vpss: [require?: false, default: []],
-        ppss: [require?: false, default: []],
-        spss: [require?: false, default: []]
+        vps: [require?: false, default: nil],
+        pps: [require?: false, default: nil],
+        sps: [require?: false, default: nil]
       ]
     },
     output: %{
-      AAC: [bitrate_mode: [require?: true]]
+      AAC: [aac_bitrate_mode: [require?: true]]
     }
   }
 
@@ -84,13 +86,13 @@ defmodule Boombox.RTP do
         {depayloader, parser} =
           case track_config.encoding_name do
             :H264 ->
-              ppss = track_config.encoding_specific_params.ppss
-              spss = track_config.encoding_specific_params.spss
+              ppss = List.wrap(track_config.encoding_specific_params.pps)
+              spss = List.wrap(track_config.encoding_specific_params.sps)
               {Membrane.RTP.H264.Depayloader, %Membrane.H264.Parser{ppss: ppss, spss: spss}}
 
             :AAC ->
               audio_specific_config = track_config.encoding_specific_params.audio_specific_config
-              bitrate_mode = track_config.encoding_specific_params.bitrate_mode
+              bitrate_mode = track_config.encoding_specific_params.aac_bitrate_mode
 
               {%Membrane.RTP.AAC.Depayloader{mode: bitrate_mode},
                %Membrane.AAC.Parser{audio_specific_config: audio_specific_config}}
@@ -99,9 +101,9 @@ defmodule Boombox.RTP do
               {Membrane.RTP.Opus.Depayloader, Membrane.Opus.Parser}
 
             :H265 ->
-              vpss = Map.get(track_config.encoding_specific_params, :vpss, [])
-              ppss = Map.get(track_config.encoding_specific_params, :ppss, [])
-              spss = Map.get(track_config.encoding_specific_params, :spss, [])
+              vpss = List.wrap(track_config.encoding_specific_params.vps)
+              ppss = List.wrap(track_config.encoding_specific_params.pps)
+              spss = List.wrap(track_config.encoding_specific_params.sps)
 
               {Membrane.RTP.H265.Depayloader,
                %Membrane.H265.Parser{vpss: vpss, ppss: ppss, spss: spss}}
@@ -151,7 +153,7 @@ defmodule Boombox.RTP do
               {%Membrane.AAC{encapsulation: :none},
                %Membrane.AAC.Parser{out_encapsulation: :none},
                %Membrane.RTP.AAC.Payloader{
-                 mode: track_config.encoding_specific_params.bitrate_mode,
+                 mode: track_config.encoding_specific_params.aac_bitrate_mode,
                  frames_per_packet: 1
                }}
 
@@ -195,14 +197,19 @@ defmodule Boombox.RTP do
       end
     end)
 
-    if opts[:track_configs] == [] do
+    parsed_track_configs =
+      [:audio, :video]
+      |> Enum.filter(fn
+        :video -> opts[:video_encoding] != nil
+        :audio -> opts[:audio_encoding] != nil
+      end)
+      |> Map.new(fn media_type ->
+        {media_type, validate_and_parse_track_config!(direction, media_type, opts)}
+      end)
+
+    if parsed_track_configs == %{} do
       raise "No RTP media configured"
     end
-
-    parsed_track_configs =
-      Map.new(opts[:track_configs], fn {media_type, track_config} ->
-        {media_type, validate_and_parse_track_config!(direction, track_config)}
-      end)
 
     case direction do
       :input ->
@@ -213,18 +220,31 @@ defmodule Boombox.RTP do
     end
   end
 
-  @spec validate_and_parse_track_config!(:input, Boombox.rtp_track_config()) ::
+  @spec validate_and_parse_track_config!(:input, :video | :audio, Boombox.in_rtp_opts()) ::
           parsed_input_track_config()
-  @spec validate_and_parse_track_config!(:output, Boombox.rtp_track_config()) ::
+  @spec validate_and_parse_track_config!(:output, :video | :audio, Boombox.out_rtp_opts()) ::
           parsed_output_track_config()
-  defp validate_and_parse_track_config!(direction, track_config) do
-    {encoding_name, encoding_specific_params} =
-      validate_and_parse_encoding!(direction, track_config[:encoding])
+  defp validate_and_parse_track_config!(direction, media_type, opts) do
+    {encoding_name, payload_type, clock_rate} =
+      case media_type do
+        :audio -> {opts[:audio_encoding], opts[:audio_payload_type], opts[:audio_clock_rate]}
+        :video -> {opts[:video_encoding], opts[:video_payload_type], opts[:video_clock_rate]}
+      end
 
-    track_config = Keyword.put(track_config, :encoding_name, encoding_name)
+    if encoding_name not in @supported_encodings[media_type] do
+      raise "Encoding #{inspect(encoding_name)} for #{inspect(media_type)} media type not supported"
+    end
 
-    %{payload_type: payload_type, clock_rate: clock_rate} =
-      RTP.PayloadFormat.resolve(track_config)
+    %{
+      payload_format: %RTP.PayloadFormat{encoding_name: encoding_name},
+      payload_type: payload_type,
+      clock_rate: clock_rate
+    } =
+      RTP.PayloadFormat.resolve(
+        encoding_name: encoding_name,
+        payload_type: payload_type,
+        clock_rate: clock_rate
+      )
 
     if payload_type == nil do
       raise "payload_type for encoding #{inspect(encoding_name)} not provided with no default value registered"
@@ -234,35 +254,19 @@ defmodule Boombox.RTP do
       raise "clock_rate for encoding #{inspect(encoding_name)} and payload_type #{inspect(payload_type)} not provided with no default value registered"
     end
 
+    encoding_specific_params_specs =
+      Map.get(@encoding_specific_params_specs[direction], encoding_name, [])
+
+    {:ok, encoding_specific_params} =
+      Keyword.intersect(encoding_specific_params_specs, opts)
+      |> Bunch.Config.parse(encoding_specific_params_specs)
+
     %{
       encoding_name: encoding_name,
       encoding_specific_params: encoding_specific_params,
       payload_type: payload_type,
       clock_rate: clock_rate
     }
-  end
-
-  @spec validate_and_parse_encoding!(
-          :input,
-          RTP.encoding_name() | Boombox.rtp_encoding_specific_params()
-        ) :: {RTP.encoding_name(), parsed_input_encoding_specific_params()}
-  @spec validate_and_parse_encoding!(
-          :output,
-          RTP.encoding_name() | Boombox.rtp_encoding_specific_params()
-        ) :: {RTP.encoding_name(), parsed_output_encoding_specific_params()}
-  defp validate_and_parse_encoding!(direction, encoding) do
-    case encoding do
-      nil ->
-        raise "Encoding name not provided"
-
-      encoding when is_atom(encoding) ->
-        validate_and_parse_encoding!(direction, {encoding, []})
-
-      {encoding, encoding_params} when is_atom(encoding) ->
-        field_specs = Map.get(@required_encoding_specific_params[direction], encoding, [])
-        {:ok, encoding_params} = Bunch.Config.parse(encoding_params, field_specs)
-        {encoding, encoding_params}
-    end
   end
 
   @spec get_payload_type_mapping(%{audio: parsed_track_config(), video: parsed_track_config()}) ::

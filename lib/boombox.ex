@@ -22,54 +22,46 @@ defmodule Boombox do
         ]
 
   @typedoc """
-  Some encodings can/must be accompanied with encoding specific parameters:
-    * AAC:
-      - bitrate_mode - MUST be provided for both RTP input and output. Defines which mode should be assumed/set when depayloading/payloading.
-      - audio_specific_config - MUST be provided for RTP input. Contains crucial information about the stream and has to be obtained from a side channel.
-    * H264 and H265:
-      - vpss (H265 only), ppss, spss - MAY be provided for RTP input. picture and sequence parameter sets, could be obtained from a side channel. They contain information about the encoded stream.
+  When configuring a track for a media type (video or audio), the following options are used:
+    * <media_type>_encoding - MUST be provided to configure given media type. Some options are encoding-specific. Currently supported encodings are: AAC, Opus, H264, H265.
+    * <media_type>_payload_type, <media_type>_clock rate - MAY be provided. If not, an unofficial default will be used.
+  The following encoding-specific parameters are available for both RTP input and output:
+    * aac_bitrate_mode - MUST be provided for AAC encoding. Defines which mode should be assumed/set when depayloading/payloading.
   """
-  @type rtp_encoding_specific_params ::
-          {:AAC, [{:bitrate_mode, RTP.AAC.Utils.mode()} | {:audio_specific_config, binary()}]}
-          | {:H264, [{:ppss, [binary()]} | {:spss, [binary()]}]}
-          | {:H265, [{:vpss, [binary()]} | {:ppss, [binary()]} | {:spss, [binary()]}]}
+  @type common_rtp_opt ::
+          {:video_encoding, RTP.encoding_name()}
+          | {:video_payload_type, RTP.payload_type()}
+          | {:video_clock_rate, RTP.clock_rate()}
+          | {:audio_encoding, RTP.encoding_name()}
+          | {:audio_payload_type, RTP.payload_type()}
+          | {:audio_clock_rate, RTP.clock_rate()}
+          | {:aac_bitrate_mode, RTP.AAC.Utils.mode()}
 
   @typedoc """
-  For each media type the following parameters are specified:
-    * encoding - MUST be provided for both RTP input and output, some encodings require additional parameters, see `rtp_encoding_specific_params/0`.
-    * payload_type, clock rate - MAY be provided for both RTP input and output, if not, then an unofficial default will be used.
-  """
-  @type rtp_track_config :: [
-          {:encoding, RTP.encoding_name() | rtp_encoding_specific_params()}
-          | {:payload_type, RTP.payload_type()}
-          | {:clock_rate, RTP.clock_rate()}
-        ]
+  In order to configure a RTP input a receiving port MUST be provided and the media that will be received
+  MUST be configured. Media configuration is explained further in `t:common_rtp_opt/0`.
 
-  @typedoc """
-  In order to configure RTP input both a receiving port and media configurations must be provided.
-  At least one media type needs to be configured.
+  The following encoding-specific parameters are available for RTP input:
+    * audio_specific_config - MUST be provided for AAC encoding. Contains crucial information about the stream and has to be obtained from a side channel.
+    * vps (H265 only), pps, sps - MAY be provided for H264 or H265 encodings. Parameter sets, could be obtained from a side channel. They contain information about the encoded stream.
   """
   @type in_rtp_opts :: [
-          {:port, :inet.port_number()}
-          | {:track_configs,
-             [
-               {:audio, rtp_track_config()}
-               | {:video, rtp_track_config()}
-             ]}
+          common_rtp_opt()
+          | {:port, :inet.port_number()}
+          | {:audio_specific_config, binary()}
+          | {:vps, binary()}
+          | {:pps, binary()}
+          | {:sps, binary()}
         ]
 
   @typedoc """
-  In order to configure RTP output the destination and media configurations must be provided.
-  At least one media type needs to be configured.
+  In order to configure a RTP output a destination port address MUST be provided and the media that will be sent
+  MUST be configured. Media configuration is explained further in `t:common_rtp_opt/0`.
   """
   @type out_rtp_opts :: [
-          {:address, :inet.ip_address()}
+          common_rtp_opt()
+          | {:address, :inet.ip_address()}
           | {:port, :inet.port_number()}
-          | {:track_configs,
-             [
-               {:audio, rtp_track_config()}
-               | {:video, rtp_track_config()}
-             ]}
         ]
 
   @type input ::
