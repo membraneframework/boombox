@@ -20,9 +20,9 @@ defmodule Boombox.Utils.CLI do
     i_type = [get_switch_type(argv, :input, aliases), :keep]
     o_type = [get_switch_type(argv, :output, aliases), :keep]
 
-    switches =
-      [input: i_type, output: o_type] ++
-        Keyword.from_keys([:mp4, :webrtc, :rtmp, :hls, :transport], [:string, :keep])
+    endpoints = Keyword.from_keys([:mp4, :webrtc, :port, :whip, :hls], [:string, :keep])
+    options = Keyword.from_keys([:transport, :uri, :token, :rtmp], [:string, :keep])
+    switches = [input: i_type, output: o_type] ++ endpoints ++ options
 
     {input, output} =
       OptionParser.parse(argv, strict: switches, aliases: aliases)

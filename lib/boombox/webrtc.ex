@@ -12,7 +12,7 @@ defmodule Boombox.WebRTC do
 
   @spec create_input(Boombox.webrtc_signaling(), Boombox.output(), State.t()) :: Wait.t()
   def create_input(signaling, output, state) do
-    signaling = resolve_signaling(signaling)
+    signaling = resolve_signaling(signaling, :input)
 
     keyframe_interval =
       case output do
@@ -71,7 +71,7 @@ defmodule Boombox.WebRTC do
 
   @spec create_output(Boombox.webrtc_signaling(), State.t()) :: {Ready.t() | Wait.t(), State.t()}
   def create_output(signaling, state) do
-    signaling = resolve_signaling(signaling)
+    signaling = resolve_signaling(signaling, :output)
     startup_tracks = if webrtc_input?(state), do: [:audio, :video], else: []
 
     spec =
@@ -175,11 +175,21 @@ defmodule Boombox.WebRTC do
     %Ready{actions: [spec: spec], eos_info: Map.values(tracks)}
   end
 
-  defp resolve_signaling(%Membrane.WebRTC.SignalingChannel{} = signaling) do
+  defp resolve_signaling(%Membrane.WebRTC.SignalingChannel{} = signaling, _direction) do
     signaling
   end
 
-  defp resolve_signaling(uri) when is_binary(uri) do
+  defp resolve_signaling({:whip, uri, opts}, :input) do
+    uri = URI.new!(uri)
+    {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
+    {:whip, [ip: ip, port: uri.port] ++ opts}
+  end
+
+  defp resolve_signaling({:whip, uri, opts}, :output) do
+    {:whip, [uri: uri] ++ opts}
+  end
+
+  defp resolve_signaling(uri, _direction) when is_binary(uri) do
     uri = URI.new!(uri)
     {:ok, ip} = :inet.getaddr(~c"#{uri.host}", :inet)
     {:websocket, ip: ip, port: uri.port}
