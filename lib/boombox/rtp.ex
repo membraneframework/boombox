@@ -189,10 +189,10 @@ defmodule Boombox.RTP do
     transport_opts =
       case direction do
         :input ->
-          unless Keyword.has_key?(opts, :port) do
-            raise "Receiving port not specified in RTP options"
-          else
+          if Keyword.has_key?(opts, :port) do
             %{port: opts[:port]}
+          else
+            raise "Receiving port not specified in RTP options"
           end
 
         :output ->
