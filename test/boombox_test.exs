@@ -365,13 +365,10 @@ defmodule BoomboxTest do
           input:
             {:rtp,
              port: 50_001,
-             track_configs: [
-               audio: [
-                 encoding:
-                   {:AAC, bitrate_mode: :hbr, audio_specific_config: Base.decode16!("1210")}
-               ],
-               video: [encoding: :H264]
-             ]},
+             audio_encoding: :AAC,
+             aac_bitrate_mode: :hbr,
+             audio_specific_config: Base.decode16!("1210"),
+             video_encoding: :H264},
           output: manifest_filename
         )
       end)
@@ -384,10 +381,9 @@ defmodule BoomboxTest do
         {:rtp,
          port: 50_001,
          address: {127, 0, 0, 1},
-         track_configs: [
-           audio: [encoding: {:AAC, bitrate_mode: :hbr}],
-           video: [encoding: :H264]
-         ]}
+         audio_encoding: :AAC,
+         aac_bitrate_mode: :hbr,
+         video_encoding: :H264}
     )
 
     Process.sleep(500)

@@ -1,6 +1,30 @@
 defmodule Boombox.Utils.CLI do
   @moduledoc false
 
+  # first element of the tuple is switch type, and the second is the elixir type
+  @arg_types [
+    mp4: {:string, :string},
+    webrtc: {:string, :string},
+    rtmp: {:string, :string},
+    hls: {:string, :string},
+    transport: {:string, :string},
+    rtp: {:boolean, nil},
+    port: {:integer, :integer},
+    address: {:string, :string},
+    target: {:string, :string},
+    video_encoding: {:string, :atom},
+    video_payload_type: {:integer, :integer},
+    video_clock_rate: {:integer, :integer},
+    audio_encoding: {:string, :atom},
+    audio_payload_type: {:integer, :integer},
+    audio_clock_rate: {:integer, :integer},
+    aac_bitrate_mode: {:string, :atom},
+    audio_specific_config: {:string, :binary},
+    pps: {:string, :binary},
+    sps: {:string, :binary},
+    vps: {:string, :binary}
+  ]
+
   @spec parse_argv([String.t()]) ::
           {:args, input: Boombox.input(), output: Boombox.output()} | {:script, String.t()}
   def parse_argv(argv) do
@@ -22,7 +46,9 @@ defmodule Boombox.Utils.CLI do
 
     switches =
       [input: i_type, output: o_type] ++
-        Keyword.from_keys([:mp4, :webrtc, :rtmp, :hls, :transport], [:string, :keep])
+        Keyword.new(@arg_types, fn {key, {switch_type, _elixir_type}} ->
+          {key, [switch_type, :keep]}
+        end)
 
     {input, output} =
       OptionParser.parse(argv, strict: switches, aliases: aliases)
@@ -55,10 +81,23 @@ defmodule Boombox.Utils.CLI do
   @spec resolve_endpoint(Keyword.t()) :: {:input, Boombox.input()} | {:output, Boombox.output()}
   defp resolve_endpoint(parsed) do
     case parsed do
-      [{direction, true}, {endpoint, value}] -> {direction, {endpoint, value}}
-      [{direction, true}, {endpoint, value} | opts] -> {direction, {endpoint, value, opts}}
-      [{direction, value}] -> {direction, value}
-      _other -> cli_exit_error()
+      [{direction, true}, {endpoint, true}] ->
+        {direction, endpoint}
+
+      [{direction, true}, {endpoint, value}] ->
+        {direction, {endpoint, value}}
+
+      [{direction, true}, {endpoint, true} | opts] ->
+        {direction, {endpoint, translate_opts(opts)}}
+
+      [{direction, true}, {endpoint, value} | opts] ->
+        {direction, {endpoint, value, translate_opts(opts)}}
+
+      [{direction, value}] ->
+        {direction, value}
+
+      _other ->
+        cli_exit_error()
     end
   end
 
@@ -68,6 +107,25 @@ defmodule Boombox.Utils.CLI do
       {parsed, [], []} -> parsed
       {_parsed, _argv, [{s, _v} | _switches]} -> cli_exit_error("unexpected option '#{s}'")
       {_parsed, [arg | _argv], []} -> cli_exit_error("unexpected value '#{arg}'")
+    end
+  end
+
+  @spec translate_opts(Keyword.t()) :: Keyword.t()
+  defp translate_opts(opts) do
+    Keyword.new(opts, fn {opt, value} ->
+      case @arg_types[opt] do
+        {:string, :atom} -> {opt, String.to_atom(value)}
+        {:string, :binary} -> {opt, decode_binary_opt(value)}
+        {type, type} -> {opt, value}
+      end
+    end)
+  end
+
+  @spec decode_binary_opt(String.t()) :: binary()
+  defp decode_binary_opt(opt_value) do
+    case Base.decode16(opt_value, case: :mixed) do
+      {:ok, value} -> value
+      :error -> cli_exit_error("bad base16 string '#{inspect(opt_value)}'")
     end
   end
 
