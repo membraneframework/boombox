@@ -11,6 +11,7 @@ defmodule Boombox.Utils.CLI do
     rtp: {:boolean, nil},
     port: {:integer, :integer},
     address: {:string, :string},
+    target: {:string, :string},
     video_encoding: {:string, :atom},
     video_payload_type: {:integer, :integer},
     video_clock_rate: {:integer, :integer},

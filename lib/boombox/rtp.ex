@@ -7,11 +7,6 @@ defmodule Boombox.RTP do
   alias Boombox.Pipeline.Ready
   alias Membrane.RTP
 
-  @required_opts %{
-    input: [:port],
-    output: [:address, :port]
-  }
-
   @supported_encodings [audio: [:AAC, :Opus], video: [:H264, :H265]]
 
   @encoding_specific_params_specs %{
@@ -191,11 +186,18 @@ defmodule Boombox.RTP do
   @spec validate_and_parse_options(:input, Boombox.in_rtp_opts()) :: parsed_in_opts()
   @spec validate_and_parse_options(:output, Boombox.out_rtp_opts()) :: parsed_out_opts()
   defp validate_and_parse_options(direction, opts) do
-    Enum.each(@required_opts[direction], fn required_option ->
-      unless Keyword.has_key?(opts, required_option) do
-        raise "Required option #{inspect(required_option)} not present in passed RTP options"
+    transport_opts =
+      case direction do
+        :input ->
+          unless Keyword.has_key?(opts, :port) do
+            raise "Receiving port not specified in RTP options"
+          else
+            %{port: opts[:port]}
+          end
+
+        :output ->
+          parse_output_target(opts)
       end
-    end)
 
     parsed_track_configs =
       [:audio, :video]
@@ -204,27 +206,45 @@ defmodule Boombox.RTP do
         :audio -> opts[:audio_encoding] != nil
       end)
       |> Map.new(fn media_type ->
-        {media_type, validate_and_parse_track_config!(direction, media_type, opts)}
+        {media_type, validate_and_parse_track_config(direction, media_type, opts)}
       end)
 
     if parsed_track_configs == %{} do
       raise "No RTP media configured"
     end
 
-    case direction do
-      :input ->
-        %{port: opts[:port], track_configs: parsed_track_configs}
+    Map.put(transport_opts, :track_configs, parsed_track_configs)
+  end
 
-      :output ->
-        %{address: opts[:address], port: opts[:port], track_configs: parsed_track_configs}
+  @spec parse_output_target(
+          target: String.t(),
+          address: :inet.ip4_address() | String.t(),
+          port: :inet.port_number()
+        ) :: %{address: :inet.ip4_address(), port: :inet.port_number()}
+  defp parse_output_target(opts) do
+    case Map.new(opts) do
+      %{target: target} ->
+        [address_string, port_string] = String.split(target, ":")
+        {:ok, address} = :inet.parse_ipv4_address(String.to_charlist(address_string))
+        %{address: address, port: String.to_integer(port_string)}
+
+      %{address: address, port: port} when is_binary(address) ->
+        {:ok, address} = :inet.parse_ipv4_address(String.to_charlist(address))
+        %{address: address, port: port}
+
+      %{address: address, port: port} when is_tuple(address) ->
+        %{address: address, port: port}
+
+      _invalid_target ->
+        raise "RTP output target address and port not specified"
     end
   end
 
-  @spec validate_and_parse_track_config!(:input, :video | :audio, Boombox.in_rtp_opts()) ::
+  @spec validate_and_parse_track_config(:input, :video | :audio, Boombox.in_rtp_opts()) ::
           parsed_input_track_config()
-  @spec validate_and_parse_track_config!(:output, :video | :audio, Boombox.out_rtp_opts()) ::
+  @spec validate_and_parse_track_config(:output, :video | :audio, Boombox.out_rtp_opts()) ::
           parsed_output_track_config()
-  defp validate_and_parse_track_config!(direction, media_type, opts) do
+  defp validate_and_parse_track_config(direction, media_type, opts) do
     {encoding_name, payload_type, clock_rate} =
       case media_type do
         :audio -> {opts[:audio_encoding], opts[:audio_payload_type], opts[:audio_clock_rate]}

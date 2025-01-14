@@ -108,7 +108,7 @@ The CLI API is a direct mapping of the Elixir API:
     - String values, like `"some_value"`, are mapped to CLI arguments by stripping the quotes, like `some_value`.
     - Atom values, like `:some_value`, are mapped to CLI arguments by stripping the leading colon, like `some_value`.
     - Integer values are identical in elixir and CLI.
-    - Binary values, like `<<161, 63>>`, are mapped to CLI arguments as their representation as base 16 strings, like `a13f`.
+    - Binary values, like `<<161, 63>>`, are represented in CLI as their representation in base 16, like `a13f`.
 
 For example:
 
@@ -121,7 +121,7 @@ Boombox.run(
      audio_payload_type: 123,
      audio_specific_config: <<161, 63>>,
      aac_bitrate_mode: :hbr},
-  output: "file.mp4"
+  output: "index.m3u8"
 )
 ```
 
@@ -129,7 +129,7 @@ are equivalent to:
 
 ```sh
 ./boombox -i file.mp4 -o --webrtc ws://localhost:8830
-./boombox -i --rtp --audio-encoding AAC --audio-payload-type 123 --audio-specific-config a13f --aac-bitrate-mode hbr -o file.mp4
+./boombox -i --rtp --audio-encoding AAC --audio-payload-type 123 --audio-specific-config a13f --aac-bitrate-mode hbr -o index.m3u8
 ```
 
 It's also possible to pass an `.exs` script:

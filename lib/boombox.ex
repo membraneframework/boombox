@@ -55,13 +55,14 @@ defmodule Boombox do
         ]
 
   @typedoc """
-  In order to configure a RTP output a destination port address MUST be provided and the media that will be sent
-  MUST be configured. Media configuration is explained further in `t:common_rtp_opt/0`.
+  In order to configure a RTP output the target port and address MUST be provided (can be provided in `:target` option as a `<address>:<port>` string)
+  and the media that will be sent MUST be configured. Media configuration is explained further in `t:common_rtp_opt/0`.
   """
   @type out_rtp_opts :: [
           common_rtp_opt()
-          | {:address, :inet.ip_address()}
+          | {:address, :inet.ip_address() | String.t()}
           | {:port, :inet.port_number()}
+          | {:target, String.t()}
         ]
 
   @type input ::
