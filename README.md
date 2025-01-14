@@ -101,9 +101,8 @@ Make sure you have [Elixir](https://elixir-lang.org/) installed. The first call 
 ## CLI
 
 The CLI API is a direct mapping of the Elixir API:
-  * `:input` and `:output` options of `Boombox.run/2` are mapped to `-i` and `-o` CLI
-  arguments respectively.
-  * Option names, like `:some_option`, are mapped to CLI arguments by replacing the colon by double hyphen and replacing all underscore with hyphens, like `--some-option`.
+  * `:input` and `:output` options of `Boombox.run/2` are mapped to `-i` and `-o` CLI arguments respectively.
+  * Option names, like `:some_option`, are mapped to CLI arguments by removing the colon, adding a leading double hyphen and replacing all underscores with hyphens, like `--some-option`.
   * Option values mappings depend on the option's type:
     - String values, like `"some_value"`, are mapped to CLI arguments by stripping the quotes, like `some_value`.
     - Atom values, like `:some_value`, are mapped to CLI arguments by stripping the leading colon, like `some_value`.
@@ -117,8 +116,8 @@ Boombox.run(input: "file.mp4", output: {:webrtc, "ws://localhost:8830"})
 Boombox.run(
   input:
     {:rtp,
+     port: 50001,
      audio_encoding: :AAC,
-     audio_payload_type: 123,
      audio_specific_config: <<161, 63>>,
      aac_bitrate_mode: :hbr},
   output: "index.m3u8"
@@ -129,7 +128,7 @@ are equivalent to:
 
 ```sh
 ./boombox -i file.mp4 -o --webrtc ws://localhost:8830
-./boombox -i --rtp --audio-encoding AAC --audio-payload-type 123 --audio-specific-config a13f --aac-bitrate-mode hbr -o index.m3u8
+./boombox -i --rtp --port 50001 --audio-encoding AAC --audio-specific-config a13f --aac-bitrate-mode hbr -o index.m3u8
 ```
 
 It's also possible to pass an `.exs` script:
