@@ -34,6 +34,11 @@ unless File.exists?("#{input_dir}/bun.mp4") do
   File.write!("#{input_dir}/bun.mp4", bbb_mp4)
 end
 
+unless File.exists?("#{input_dir}/bun.mkv") do
+  %{status: 200, body: bbb_mkv} = Req.get!("#{samples_url}/big-buck-bunny/bun33s.mkv")
+  File.write!("#{input_dir}/bun.mkv", bbb_mkv)
+end
+
 assets_url =
   "https://raw.githubusercontent.com/membraneframework/boombox/master/boombox_examples_data"
 
@@ -523,6 +528,34 @@ To receive the stream, visit http://localhost:1234/hls.html after running the ce
 rtsp_port = 8554
 Membrane.SimpleRTSPServer.start_link("#{input_dir}/bun.mp4", port: rtsp_port)
 Boombox.run(input: "rtsp://localhost:#{rtsp_port}/", output: "#{out_dir}/index.m3u8")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Receive RTP, broadcast via HLS
+
+To receive the stream, visit http://localhost:1234/hls.html after running the cell below
+
+```elixir
+rtp_port = 50001
+t =
+  Task.async(fn ->
+    Boombox.run(
+      input: {:rtp, port: rtp_port, track_configs: [audio: [encoding: :OPUS], video: [encoding: :H264]]},
+      output: "#{out_dir}/index.m3u8"
+    )
+  end)
+
+{_output, 0} =
+  System.shell("""
+  ffmpeg -re -i #{input_dir}/bun.mkv \
+  -map 0:v:0 -c:v copy -payload_type 96 -f rtp rtp://127.0.0.1:#{rtp_port} \
+  -map 0:a:0 -c:a copy -payload_type 120 -f rtp rtp://127.0.0.1:#{rtp_port}
+  """)
+
+Process.sleep(200)
+
+Task.shutdown(t)
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
