@@ -70,7 +70,7 @@ defmodule Boombox.Mixfile do
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
       {:image, "~> 0.54.0"},
       {:membrane_simple_rtsp_server, "~> 0.1.3", only: :test},
-      {:playwright, "~> 1.18.0-alpha.1", only: :test},
+      {:playwright, "~> 1.49.1-alpha.1", only: :test},
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},

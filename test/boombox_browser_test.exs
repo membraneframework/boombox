@@ -1,14 +1,9 @@
 defmodule BoomboxBrowserTest do
   use ExUnit.Case, async: true
 
-  import Membrane.ChildrenSpec
-  import Membrane.Testing.Assertions
-  import Support.Async
-
-  require Membrane.Pad, as: Pad
   require Logger
 
-  alias Playwright.Page
+  @port 1235
 
   setup_all do
     browser_launch_opts = %{
@@ -22,11 +17,24 @@ defmodule BoomboxBrowserTest do
     Application.put_env(:playwright, LaunchOptions, browser_launch_opts)
     {:ok, _} = Application.ensure_all_started(:playwright)
 
+    :inets.stop()
+    :ok = :inets.start()
+
+    {:ok, _server} =
+      :inets.start(:httpd,
+        bind_address: ~c"localhost",
+        port: @port,
+        document_root: ~c"#{__DIR__}/../boombox_examples_data",
+        server_name: ~c"assets_server",
+        server_root: ~c"/tmp",
+        erl_script_nocache: true
+      )
+
     []
   end
 
   setup do
-    {:ok, browser} = Playwright.BrowserType.launch(:chromium)
+    {_pid, browser} = Playwright.BrowserType.launch(:chromium)
 
     on_exit(fn ->
       Playwright.Browser.close(browser)
@@ -35,21 +43,85 @@ defmodule BoomboxBrowserTest do
     [browser: browser]
   end
 
-  test "browser <-(via WebRTC)-> boombox", %{browser: browser} do
-    {:ok, task} =
-      Task.start_link(fn ->
-        Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
+  test "browser -> boombox -> mp4", %{browser: browser} do
+    output_path = "#{__DIR__}/../webrtc_to_mp4.mp4"
+
+    boombox_task =
+      Task.async(fn ->
+        Boombox.run(
+          input: {:webrtc, "ws://localhost:8829"},
+          output: output_path
+        )
       end)
 
-    Process.sleep(500)
+    ingress_page = start_ingress_page(browser)
 
-    path = __DIR__ |> Path.join("../boombox_examples_data/webrtc_from_browser.html")
-    Page.goto(page, path)
-    # Page.click(page, selector)
+    Process.sleep(5_000)
+    Playwright.Page.close(ingress_page)
 
+    Task.await(boombox_task)
 
-
-
+    assert %{size: size} = File.stat!(output_path)
+    # if things work fine, the size should be around 450_000
+    assert size > 100_000
   end
 
+  for first <- [:ingress, :egress] do
+    test "browser -> boombox -> browser, but #{first} browser connects first", %{browser: browser} do
+      boombox_task =
+      Task.async(fn ->
+        Boombox.run(
+          input: {:webrtc, "ws://localhost:8829"},
+          output: {:webrtc, "ws://localhost:8830"}
+        )
+      end)
+
+      {ingress_page, egress_page} =
+        case unquote(first) do
+          :ingress ->
+            ingress_page = start_ingress_page(browser)
+            egress_page = start_egress_page(browser)
+            {ingress_page, egress_page}
+
+          :egress ->
+            egress_page = start_egress_page(browser)
+            ingress_page = start_ingress_page(browser)
+            {ingress_page, egress_page}
+        end
+
+      Process.sleep(1_000)
+
+      assert ingress_page
+             |> Playwright.Page.main_frame()
+             |> Playwright.Frame.content()
+             |> String.contains?("Connected")
+
+      [ingress_page, egress_page]
+      |> Enum.each(&Playwright.Page.close/1)
+
+      Task.await(boombox_task)
+    end
+  end
+
+  defp start_ingress_page(browser) do
+    url = "http://localhost:#{inspect(@port)}/webrtc_from_browser.html"
+    page = start_page(browser, url)
+    Playwright.Page.click(page, "button[id=\"button\"]")
+
+    page
+  end
+
+  defp start_egress_page(browser) do
+    url = "http://localhost:#{inspect(@port)}/webrtc_to_browser.html"
+    start_page(browser, url)
+  end
+
+  defp start_page(browser, url) do
+    page = Playwright.Browser.new_page(browser)
+
+    response = Playwright.Page.goto(page, url)
+    assert response.status == 200
+
+    page
+  end
 end
