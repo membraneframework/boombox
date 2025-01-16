@@ -305,8 +305,8 @@ defmodule Boombox.Pipeline do
 
   @spec create_input(Boombox.input(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
-  defp create_input({:webrtc, signaling}, _ctx, state) do
-    Boombox.WebRTC.create_input(signaling, state.output, state)
+  defp create_input({:webrtc, signaling}, ctx, state) do
+    Boombox.WebRTC.create_input(signaling, state.output, ctx, state)
   end
 
   defp create_input({:mp4, location, opts}, _ctx, _state) do
@@ -331,8 +331,8 @@ defmodule Boombox.Pipeline do
 
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
           {Ready.t() | Wait.t(), State.t()}
-  defp create_output({:webrtc, signaling}, _ctx, state) do
-    Boombox.WebRTC.create_output(signaling, state)
+  defp create_output({:webrtc, signaling}, ctx, state) do
+    Boombox.WebRTC.create_output(signaling, ctx, state)
   end
 
   defp create_output(_output, _ctx, state) do
