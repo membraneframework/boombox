@@ -71,7 +71,7 @@ defmodule Boombox.Mixfile do
       {:image, "~> 0.54.0"},
       {:membrane_simple_rtsp_server, "~> 0.1.3", only: :test},
       # {:playwright, "~> 1.49.1-alpha.1", only: :test},
-      {:playwright, github: "mechanical-orchard/playwright-elixir", only: :test},
+      {:playwright, github: "membraneframework-labs/playwright-elixir", only: :test},
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
