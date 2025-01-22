@@ -29,6 +29,9 @@ workflows:
       - elixir/lint:
           filters:
             <<: *filters
+      - test_browser:
+          filters:
+            <<: *filters
       - elixir/hex_publish:
           requires:
             - elixir/build_test
