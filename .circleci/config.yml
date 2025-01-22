@@ -13,8 +13,6 @@ jobs:
     steps:
       - attach_workspace:
           at: .
-      - restore_build_cache:
-          env: test
       - run: mix playwright.install
       - run: MIX_ENV=test mix compile
       - run: mix test --only browser
