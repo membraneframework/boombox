@@ -13,7 +13,7 @@ jobs:
     steps:
       - attach_workspace:
           at: .
-      # - checkout
+      - checkout
       - run: pwd
       - run: find .
       - run: mix playwright.install
