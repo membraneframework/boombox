@@ -15,7 +15,7 @@ defmodule BrowserTest do
     }
 
     Application.put_env(:playwright, LaunchOptions, browser_launch_opts)
-    {:ok, _} = Application.ensure_all_started(:playwright)
+    {:ok, _apps} = Application.ensure_all_started(:playwright)
 
     :inets.stop()
     :ok = :inets.start()
