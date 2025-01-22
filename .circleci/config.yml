@@ -2,6 +2,19 @@ version: 2.1
 orbs:
   elixir: membraneframework/elixir@1
 
+jobs: 
+  test_browser:
+    docker:
+      - image: membraneframeworklabs/docker_membrane
+        environment:
+          MIX_ENV: test
+
+    working_directory: ~/app
+    steps:
+      - run: mix playwright.install
+      - run: MIX_ENV=test mix compile
+      - run: mix test --only browser
+
 workflows:
   version: 2
   build:
