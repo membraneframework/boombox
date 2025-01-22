@@ -13,6 +13,7 @@ jobs:
     steps:
       - attach_workspace:
           at: .
+      - run: find .
       - run: mix playwright.install
       - run: MIX_ENV=test mix compile
       - run: mix test --only browser
