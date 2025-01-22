@@ -14,8 +14,7 @@ jobs:
       - attach_workspace:
           at: .
       - checkout
-      - run: pwd
-      - run: find .
+      - run: mix deps.get
       - run: mix playwright.install
       - run: MIX_ENV=test mix compile
       - run: mix test --only browser
