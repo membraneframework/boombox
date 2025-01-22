@@ -44,8 +44,9 @@ defmodule BrowserTest do
   end
 
   @tag :browser
-  test "browser -> boombox -> mp4", %{browser: browser} do
-    output_path = "#{__DIR__}/../webrtc_to_mp4.mp4"
+  @tag :tmp_dir
+  test "browser -> boombox -> mp4", %{browser: browser, tmp_dir: tmp_dir} do
+    output_path = Path.join(tmp_dir, "/webrtc_to_mp4.mp4")
 
     boombox_task =
       Task.async(fn ->
@@ -64,12 +65,14 @@ defmodule BrowserTest do
 
     assert %{size: size} = File.stat!(output_path)
     # if things work fine, the size should be around 450_000
-    assert size > 100_000
+    assert size > 200_000
   end
 
   for first <- [:ingress, :egress] do
     @tag :browser
-    test "browser -> boombox -> browser, but #{first} browser page connects first", %{browser: browser} do
+    test "browser -> boombox -> browser, but #{first} browser page connects first", %{
+      browser: browser
+    } do
       boombox_task =
         Task.async(fn ->
           Boombox.run(
@@ -95,13 +98,8 @@ defmodule BrowserTest do
 
       Process.sleep(1_000)
 
-      # dodaj podobne do egress page
-      assert ingress_page
-            #  |> Playwright.Page.main_frame()
-            #  |> Playwright.Frame.content()
-            |> Playwright.Page.text_content("[id=\"status\"]")
-             |> IO.inspect(label: "PAGE CONTENT")
-            #  |> String.contains?("Connected")
+      [ingress_page, egress_page]
+      |> Enum.each(&assert_page_connected/1)
 
       [ingress_page, egress_page]
       |> Enum.each(&Playwright.Page.close/1)
@@ -112,10 +110,7 @@ defmodule BrowserTest do
 
   defp start_ingress_page(browser) do
     url = "http://localhost:#{inspect(@port)}/webrtc_from_browser.html"
-    page = start_page(browser, url)
-    Playwright.Page.click(page, "button[id=\"button\"]")
-
-    page
+    start_page(browser, url)
   end
 
   defp start_egress_page(browser) do
@@ -129,6 +124,14 @@ defmodule BrowserTest do
     response = Playwright.Page.goto(page, url)
     assert response.status == 200
 
+    Playwright.Page.click(page, "button[id=\"button\"]")
+
     page
+  end
+
+  defp assert_page_connected(page) do
+    assert page
+           |> Playwright.Page.text_content("[id=\"status\"]")
+           |> String.contains?("Connected")
   end
 end

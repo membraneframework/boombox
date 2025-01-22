@@ -12,6 +12,7 @@
   style="background-color: black; color: white; font-family: Arial, Helvetica, sans-serif; min-height: 100vh; margin: 0px; padding: 5px 0px 5px 0px">
   <main>
     <h1>Boombox stream WebRTC to browser example</h1>
+    <div id="status"></div>
     <div>
       Boombox URL: <input type="text" value="ws://localhost:8830" id="url" /> <button id="button">Connect</button>
     </div>
@@ -37,6 +38,12 @@
         console.log("Sent ICE candidate:", event.candidate);
         ws.send(JSON.stringify({ type: "ice_candidate", data: event.candidate }));
       };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState == "connected") {
+          connStatus.innerHTML = "Connected";
+        }
+      }
 
       ws.onmessage = async event => {
         const { type, data } = JSON.parse(event.data);
