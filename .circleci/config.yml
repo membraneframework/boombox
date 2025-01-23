@@ -15,8 +15,7 @@ jobs:
           at: .
       - checkout
       - run: mix deps.get
-      - run: mix playwright.install
-      - run: MIX_ENV=test mix compile
+      - run: mix compile
       - run: mix test --exclude browser
 
 workflows:
