@@ -1,6 +1,11 @@
 defmodule BrowserTest do
   use ExUnit.Case, async: false
 
+  # Tests from this module are currently switched off on the CI because
+  # they raise some errors there, that doesn't occur locally (probably
+  # because of the problems with granting permissions for camera and
+  # microphone access)
+
   require Logger
 
   @port 1235
@@ -9,8 +14,7 @@ defmodule BrowserTest do
     browser_launch_opts = %{
       args: [
         "--use-fake-device-for-media-stream",
-        "--use-fake-ui-for-media-stream",
-        "--auto-accept-camera-and-microphone-capture"
+        "--use-fake-ui-for-media-stream"
       ],
       headless: true
     }

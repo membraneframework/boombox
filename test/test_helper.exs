@@ -1,1 +1,1 @@
-ExUnit.start(capture_log: true, exclude: :browser)
+ExUnit.start(capture_log: true)

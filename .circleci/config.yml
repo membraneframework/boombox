@@ -3,7 +3,7 @@ orbs:
   elixir: membraneframework/elixir@1
 
 jobs: 
-  test_browser:
+  test_exclude_browser:
     docker:
       - image: membraneframeworklabs/docker_membrane
         environment:
@@ -17,7 +17,7 @@ jobs:
       - run: mix deps.get
       - run: mix playwright.install
       - run: MIX_ENV=test mix compile
-      - run: mix test --only browser
+      - run: mix test --exclude browser
 
 workflows:
   version: 2
@@ -27,13 +27,10 @@ workflows:
           filters: &filters
             tags:
               only: /v.*/
-      - elixir/test:
-          filters:
-            <<: *filters
       - elixir/lint:
           filters:
             <<: *filters
-      - test_browser:
+      - test_exclude_browser:
           filters:
             <<: *filters
       - elixir/hex_publish:
