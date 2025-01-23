@@ -35,7 +35,7 @@ workflows:
       - elixir/hex_publish:
           requires:
             - elixir/build_test
-            - elixir/test
+            - test_exclude_browser
             - elixir/lint
           context:
             - Deployment
