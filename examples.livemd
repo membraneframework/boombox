@@ -541,7 +541,7 @@ rtp_port = 50001
 t =
   Task.async(fn ->
     Boombox.run(
-      input: {:rtp, port: rtp_port, track_configs: [audio: [encoding: :OPUS], video: [encoding: :H264]]},
+      input: {:rtp, port: rtp_port, audio_encoding: :OPUS, video_encoding: :H264},
       output: "#{out_dir}/index.m3u8"
     )
   end)
