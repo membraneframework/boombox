@@ -21,6 +21,9 @@ defmodule Boombox.Transcoder.Video do
         ) :: ChildrenSpec.builder()
   def plug_video_transcoding(builder, input_format, output_format)
       when is_video_format(input_format) and is_video_format(output_format) do
+        IO.inspect(input_format, label: "INPUT VIDEO FORMAT")
+        IO.inspect(output_format, label: "OUTPUT VIDEO FORMAT")
+
     do_plug_video_transcoding(builder, input_format, output_format)
   end
 

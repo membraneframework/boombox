@@ -393,11 +393,11 @@ To receive the stream, visit http://localhost:1234/webrtc_to_browser.html
 
 ```elixir
 overlay =
-  Req.get!("https://avatars.githubusercontent.com/u/25247695?s=200&v=4").body
+  (Req.get!("https://avatars.githubusercontent.com/u/25247695?s=200&v=4").body
   |> Vix.Vips.Image.new_from_buffer()
   |> then(fn {:ok, img} -> img end)
   |> Image.trim!()
-  |> Image.thumbnail!(100)
+  |> Image.thumbnail!(100))
 
 bg = Image.new!(640, 480, color: :light_gray)
 max_x = Image.width(bg) - Image.width(overlay)

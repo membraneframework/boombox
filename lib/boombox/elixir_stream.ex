@@ -22,7 +22,8 @@ defmodule Boombox.ElixirStream do
            get_child(:elixir_stream_source)
            |> via_out(Pad.ref(:output, :video))
            |> child(%Membrane.FFmpeg.SWScale.Converter{format: :I420})
-           |> child(%Membrane.H264.FFmpeg.Encoder{profile: :baseline, preset: :ultrafast})}
+          #  |> child(%Membrane.H264.FFmpeg.Encoder{profile: :baseline, preset: :ultrafast})
+          }
 
         :audio ->
           {:audio,

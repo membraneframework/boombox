@@ -157,7 +157,7 @@ defmodule Boombox.WebRTC do
           |> get_child(:webrtc_output)
 
         {:video, builder} ->
-          negotiated_codecs = state.output_webrtc_state.negotiated_video_codecs
+          negotiated_codecs = state.output_webrtc_state.negotiated_video_codecs |> IO.inspect(label: "WEBRTC NEGOTIATED CODECS")
           vp8_negotiated? = :vp8 in negotiated_codecs
           h264_negotiated? = :h264 in negotiated_codecs
 
