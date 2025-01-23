@@ -9,7 +9,8 @@ defmodule BrowserTest do
     browser_launch_opts = %{
       args: [
         "--use-fake-device-for-media-stream",
-        "--use-fake-ui-for-media-stream"
+        "--use-fake-ui-for-media-stream",
+        "--auto-accept-camera-and-microphone-capture"
       ],
       headless: true
     }
