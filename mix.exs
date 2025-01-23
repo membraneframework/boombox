@@ -14,6 +14,7 @@ defmodule Boombox.Mixfile do
       deps: deps(),
       dialyzer: dialyzer(),
       releases: releases(),
+      aliases: aliases(),
 
       # hex
       description: "Boombox",
@@ -102,10 +103,45 @@ defmodule Boombox.Mixfile do
     ]
   end
 
+  defp aliases do
+    [docs: [&generate_stable_examples/1, "docs", &remove_stable_examples/1]]
+  end
+
+  defp generate_stable_examples(_) do
+    livebook_lines =
+      File.read!("examples.livemd")
+      |> String.split("\n")
+
+    File.rename!("examples.livemd", "_examples.livemd")
+
+    mix_install_line =
+      livebook_lines
+      |> Enum.find_index(fn line -> Regex.match?(~r"^Mix.install", line) end)
+
+    modified_livebook =
+      List.update_at(livebook_lines, mix_install_line, fn line ->
+        String.replace(line, "{:boombox, github: \"membraneframework/boombox\"}", ":boombox")
+      end)
+      |> List.delete_at(mix_install_line + 1)
+      |> List.delete_at(mix_install_line + 1)
+      |> Enum.join("\n")
+
+    File.write!("examples.livemd", modified_livebook)
+  end
+
+  defp remove_stable_examples(_) do
+    File.rm!("examples.livemd")
+    File.rename!("_examples.livemd", "examples.livemd")
+  end
+
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", {"examples.livemd", title: "Examples"}, {"LICENSE", title: "License"}],
+      extras: [
+        "README.md",
+        {"examples.livemd", title: "Examples"},
+        {"LICENSE", title: "License"}
+      ],
       formatters: ["html"],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [Boombox]
