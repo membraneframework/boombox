@@ -14,6 +14,7 @@ defmodule Boombox.Mixfile do
       deps: deps(),
       dialyzer: dialyzer(),
       releases: releases(),
+      aliases: aliases(),
 
       # hex
       description: "Boombox",
@@ -68,7 +69,11 @@ defmodule Boombox.Mixfile do
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
-      {:membrane_simple_rtsp_server, "~> 0.1.3"},
+      {:membrane_simple_rtsp_server,
+       github: "membraneframework-labs/membrane_simple_rtsp_server",
+       branch: "use-rtp-muxer",
+       only: :test},
+      # {:membrane_simple_rtsp_server, "~> 0.1.3", only: :test},
       {:image, "~> 0.54.0"},
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
@@ -102,10 +107,45 @@ defmodule Boombox.Mixfile do
     ]
   end
 
+  defp aliases do
+    [docs: [&generate_stable_examples/1, "docs", &remove_stable_examples/1]]
+  end
+
+  defp generate_stable_examples(_) do
+    livebook_lines =
+      File.read!("examples.livemd")
+      |> String.split("\n")
+
+    File.rename!("examples.livemd", "_examples.livemd")
+
+    mix_install_line =
+      livebook_lines
+      |> Enum.find_index(fn line -> Regex.match?(~r"^Mix.install", line) end)
+
+    modified_livebook =
+      List.update_at(livebook_lines, mix_install_line, fn line ->
+        String.replace(line, "{:boombox, github: \"membraneframework/boombox\"}", ":boombox")
+      end)
+      |> List.delete_at(mix_install_line + 1)
+      |> List.delete_at(mix_install_line + 1)
+      |> Enum.join("\n")
+
+    File.write!("examples.livemd", modified_livebook)
+  end
+
+  defp remove_stable_examples(_) do
+    File.rm!("examples.livemd")
+    File.rename!("_examples.livemd", "examples.livemd")
+  end
+
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", {"examples.livemd", title: "Examples"}, {"LICENSE", title: "License"}],
+      extras: [
+        "README.md",
+        {"examples.livemd", title: "Examples"},
+        {"LICENSE", title: "License"}
+      ],
       formatters: ["html"],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [Boombox]
