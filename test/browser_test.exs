@@ -50,6 +50,7 @@ defmodule BrowserTest do
 
   @tag :browser
   @tag :tmp_dir
+  @tag :a
   test "browser -> boombox -> mp4", %{browser: browser, tmp_dir: tmp_dir} do
     output_path = Path.join(tmp_dir, "/webrtc_to_mp4.mp4")
 
@@ -63,14 +64,19 @@ defmodule BrowserTest do
 
     ingress_page = start_ingress_page(browser)
 
-    Process.sleep(5_000)
+    seconds = 10
+    Process.sleep(seconds * 1000)
+
+    assert_page_connected(ingress_page)
+    assert_frames_on_ingress_page(ingress_page, seconds)
+
     Playwright.Page.close(ingress_page)
 
     Task.await(boombox_task)
 
     assert %{size: size} = File.stat!(output_path)
-    # if things work fine, the size should be around 450_000
-    assert size > 200_000
+    # if things work fine, the size should be around ~850_000
+    assert size > 400_000
   end
 
   for first <- [:ingress, :egress] do
@@ -101,10 +107,14 @@ defmodule BrowserTest do
             {ingress_page, egress_page}
         end
 
-      Process.sleep(1_000)
+      seconds = 10
+      Process.sleep(seconds * 1000)
 
       [ingress_page, egress_page]
       |> Enum.each(&assert_page_connected/1)
+
+      assert_frames_on_ingress_page(ingress_page, seconds)
+      assert_frames_on_egress_page(egress_page, seconds)
 
       [ingress_page, egress_page]
       |> Enum.each(&Playwright.Page.close/1)
@@ -132,6 +142,28 @@ defmodule BrowserTest do
     Playwright.Page.click(page, "button[id=\"button\"]")
 
     page
+  end
+
+  defp assert_frames_on_ingress_page(page, seconds_since_launch) do
+    div_id = "outbound-rtp-frames-encoded"
+    assert_frames_on_page(page, div_id, seconds_since_launch)
+  end
+
+  defp assert_frames_on_egress_page(page, seconds_since_launch) do
+    div_id = "inbound-rtp-frames-decoded"
+    assert_frames_on_page(page, div_id, seconds_since_launch)
+  end
+
+  defp assert_frames_on_page(page, id, seconds_since_launch) do
+    frames_number =
+      page
+      |> Playwright.Page.text_content("[id=\"#{id}\"]")
+      |> String.to_integer()
+
+    frames_per_second_lowerbound = 12
+    frames_number_lowerbound = frames_per_second_lowerbound * seconds_since_launch
+
+    assert frames_number >= frames_number_lowerbound
   end
 
   defp assert_page_connected(page) do

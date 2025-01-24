@@ -16,6 +16,7 @@
       Boombox URL: <input type="text" value="ws://localhost:8829" id="url" /> <button id="button">Connect</button>
     </div>
     <div id="status"></div>
+    <div id="stats"></div>
     <br>
     <video id="preview" autoplay muted></video>
   </main>
@@ -75,6 +76,38 @@
       await pc.setLocalDescription(offer);
       console.log("Sent SDP offer:", offer)
       ws.send(JSON.stringify({ type: "sdp_offer", data: offer }));
+
+      setInterval(() => {
+        pc.getStats(null).then((stats) => {
+          let statsOutput = "";
+
+          stats.forEach((report) => {
+            statsOutput +=
+              `<h2>Report: ${report.type}</h2>\n<strong>ID:</strong> ${report.id}<br>\n` +
+              `<strong>Timestamp:</strong> ${report.timestamp}<br>\n`;
+
+            Object.keys(report).forEach((statName) => {
+              if (
+                statName !== "id" &&
+                statName !== "timestamp" &&
+                statName !== "type"
+              ) {
+                if (report.type == `outbound-rtp` && statName == `framesEncoded`) {
+                  div_id = `outbound-rtp-frames-encoded`
+                  statsOutput += `<strong>${statName}:</strong> <div id=${div_id}>${report[statName]}</div><br>\n`;
+                } else if (report.type == `inbound-rtp` && statName == `framesDecoded`) {
+                  div_id = `inbound-rtp-frames-decoded`
+                  statsOutput += `<strong>${statName}:</strong> <div id=${div_id}>${report[statName]}</div><br>\n`;
+                } else {
+                  statsOutput += `<strong>${statName}:</strong> ${report[statName]}<br>\n`;
+                }
+              }
+            });
+          });
+
+          document.getElementById("stats").innerHTML = statsOutput
+        });
+      }, 1000);
     };
 
     const connect = () => {
