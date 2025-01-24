@@ -50,7 +50,6 @@ defmodule BrowserTest do
 
   @tag :browser
   @tag :tmp_dir
-  @tag :a
   test "browser -> boombox -> mp4", %{browser: browser, tmp_dir: tmp_dir} do
     output_path = Path.join(tmp_dir, "/webrtc_to_mp4.mp4")
 
