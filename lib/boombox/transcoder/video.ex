@@ -3,12 +3,16 @@ defmodule Boombox.Transcoder.Video do
 
   import Membrane.ChildrenSpec
   require Membrane.Logger
+  alias Membrane.RemoteStream
   alias Membrane.{ChildrenSpec, H264, H265, RawVideo, VP8}
 
   @type video_stream_format :: VP8.t() | H264.t() | H265.t() | RawVideo.t()
 
   defguard is_video_format(format)
-           when is_struct(format) and format.__struct__ in [VP8, H264, H265, RawVideo]
+           when is_struct(format) and
+                  (format.__struct__ in [VP8, H264, H265, RawVideo] or
+                     (format.__struct__ == RemoteStream and format.content_format == VP8 and
+                        format.type == :packetized))
 
   @spec plug_video_transcoding(
           ChildrenSpec.builder(),
@@ -67,6 +71,13 @@ defmodule Boombox.Transcoder.Video do
 
   defp maybe_plug_parser_and_decoder(builder, %VP8{}) do
     # todo: maybe specify framerate in decoder options
+    builder |> child(:vp8_decoder, %VP8.Decoder{})
+  end
+
+  defp maybe_plug_parser_and_decoder(builder, %RemoteStream{
+         content_format: VP8,
+         type: :packetized
+       }) do
     builder |> child(:vp8_decoder, %VP8.Decoder{})
   end
 

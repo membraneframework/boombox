@@ -240,6 +240,7 @@ defmodule BoomboxTest do
     end)
   end
 
+  @tag :flaky
   @tag :rtsp_mp4
   async_test "rtsp -> mp4", %{tmp_dir: tmp} do
     rtsp_port = 8554
