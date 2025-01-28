@@ -84,14 +84,14 @@ Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://loc
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## Record WebRTC to MP4
+## Record WebRTC via WHIP to MP4
 
-To send the stream, visit http://localhost:1234/webrtc_from_browser.html.
+To send the stream, visit http://localhost:1234/whip.html.
 
 Note: don't stop this cell to finish recording - click 'disconnect' or close the browser tab instead, so the recording is finalized properly.
 
 ```elixir
-Boombox.run(input: {:whip, port: 8829, token: "whip_it!"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
+Boombox.run(input: {:whip, "http://localhost:8829", token: "whip_it!"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
 ```
 
 ```elixir

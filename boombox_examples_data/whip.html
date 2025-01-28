@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Membrane WebRTC WHIP/WHEP Example</title>
+</head>
+
+<body
+    style="background-color: black; color: white; font-family: Arial, Helvetica, sans-serif; min-height: 100vh; margin: 0px; padding: 5px 0px 5px 0px">
+    <h1>Membrane WebRTC WHIP/WHEP Example</h1>
+    <div id="status">Connecting...</div>
+    <script type="module">
+        import { WHIPClient } from 'https://cdn.jsdelivr.net/npm/whip-whep@1.2.0/whip.js'
+
+        const status = document.getElementById("status");
+        const pcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        const pc = new RTCPeerConnection(pcConfig);
+        for (const track of stream.getTracks()) { pc.addTransceiver(track, { 'direction': 'sendonly' }) }
+        const whip = new WHIPClient();
+        const url = "http://localhost:8829/";
+        const token = "whip_it!";
+        await whip.publish(pc, url, token);
+        status.innerHTML = "Connected <button id='disconnect'>Disconnect</button>"
+        document.getElementById("disconnect").onclick = () => {
+            status.innerHTML = "Disconnected";
+            whip.stop();
+        }
+    </script>
+</body>
+
+</html>
