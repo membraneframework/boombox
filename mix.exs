@@ -64,11 +64,7 @@ defmodule Boombox.Mixfile do
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
-      {:membrane_simple_rtsp_server,
-       github: "membraneframework-labs/membrane_simple_rtsp_server",
-       branch: "use-rtp-muxer",
-       only: :test},
-      # {:membrane_simple_rtsp_server, "~> 0.1.3", only: :test},
+      {:membrane_simple_rtsp_server, "~> 0.1.4", only: :test},
       {:image, "~> 0.54.0"},
       {:membrane_simple_rtsp_server, "~> 0.1.3", only: :test},
       # {:playwright, "~> 1.49.1-alpha.1", only: :test},
@@ -109,34 +105,28 @@ defmodule Boombox.Mixfile do
   end
 
   defp aliases do
-    [docs: [&generate_stable_examples/1, "docs", &remove_stable_examples/1]]
+    [docs: [&generate_docs_examples/1, "docs"]]
   end
 
-  defp generate_stable_examples(_) do
+  defp generate_docs_examples(_) do
+    docs_install_config = "boombox = :boombox"
+
     livebook_lines =
       File.read!("examples.livemd")
       |> String.split("\n")
 
-    File.rename!("examples.livemd", "_examples.livemd")
+    install_config_begin = Enum.find_index(livebook_lines, &(&1 == "# MIX_INSTALL_CONFIG_BEGIN"))
+    install_config_end = Enum.find_index(livebook_lines, &(&1 == "# MIX_INSTALL_CONFIG_END"))
 
-    mix_install_line =
-      livebook_lines
-      |> Enum.find_index(fn line -> Regex.match?(~r"^Mix.install", line) end)
+    config_lines =
+      Enum.slice(livebook_lines, (install_config_begin + 1)..(install_config_end - 1))
 
     modified_livebook =
-      List.update_at(livebook_lines, mix_install_line, fn line ->
-        String.replace(line, "{:boombox, github: \"membraneframework/boombox\"}", ":boombox")
-      end)
-      |> List.delete_at(mix_install_line + 1)
-      |> List.delete_at(mix_install_line + 1)
+      (livebook_lines -- config_lines)
+      |> List.insert_at(install_config_begin + 1, docs_install_config)
       |> Enum.join("\n")
 
-    File.write!("examples.livemd", modified_livebook)
-  end
-
-  defp remove_stable_examples(_) do
-    File.rm!("examples.livemd")
-    File.rename!("_examples.livemd", "examples.livemd")
+    File.write!("#{Mix.Project.build_path()}/examples.livemd", modified_livebook)
   end
 
   defp docs do
@@ -144,7 +134,7 @@ defmodule Boombox.Mixfile do
       main: "readme",
       extras: [
         "README.md",
-        {"examples.livemd", title: "Examples"},
+        {"#{Mix.Project.build_path()}/examples.livemd", title: "Examples"},
         {"LICENSE", title: "License"}
       ],
       formatters: ["html"],
