@@ -111,20 +111,13 @@ defmodule Boombox.Mixfile do
   defp generate_docs_examples(_) do
     docs_install_config = "boombox = :boombox"
 
-    livebook_lines =
-      File.read!("examples.livemd")
-      |> String.split("\n")
-
-    install_config_begin = Enum.find_index(livebook_lines, &(&1 == "# MIX_INSTALL_CONFIG_BEGIN"))
-    install_config_end = Enum.find_index(livebook_lines, &(&1 == "# MIX_INSTALL_CONFIG_END"))
-
-    config_lines =
-      Enum.slice(livebook_lines, (install_config_begin + 1)..(install_config_end - 1))
-
     modified_livebook =
-      (livebook_lines -- config_lines)
-      |> List.insert_at(install_config_begin + 1, docs_install_config)
-      |> Enum.join("\n")
+      File.read!("examples.livemd")
+      |> String.replace(
+        ~r/# MIX_INSTALL_CONFIG_BEGIN\n(.|\n)*# MIX_INSTALL_CONFIG_END\n/U,
+        docs_install_config,
+        global: false
+      )
 
     File.write!("#{Mix.Project.build_path()}/examples.livemd", modified_livebook)
   end
