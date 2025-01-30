@@ -1,4 +1,4 @@
-defmodule BrowserTest do
+defmodule Boombox.BrowserTest do
   use ExUnit.Case, async: false
 
   # Tests from this module are currently switched off on the CI because
@@ -9,6 +9,8 @@ defmodule BrowserTest do
   require Logger
 
   @port 1235
+
+  @moduletag :browser
 
   setup_all do
     browser_launch_opts = %{
@@ -29,7 +31,7 @@ defmodule BrowserTest do
       :inets.start(:httpd,
         bind_address: ~c"localhost",
         port: @port,
-        document_root: ~c"#{__DIR__}/assets",
+        document_root: ~c"boombox_examples_data",
         server_name: ~c"assets_server",
         server_root: ~c"/tmp",
         erl_script_nocache: true
@@ -48,7 +50,6 @@ defmodule BrowserTest do
     [browser: browser]
   end
 
-  @tag :browser
   @tag :tmp_dir
   test "browser -> boombox -> mp4", %{browser: browser, tmp_dir: tmp_dir} do
     output_path = Path.join(tmp_dir, "/webrtc_to_mp4.mp4")
@@ -61,13 +62,13 @@ defmodule BrowserTest do
         )
       end)
 
-    ingress_page = start_ingress_page(browser)
+    ingress_page = start_page(browser, "webrtc_from_browser")
 
     seconds = 10
     Process.sleep(seconds * 1000)
 
     assert_page_connected(ingress_page)
-    assert_frames_on_ingress_page(ingress_page, seconds)
+    assert_frames_encoded(ingress_page, seconds)
 
     Playwright.Page.close(ingress_page)
 
@@ -78,8 +79,36 @@ defmodule BrowserTest do
     assert size > 400_000
   end
 
+  @tag :tmp_dir
+  @tag :target
+  test "browser -> (whip) boombox -> mp4", %{browser: browser, tmp_dir: tmp_dir} do
+    output_path = Path.join(tmp_dir, "/webrtc_to_mp4.mp4")
+
+    boombox_task =
+      Task.async(fn ->
+        Boombox.run(
+          input: {:whip, "http://localhost:8829", token: "whip_it!"},
+          output: output_path
+        )
+      end)
+
+    ingress_page = start_page(browser, "whip")
+    seconds = 10
+    Process.sleep(seconds * 1000)
+
+    assert_page_connected(ingress_page)
+    assert_frames_encoded(ingress_page, seconds)
+
+    close_page(ingress_page)
+
+    Task.await(boombox_task)
+
+    assert %{size: size} = File.stat!(output_path)
+    # if things work fine, the size should be around ~850_000
+    assert size > 400_000
+  end
+
   for first <- [:ingress, :egress] do
-    @tag :browser
     test "browser -> boombox -> browser, but #{first} browser page connects first", %{
       browser: browser
     } do
@@ -94,15 +123,15 @@ defmodule BrowserTest do
       {ingress_page, egress_page} =
         case unquote(first) do
           :ingress ->
-            ingress_page = start_ingress_page(browser)
+            ingress_page = start_page(browser, "webrtc_from_browser")
             Process.sleep(500)
-            egress_page = start_egress_page(browser)
+            egress_page = start_page(browser, "webrtc_to_browser")
             {ingress_page, egress_page}
 
           :egress ->
-            egress_page = start_egress_page(browser)
+            egress_page = start_page(browser, "webrtc_to_browser")
             Process.sleep(500)
-            ingress_page = start_ingress_page(browser)
+            ingress_page = start_page(browser, "webrtc_from_browser")
             {ingress_page, egress_page}
         end
 
@@ -112,8 +141,8 @@ defmodule BrowserTest do
       [ingress_page, egress_page]
       |> Enum.each(&assert_page_connected/1)
 
-      assert_frames_on_ingress_page(ingress_page, seconds)
-      assert_frames_on_egress_page(egress_page, seconds)
+      assert_frames_encoded(ingress_page, seconds)
+      assert_frames_decoded(egress_page, seconds)
 
       [ingress_page, egress_page]
       |> Enum.each(&Playwright.Page.close/1)
@@ -122,17 +151,12 @@ defmodule BrowserTest do
     end
   end
 
-  defp start_ingress_page(browser) do
-    url = "http://localhost:#{inspect(@port)}/webrtc_from_browser.html"
-    start_page(browser, url)
+  defp start_page(browser, page) do
+    url = "http://localhost:#{@port}/#{page}.html"
+    do_start_page(browser, url)
   end
 
-  defp start_egress_page(browser) do
-    url = "http://localhost:#{inspect(@port)}/webrtc_to_browser.html"
-    start_page(browser, url)
-  end
-
-  defp start_page(browser, url) do
+  defp do_start_page(browser, url) do
     page = Playwright.Browser.new_page(browser)
 
     response = Playwright.Page.goto(page, url)
@@ -143,31 +167,35 @@ defmodule BrowserTest do
     page
   end
 
-  defp assert_frames_on_ingress_page(page, seconds_since_launch) do
-    div_id = "outbound-rtp-frames-encoded"
-    assert_frames_on_page(page, div_id, seconds_since_launch)
-  end
-
-  defp assert_frames_on_egress_page(page, seconds_since_launch) do
-    div_id = "inbound-rtp-frames-decoded"
-    assert_frames_on_page(page, div_id, seconds_since_launch)
-  end
-
-  defp assert_frames_on_page(page, id, seconds_since_launch) do
-    frames_number =
-      page
-      |> Playwright.Page.text_content("[id=\"#{id}\"]")
-      |> String.to_integer()
-
-    frames_per_second_lowerbound = 12
-    frames_number_lowerbound = frames_per_second_lowerbound * seconds_since_launch
-
-    assert frames_number >= frames_number_lowerbound
+  defp close_page(page) do
+    Playwright.Page.click(page, "button[id=\"button\"]")
+    Playwright.Page.close(page)
   end
 
   defp assert_page_connected(page) do
     assert page
            |> Playwright.Page.text_content("[id=\"status\"]")
            |> String.contains?("Connected")
+  end
+
+  defp assert_frames_encoded(page, time_seconds) do
+    fps_lowerbound = 12
+    frames_encoded = get_webrtc_stats(page, type: "outbound-rtp", kind: "video").framesEncoded
+    assert frames_encoded >= time_seconds * fps_lowerbound
+  end
+
+  defp assert_frames_decoded(page, time_seconds) do
+    fps_lowerbound = 12
+    frames_decoded = get_webrtc_stats(page, type: "inbound-rtp", kind: "video").framesDecoded
+    assert frames_decoded >= time_seconds * fps_lowerbound
+  end
+
+  defp get_webrtc_stats(page, constraints) do
+    js_fuj =
+      "async () => {const stats = await window.pc.getStats(null); return Array.from(stats)}"
+
+    Playwright.Page.evaluate(page, js_fuj)
+    |> Enum.map(fn [_id, data] -> data end)
+    |> Enum.find(fn stat -> Enum.all?(constraints, fn {k, v} -> stat[k] == v end) end)
   end
 end
