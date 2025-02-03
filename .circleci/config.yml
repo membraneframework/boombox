@@ -2,6 +2,22 @@ version: 2.1
 orbs:
   elixir: membraneframework/elixir@1
 
+jobs: 
+  test_exclude_browser:
+    docker:
+      - image: membraneframeworklabs/docker_membrane
+        environment:
+          MIX_ENV: test
+
+    working_directory: ~/app
+    steps:
+      - attach_workspace:
+          at: .
+      - checkout
+      - run: mix deps.get
+      - run: mix compile
+      - run: mix test --exclude browser
+
 workflows:
   version: 2
   build:
@@ -10,16 +26,16 @@ workflows:
           filters: &filters
             tags:
               only: /v.*/
-      - elixir/test:
+      - elixir/lint:
           filters:
             <<: *filters
-      - elixir/lint:
+      - test_exclude_browser:
           filters:
             <<: *filters
       - elixir/hex_publish:
           requires:
             - elixir/build_test
-            - elixir/test
+            - test_exclude_browser
             - elixir/lint
           context:
             - Deployment

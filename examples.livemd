@@ -9,7 +9,15 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 # In case of problems installing Nx/EXLA/Bumblebee,
 # you can remove them and the Nx backend config below.
 # Examples that don't mention them should still work.
-Mix.install([:boombox, :kino, :nx, :exla, :bumblebee, :websockex, :membrane_simple_rtsp_server])
+Mix.install([
+  {:boombox, path: __DIR__},
+  :kino,
+  :nx,
+  :exla,
+  :bumblebee,
+  :websockex,
+  :membrane_simple_rtsp_server
+])
 
 Nx.global_default_backend(EXLA.Backend)
 ```
@@ -27,8 +35,7 @@ File.mkdir_p!(input_dir)
 out_dir = "#{data_dir}/output"
 File.mkdir_p!(out_dir)
 
-samples_url =
-  "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples"
+samples_url = "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples"
 
 unless File.exists?("#{input_dir}/bun.mp4") do
   %{status: 200, body: bbb_mp4} = Req.get!("#{samples_url}/big-buck-bunny/bun33s.mp4")
@@ -77,14 +84,14 @@ Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:webrtc, "ws://loc
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## Record WebRTC to MP4
+## Record WebRTC via WHIP to MP4
 
-To send the stream, visit http://localhost:1234/webrtc_from_browser.html.
+To send the stream, visit http://localhost:1234/whip.html.
 
 Note: don't stop this cell to finish recording - click 'disconnect' or close the browser tab instead, so the recording is finalized properly.
 
 ```elixir
-Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
+Boombox.run(input: {:whip, "http://localhost:8829", token: "whip_it!"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
 ```
 
 ```elixir
@@ -539,6 +546,7 @@ To receive the stream, visit http://localhost:1234/hls.html after running the ce
 
 ```elixir
 rtp_port = 50001
+
 t =
   Task.async(fn ->
     Boombox.run(

@@ -69,6 +69,7 @@ defmodule Boombox do
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
+          | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
@@ -78,6 +79,7 @@ defmodule Boombox do
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t()}
           | {:webrtc, webrtc_signaling()}
+          | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
           | {:rtp, out_rtp_opts()}
           | {:stream, out_stream_opts()}
@@ -189,6 +191,14 @@ defmodule Boombox do
 
       {:webrtc, uri} when is_binary(uri) ->
         value
+
+      {:whip, uri} when is_binary(uri) ->
+        parse_opt!(direction, {:whip, uri, []})
+
+      {:whip, uri, opts} when is_binary(uri) and is_list(opts) ->
+        if Keyword.keyword?(opts) do
+          {:webrtc, {:whip, uri, opts}}
+        end
 
       {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
         value
