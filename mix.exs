@@ -47,8 +47,7 @@ defmodule Boombox.Mixfile do
     [
       {:membrane_core, "~> 1.1"},
       # {:membrane_webrtc_plugin, "~> 0.23.2"},
-      {:membrane_webrtc_plugin,
-       github: "membraneframework/membrane_webrtc_plugin", branch: "fix-bugs"},
+      {:membrane_webrtc_plugin, github: "membraneframework/membrane_webrtc_plugin"},
       {:membrane_opus_plugin, "~> 0.20.3"},
       {:membrane_aac_plugin, "~> 0.19.0"},
       {:membrane_aac_fdk_plugin, "~> 0.18.0"},

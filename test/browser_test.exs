@@ -70,7 +70,7 @@ defmodule Boombox.BrowserTest do
     assert_page_connected(ingress_page)
     assert_frames_encoded(ingress_page, seconds)
 
-    Playwright.Page.close(ingress_page)
+    close_page(ingress_page)
 
     Task.await(boombox_task)
 
@@ -80,7 +80,6 @@ defmodule Boombox.BrowserTest do
   end
 
   @tag :tmp_dir
-  @tag :target
   test "browser -> (whip) boombox -> mp4", %{browser: browser, tmp_dir: tmp_dir} do
     output_path = Path.join(tmp_dir, "/webrtc_to_mp4.mp4")
 
@@ -145,7 +144,7 @@ defmodule Boombox.BrowserTest do
       assert_frames_decoded(egress_page, seconds)
 
       [ingress_page, egress_page]
-      |> Enum.each(&Playwright.Page.close/1)
+      |> Enum.each(&close_page/1)
 
       Task.await(boombox_task)
     end
