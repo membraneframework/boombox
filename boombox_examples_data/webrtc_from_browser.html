@@ -32,6 +32,7 @@
       const localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
       preview.srcObject = localStream;
       const pc = new RTCPeerConnection(pcConfig);
+      window.pc = pc; // for debugging purposes
 
       pc.onicecandidate = event => {
         if (event.candidate === null) return;
