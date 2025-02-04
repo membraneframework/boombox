@@ -163,7 +163,7 @@ defmodule Boombox.RTP do
           end
 
         builder
-        |> child({:rtp_transcoder, media_type}, %Boombox.Transcoder{
+        |> child({:rtp_transcoder, media_type}, %Membrane.Transcoder{
           output_stream_format: output_stream_format
         })
         |> child({:rtp_out_parser, media_type}, parser)

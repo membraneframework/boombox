@@ -55,7 +55,7 @@ defmodule Boombox.ElixirStream do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+            |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawAudio
             })
             |> maybe_plug_resampler(options)
@@ -64,7 +64,7 @@ defmodule Boombox.ElixirStream do
 
           {:video, builder} ->
             builder
-            |> child(:elixir_stream_video_transcoder, %Boombox.Transcoder{
+            |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawVideo
             })
             |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
