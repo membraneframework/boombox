@@ -12,10 +12,10 @@
   style="background-color: black; color: white; font-family: Arial, Helvetica, sans-serif; min-height: 100vh; margin: 0px; padding: 5px 0px 5px 0px">
   <main>
     <h1>Boombox stream WebRTC to browser example</h1>
-    <div id="status"></div>
     <div>
       Boombox URL: <input type="text" value="ws://localhost:8830" id="url" /> <button id="button">Connect</button>
     </div>
+    <div id="status"></div>
     <br>
     <video id="videoPlayer" controls muted autoplay></video>
   </main>
@@ -30,6 +30,7 @@
       videoPlayer.srcObject = new MediaStream();
 
       const pc = new RTCPeerConnection(pcConfig);
+      window.pc = pc; // for debugging purposes
       pc.ontrack = event => videoPlayer.srcObject.addTrack(event.track);
       videoPlayer.play();
       pc.onicecandidate = event => {
@@ -42,6 +43,7 @@
       pc.onconnectionstatechange = () => {
         if (pc.connectionState == "connected") {
           connStatus.innerHTML = "Connected";
+          button.innerHTML = "Disconnect";
         }
       }
 
@@ -67,7 +69,11 @@
     const connect = () => {
       const ws = new WebSocket(url.value);
       ws.onopen = () => connectRTC(ws);
-      ws.onclose = event => console.log("WebSocket connection was terminated:", event);
+      ws.onclose = event => {
+        console.log("WebSocket connection was terminated:", event);
+        connStatus.innerHTML = "Disconnected";
+        button.innerHTML = "Connect";
+      }
     }
 
     button.onclick = connect;

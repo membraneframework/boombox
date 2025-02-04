@@ -1,0 +1,2 @@
+#/bin/sh
+mix run -e 'Logger.configure(level: :info);Boombox.run_cli()' -- $@

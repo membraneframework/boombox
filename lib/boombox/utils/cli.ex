@@ -22,7 +22,9 @@ defmodule Boombox.Utils.CLI do
     audio_specific_config: {:string, :binary},
     pps: {:string, :binary},
     sps: {:string, :binary},
-    vps: {:string, :binary}
+    vps: {:string, :binary},
+    whip: {:string, :string},
+    token: {:string, :string}
   ]
 
   @spec parse_argv([String.t()]) ::

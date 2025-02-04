@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Membrane WebRTC WHIP/WHEP Example</title>
+</head>
+
+<body
+    style="background-color: black; color: white; font-family: Arial, Helvetica, sans-serif; min-height: 100vh; margin: 0px; padding: 5px 0px 5px 0px">
+    <h1>Boombox WHIP Example</h1>
+    <div>
+        Boombox URL: <input type="text" value="http://localhost:8829" id="url" />
+        Token: <input type="text" value="whip_it!" id="token" />
+        <button id="button">Connect</button>
+    </div>
+    <div id="status"></div>
+    <br>
+    <video id="preview" autoplay muted></video>
+    <script type="module">
+        import { WHIPClient } from 'https://cdn.jsdelivr.net/npm/whip-whep@1.2.0/whip.js'
+
+        const button = document.getElementById("button");
+        const connStatus = document.getElementById("status");
+        const preview = document.getElementById("preview");
+        const url = document.getElementById("url");
+        const status = document.getElementById("status");
+        const token = document.getElementById("token");
+        const pcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const mediaConstraints = { video: true, audio: true };
+
+        const connect = async () => {
+            connStatus.innerHTML = "Connecting..."
+            const localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+            preview.srcObject = localStream;
+            const pc = new RTCPeerConnection(pcConfig);
+            window.pc = pc; // for debugging purposes
+            for (const track of localStream.getTracks()) { pc.addTransceiver(track, { 'direction': 'sendonly' }) }
+            const whip = new WHIPClient();
+            await whip.publish(pc, url.value, token.value);
+            connStatus.innerHTML = "Connected";
+            button.innerHTML = "Disconnect";
+            button.onclick = async () => {
+                await whip.stop();
+                status.innerHTML = "Disconnected";
+                button.onclick = connect;
+            }
+        }
+
+        button.onclick = connect;
+    </script>
+</body>
+
+</html>
