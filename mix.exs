@@ -66,7 +66,6 @@ defmodule Boombox.Mixfile do
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
       {:membrane_simple_rtsp_server, "~> 0.1.4", only: :test},
       {:image, "~> 0.54.0"},
-      {:membrane_simple_rtsp_server, "~> 0.1.3", only: :test},
       # {:playwright, "~> 1.49.1-alpha.1", only: :test},
       {:playwright,
        github: "membraneframework-labs/playwright-elixir",
