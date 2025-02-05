@@ -14,6 +14,7 @@ defmodule Boombox.Mixfile do
       deps: deps(),
       dialyzer: dialyzer(),
       releases: releases(),
+      aliases: aliases(),
 
       # hex
       description: "Boombox",
@@ -63,8 +64,8 @@ defmodule Boombox.Mixfile do
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
+      {:membrane_simple_rtsp_server, "~> 0.1.4", only: :test},
       {:image, "~> 0.54.0"},
-      {:membrane_simple_rtsp_server, "~> 0.1.3", only: :test},
       # {:playwright, "~> 1.49.1-alpha.1", only: :test},
       {:playwright,
        github: "membraneframework-labs/playwright-elixir",
@@ -102,10 +103,32 @@ defmodule Boombox.Mixfile do
     ]
   end
 
+  defp aliases do
+    [docs: [&generate_docs_examples/1, "docs"]]
+  end
+
+  defp generate_docs_examples(_) do
+    docs_install_config = "boombox = :boombox"
+
+    modified_livebook =
+      File.read!("examples.livemd")
+      |> String.replace(
+        ~r/# MIX_INSTALL_CONFIG_BEGIN\n(.|\n)*# MIX_INSTALL_CONFIG_END\n/U,
+        docs_install_config,
+        global: false
+      )
+
+    File.write!("#{Mix.Project.build_path()}/examples.livemd", modified_livebook)
+  end
+
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", {"examples.livemd", title: "Examples"}, {"LICENSE", title: "License"}],
+      extras: [
+        "README.md",
+        {"#{Mix.Project.build_path()}/examples.livemd", title: "Examples"},
+        {"LICENSE", title: "License"}
+      ],
       formatters: ["html"],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [Boombox]

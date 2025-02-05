@@ -263,7 +263,7 @@ defmodule BoomboxTest do
     Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
 
     Boombox.run(input: "rtsp://localhost:#{rtsp_port}/", output: output)
-    Compare.compare(output, "test/fixtures/ref_bun10s_rtsp_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   @tag :rtsp_hls
@@ -272,8 +272,7 @@ defmodule BoomboxTest do
     Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
     manifest_filename = Path.join(tmp, "index.m3u8")
     Boombox.run(input: "rtsp://localhost:#{rtsp_port}/", output: manifest_filename)
-    ref_path = "test/fixtures/ref_bun10s_rtsp_aac_hls"
-    Compare.compare(tmp, ref_path, format: :hls)
+    Compare.compare(tmp, "test/fixtures/ref_bun10s_aac_hls", format: :hls)
   end
 
   @tag :rtsp_webrtc_mp4
@@ -294,7 +293,7 @@ defmodule BoomboxTest do
 
     Boombox.run(input: {:webrtc, signaling}, output: output)
     Task.await(t)
-    Compare.compare(output, "test/fixtures/ref_bun10s_rtsp_opus_aac.mp4")
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
 
   @tag :mp4_elixir_rotate_mp4
