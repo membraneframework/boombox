@@ -65,7 +65,7 @@ defmodule Boombox.MP4 do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+            |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.AAC
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
@@ -77,7 +77,7 @@ defmodule Boombox.MP4 do
 
           {:video, builder} ->
             builder
-            |> child(:mp4_video_transcoder, %Boombox.Transcoder{
+            |> child(:mp4_video_transcoder, %Membrane.Transcoder{
               output_stream_format: fn
                 %H264{stream_structure: :annexb} = h264 ->
                   %H264{h264 | stream_structure: :avc3, alignment: :au}

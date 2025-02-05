@@ -147,7 +147,7 @@ defmodule Boombox.WebRTC do
       Enum.map(track_builders, fn
         {:audio, builder} ->
           builder
-          |> child(:mp4_audio_transcoder, %Boombox.Transcoder{
+          |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
             output_stream_format: Membrane.Opus
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
@@ -161,7 +161,7 @@ defmodule Boombox.WebRTC do
 
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
-          |> child(:webrtc_video_transcoder, %Boombox.Transcoder{
+          |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
             output_stream_format: fn
               %H264{} = h264 when h264_negotiated? ->
                 %H264{h264 | alignment: :nalu, stream_structure: :annexb}
