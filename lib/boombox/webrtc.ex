@@ -89,8 +89,8 @@ defmodule Boombox.WebRTC do
       if webrtc_input?(state) do
         # let's spawn websocket server for webrtc source before the source starts
         {:webrtc, input_signaling} = state.input
-        signaling_channel = resolve_signaling(input_signaling, :input, ctx.utility_supervisor)
-        state = %{state | input: {:webrtc, signaling_channel}}
+        signaling = resolve_signaling(input_signaling, :input, ctx.utility_supervisor)
+        state = %{state | input: {:webrtc, signaling}}
 
         {%Wait{actions: [spec: spec]}, state}
       else
@@ -188,7 +188,7 @@ defmodule Boombox.WebRTC do
   end
 
   defp resolve_signaling(
-         %WebRTC.SignalingChannel{} = signaling,
+         %WebRTC.Signaling{} = signaling,
          _direction,
          _utility_supervisor
        ) do
@@ -202,7 +202,7 @@ defmodule Boombox.WebRTC do
   end
 
   defp resolve_signaling({:whip, uri, opts}, :output, utility_supervisor) do
-    signaling = WebRTC.SignalingChannel.new()
+    signaling = WebRTC.Signaling.new()
 
     Membrane.UtilitySupervisor.start_link_child(
       utility_supervisor,
@@ -221,7 +221,7 @@ defmodule Boombox.WebRTC do
   end
 
   defp setup_whip_server(opts, utility_supervisor) do
-    signaling = WebRTC.SignalingChannel.new()
+    signaling = WebRTC.Signaling.new()
     clients_cnt = :atomics.new(1, [])
     {valid_token, opts} = Keyword.pop(opts, :token)
 

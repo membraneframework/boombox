@@ -509,7 +509,7 @@ System.shell("ffplay #{out_dir}/rtmp_to_mp4.mp4")
 ## Stream MP4 via WebRTC, receive it and record to MP4 again
 
 ```elixir
-signaling = Membrane.WebRTC.SignalingChannel.new()
+signaling = Membrane.WebRTC.Signaling.new()
 
 t =
   Task.async(fn ->
