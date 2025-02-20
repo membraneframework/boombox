@@ -151,7 +151,7 @@ defmodule Boombox.BrowserTest do
   end
 
   @tag :xd
-  test "boombox -> browser (bouncing logo)",  %{browser: browser} do
+  test "boombox -> browser (bouncing logo)", %{browser: browser} do
     overlay =
       __DIR__
       |> Path.join("fixtures/logo.png")
