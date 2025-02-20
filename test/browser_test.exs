@@ -150,7 +150,6 @@ defmodule Boombox.BrowserTest do
     end
   end
 
-  @tag :xd
   test "boombox -> browser (bouncing logo)", %{browser: browser} do
     overlay =
       __DIR__
