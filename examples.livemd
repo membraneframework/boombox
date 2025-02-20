@@ -12,6 +12,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 
 # MIX_INSTALL_CONFIG_BEGIN
 boombox = {:boombox, github: "membraneframework/boombox"}
+
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
 # can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
 # MIX_INSTALL_CONFIG_END
@@ -90,7 +91,10 @@ To send the stream, visit http://localhost:1234/whip.html.
 Note: don't stop this cell to finish recording - click 'disconnect' or close the browser tab instead, so the recording is finalized properly.
 
 ```elixir
-Boombox.run(input: {:whip, "http://localhost:8829", token: "whip_it!"}, output: "#{out_dir}/webrtc_to_mp4.mp4")
+Boombox.run(
+  input: {:whip, "http://localhost:8829", token: "whip_it!"},
+  output: "#{out_dir}/webrtc_to_mp4.mp4"
+)
 ```
 
 ```elixir
