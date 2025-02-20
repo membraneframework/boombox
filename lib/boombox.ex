@@ -8,7 +8,7 @@ defmodule Boombox do
 
   alias Membrane.RTP
 
-  @type webrtc_signaling :: Membrane.WebRTC.SignalingChannel.t() | String.t()
+  @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
   @type in_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
@@ -186,7 +186,7 @@ defmodule Boombox do
       {:mp4, location} when is_binary(location) and direction == :output ->
         {:mp4, location}
 
-      {:webrtc, %Membrane.WebRTC.SignalingChannel{}} ->
+      {:webrtc, %Membrane.WebRTC.Signaling{}} ->
         value
 
       {:webrtc, uri} when is_binary(uri) ->
