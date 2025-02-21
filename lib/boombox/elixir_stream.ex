@@ -40,9 +40,10 @@ defmodule Boombox.ElixirStream do
           consumer :: pid,
           options :: Boombox.out_stream_opts(),
           Boombox.Pipeline.track_builders(),
-          Membrane.ChildrenSpec.t()
+          Membrane.ChildrenSpec.t(),
+          boolean()
         ) :: Ready.t()
-  def link_output(consumer, options, track_builders, spec_builder) do
+  def link_output(consumer, options, track_builders, spec_builder, enforce_transcoding?) do
     options = parse_options(options, :output)
 
     {track_builders, to_ignore} =
@@ -56,7 +57,8 @@ defmodule Boombox.ElixirStream do
           {:audio, builder} ->
             builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.RawAudio
+              output_stream_format: Membrane.RawAudio,
+              enforce_transcoding?: enforce_transcoding?
             })
             |> maybe_plug_resampler(options)
             |> via_in(Pad.ref(:input, :audio))
@@ -65,7 +67,8 @@ defmodule Boombox.ElixirStream do
           {:video, builder} ->
             builder
             |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.RawVideo
+              output_stream_format: Membrane.RawVideo,
+              enforce_transcoding?: enforce_transcoding?
             })
             |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
               format: :RGB
