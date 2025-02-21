@@ -4,6 +4,7 @@ defmodule Boombox do
 
   See `run/1` for details and [examples.livemd](examples.livemd) for examples.
   """
+  require Logger
   require Membrane.Time
 
   alias Membrane.RTP
@@ -124,6 +125,8 @@ defmodule Boombox do
         {key, value} -> {key, value}
       end)
 
+    :ok = maybe_log_transcoding_related_warning(opts)
+
     if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
       raise "#{key} is not provided"
     end
@@ -239,6 +242,24 @@ defmodule Boombox do
       nil -> raise ArgumentError, "Invalid #{direction} specification: #{inspect(value)}"
       value -> value
     end
+  end
+
+  defguardp is_webrtc_endpoint(endpoint)
+            when is_tuple(endpoint) and elem(endpoint, 0) in [:webrtc, :whip]
+
+  @spec maybe_log_transcoding_related_warning(opts_map()) :: :ok
+  def maybe_log_transcoding_related_warning(opts) do
+    if is_webrtc_endpoint(opts.output) and not is_webrtc_endpoint(opts.input) and
+         not opts.enforce_transcoding? do
+      Logger.warning("""
+      Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
+      might lead to issues with the output video if the output stream isn't sent only by localhost. You \
+      can solve this by setting `:enforce_transcoding?` option to `true`, but be aware that it will \
+      increase Boombox CPU usage.
+      """)
+    end
+
+    :ok
   end
 
   @spec consume_stream(Enumerable.t(), opts_map()) :: term()
