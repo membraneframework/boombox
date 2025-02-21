@@ -208,7 +208,7 @@ defmodule Boombox.WebRTC do
          _input_stream_format,
          vp8_negotiated?,
          h264_negotiated?,
-         true = _enforce_transcoding
+         true = _enforce_transcoding?
        ) do
     # if we have to perform transcoding one way or another, we always choose H264 if it is possilbe,
     # because H264 Encoder comsumes less CPU than VP8 Encoder
