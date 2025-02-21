@@ -54,9 +54,10 @@ defmodule Boombox.MP4 do
   @spec link_output(
           String.t(),
           Boombox.Pipeline.track_builders(),
-          Membrane.ChildrenSpec.t()
+          Membrane.ChildrenSpec.t(),
+          boolean()
         ) :: Ready.t()
-  def link_output(location, track_builders, spec_builder) do
+  def link_output(location, track_builders, spec_builder, enforce_transcoding?) do
     spec =
       [
         spec_builder,
@@ -66,7 +67,8 @@ defmodule Boombox.MP4 do
           {:audio, builder} ->
             builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.AAC
+              output_stream_format: Membrane.AAC,
+              enforce_transcoding?: enforce_transcoding?
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
@@ -90,7 +92,8 @@ defmodule Boombox.MP4 do
 
                 _not_h26x ->
                   %H264{stream_structure: :avc3, alignment: :au}
-              end
+              end,
+              enforce_transcoding?: enforce_transcoding?
             })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)

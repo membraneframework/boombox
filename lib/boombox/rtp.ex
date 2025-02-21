@@ -122,9 +122,10 @@ defmodule Boombox.RTP do
   @spec link_output(
           Boombox.out_rtp_opts(),
           Boombox.Pipeline.track_builders(),
-          Membrane.ChildrenSpec.t()
+          Membrane.ChildrenSpec.t(),
+          boolean()
         ) :: Ready.t()
-  def link_output(opts, track_builders, spec_builder) do
+  def link_output(opts, track_builders, spec_builder, enforce_transcoding?) do
     parsed_opts = validate_and_parse_options(:output, opts)
 
     spec = [
@@ -164,7 +165,8 @@ defmodule Boombox.RTP do
 
         builder
         |> child({:rtp_transcoder, media_type}, %Membrane.Transcoder{
-          output_stream_format: output_stream_format
+          output_stream_format: output_stream_format,
+          enforce_transcoding?: enforce_transcoding?
         })
         |> child({:rtp_out_parser, media_type}, parser)
         |> child({:rtp_payloader, media_type}, payloader)

@@ -4,6 +4,7 @@ defmodule Boombox do
 
   See `run/1` for details and [examples.livemd](examples.livemd) for examples.
   """
+  require Logger
   require Membrane.Time
 
   alias Membrane.RTP
@@ -85,7 +86,7 @@ defmodule Boombox do
           | {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
-  @typep opts_map :: %{input: input(), output: output()}
+  @typep opts_map :: %{input: input(), output: output(), enforce_transcoding?: boolean()}
 
   @doc """
   Runs boombox with given input and output.
@@ -101,13 +102,32 @@ defmodule Boombox do
 
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
-  """
-  @spec run(Enumerable.t() | nil, input: input(), output: output()) :: :ok | Enumerable.t()
-  def run(stream \\ nil, opts) do
-    opts_keys = [:input, :output]
-    opts = Keyword.validate!(opts, opts_keys) |> Map.new(fn {k, v} -> {k, parse_opt!(k, v)} end)
 
-    if key = Enum.find(opts_keys, fn k -> not is_map_key(opts, k) end) do
+  If `:enforce_transcoding?` options is set to `true`, boombox will perform audio and/or video
+  transcoding, even if it is not necessary. By default this option is set to `false`.
+
+  ```
+  Boombox.run(input: "path/to/file.mp4", output: {:webrtc, "ws://0.0.0.0:1234"}, enforce_transcoding?: true)
+  ```
+  """
+  @spec run(Enumerable.t() | nil,
+          input: input(),
+          output: output(),
+          enforce_transcoding?: boolean()
+        ) :: :ok | Enumerable.t()
+  @endpoint_opts [:input, :output]
+  def run(stream \\ nil, opts) do
+    opts =
+      opts
+      |> Keyword.validate!(@endpoint_opts ++ [enforce_transcoding?: false])
+      |> Map.new(fn
+        {key, value} when key in @endpoint_opts -> {key, parse_endpoint_opt!(key, value)}
+        {key, value} -> {key, value}
+      end)
+
+    :ok = maybe_log_transcoding_related_warning(opts)
+
+    if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
       raise "#{key} is not provided"
     end
 
@@ -155,9 +175,9 @@ defmodule Boombox do
     end
   end
 
-  @spec parse_opt!(:input, input()) :: input()
-  @spec parse_opt!(:output, output()) :: output()
-  defp parse_opt!(direction, value) when is_binary(value) do
+  @spec parse_endpoint_opt!(:input, input()) :: input()
+  @spec parse_endpoint_opt!(:output, output()) :: output()
+  defp parse_endpoint_opt!(direction, value) when is_binary(value) do
     uri = URI.parse(value)
     scheme = uri.scheme
     extension = if uri.path, do: Path.extname(uri.path)
@@ -170,14 +190,14 @@ defmodule Boombox do
       {nil, ".m3u8", :output} -> {:hls, value}
       _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
-    |> then(&parse_opt!(direction, &1))
+    |> then(&parse_endpoint_opt!(direction, &1))
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_opt!(direction, value) when is_tuple(value) do
+  defp parse_endpoint_opt!(direction, value) when is_tuple(value) do
     case value do
       {:mp4, location} when is_binary(location) and direction == :input ->
-        parse_opt!(:input, {:mp4, location, []})
+        parse_endpoint_opt!(:input, {:mp4, location, []})
 
       {:mp4, location, opts} when is_binary(location) and direction == :input ->
         if Keyword.keyword?(opts),
@@ -193,7 +213,7 @@ defmodule Boombox do
         value
 
       {:whip, uri} when is_binary(uri) ->
-        parse_opt!(direction, {:whip, uri, []})
+        parse_endpoint_opt!(direction, {:whip, uri, []})
 
       {:whip, uri, opts} when is_binary(uri) and is_list(opts) ->
         if Keyword.keyword?(opts) do
@@ -222,6 +242,24 @@ defmodule Boombox do
       nil -> raise ArgumentError, "Invalid #{direction} specification: #{inspect(value)}"
       value -> value
     end
+  end
+
+  defguardp is_webrtc_endpoint(endpoint)
+            when is_tuple(endpoint) and elem(endpoint, 0) in [:webrtc, :whip]
+
+  @spec maybe_log_transcoding_related_warning(opts_map()) :: :ok
+  def maybe_log_transcoding_related_warning(opts) do
+    if is_webrtc_endpoint(opts.output) and not is_webrtc_endpoint(opts.input) and
+         not opts.enforce_transcoding? do
+      Logger.warning("""
+      Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
+      might lead to issues with the output video if the output stream isn't sent only by localhost. You \
+      can solve this by setting `:enforce_transcoding?` option to `true`, but be aware that it will \
+      increase Boombox CPU usage.
+      """)
+    end
+
+    :ok
   end
 
   @spec consume_stream(Enumerable.t(), opts_map()) :: term()
