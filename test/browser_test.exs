@@ -107,17 +107,15 @@ defmodule Boombox.BrowserTest do
     assert size > 400_000
   end
 
-  for first <- [:ingress, :egress], transcoding? <- [true, false] do
-    test "browser -> boombox -> browser, but #{first} browser page connects first and :enforce_transcoding? is set to #{transcoding?}",
-         %{
-           browser: browser
-         } do
+  for first <- [:ingress, :egress] do
+    test "browser -> boombox -> browser, but #{first} browser page connects first", %{
+      browser: browser
+    } do
       boombox_task =
         Task.async(fn ->
           Boombox.run(
             input: {:webrtc, "ws://localhost:8829"},
-            output: {:webrtc, "ws://localhost:8830"},
-            enforce_transcoding?: unquote(transcoding?)
+            output: {:webrtc, "ws://localhost:8830"}
           )
         end)
 

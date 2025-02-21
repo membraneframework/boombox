@@ -11,10 +11,9 @@ defmodule Boombox.HLS do
   @spec link_output(
           Path.t(),
           Boombox.Pipeline.track_builders(),
-          Membrane.ChildrenSpec.t(),
-          boolean()
+          Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(location, track_builders, spec_builder, enforce_transcoding?) do
+  def link_output(location, track_builders, spec_builder) do
     {directory, manifest_name} =
       if Path.extname(location) == ".m3u8" do
         {Path.dirname(location), Path.basename(location, ".m3u8")}
@@ -45,8 +44,7 @@ defmodule Boombox.HLS do
           {:audio, builder} ->
             builder
             |> child(:hls_audio_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.AAC,
-              enforce_transcoding?: enforce_transcoding?
+              output_stream_format: Membrane.AAC
             })
             |> via_in(Pad.ref(:input, :audio),
               options: [encoding: :AAC, segment_duration: Time.milliseconds(2000)]
@@ -56,8 +54,7 @@ defmodule Boombox.HLS do
           {:video, builder} ->
             builder
             |> child(:hls_video_transcoder, %Membrane.Transcoder{
-              output_stream_format: %H264{alignment: :au, stream_structure: :avc3},
-              enforce_transcoding?: enforce_transcoding?
+              output_stream_format: %H264{alignment: :au, stream_structure: :avc3}
             })
             |> via_in(Pad.ref(:input, :video),
               options: [encoding: :H264, segment_duration: Time.milliseconds(2000)]

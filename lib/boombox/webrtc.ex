@@ -33,15 +33,8 @@ defmodule Boombox.WebRTC do
         %{negotiated_video_codecs: [codec]} ->
           {codec, [:h264, :vp8]}
 
-        %{negotiated_video_codecs: [_codec_1, _codec_2] = codecs}
-        when state.enforce_transcoding? ->
-          # we prefer H264 here because H264 Encoder cosumes less CPU than VP8 Encoder
-          {:h264, codecs}
-
-        %{negotiated_video_codecs: [_codec_1, _codec_2] = codecs} ->
-          # if we don't have to encode the video, we choose VP8 because sometimes there
-          # are some bugs in H264 support in Chrome
-          {:vp8, codecs}
+        %{negotiated_video_codecs: both} when is_list(both) ->
+          {:vp8, both}
       end
 
     spec =
@@ -155,8 +148,7 @@ defmodule Boombox.WebRTC do
         {:audio, builder} ->
           builder
           |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
-            output_stream_format: Membrane.Opus,
-            enforce_transcoding?: state.enforce_transcoding?
+            output_stream_format: Membrane.Opus
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
@@ -185,8 +177,7 @@ defmodule Boombox.WebRTC do
 
               _format when vp8_negotiated? ->
                 VP8
-            end,
-            enforce_transcoding?: state.enforce_transcoding?
+            end
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)
