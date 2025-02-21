@@ -33,14 +33,7 @@ defmodule Boombox.WebRTC do
         %{negotiated_video_codecs: [codec]} ->
           {codec, [:h264, :vp8]}
 
-        %{negotiated_video_codecs: [_codec_1, _codec_2] = codecs}
-        when state.enforce_transcoding? ->
-          # we prefer H264 here because H264 Encoder cosumes less CPU than VP8 Encoder
-          {:h264, codecs}
-
         %{negotiated_video_codecs: [_codec_1, _codec_2] = codecs} ->
-          # if we don't have to encode the video, we choose VP8 because sometimes there
-          # are some bugs in H264 support in Chrome
           {:vp8, codecs}
       end
 
@@ -170,22 +163,13 @@ defmodule Boombox.WebRTC do
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
           |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
-            output_stream_format: fn
-              %H264{} = h264 when h264_negotiated? ->
-                %H264{h264 | alignment: :nalu, stream_structure: :annexb}
-
-              %VP8{} = vp8 when vp8_negotiated? ->
-                vp8
-
-              %RemoteStream{content_format: VP8, type: :packetized} when vp8_negotiated? ->
-                VP8
-
-              _format when h264_negotiated? ->
-                %H264{alignment: :nalu, stream_structure: :annexb}
-
-              _format when vp8_negotiated? ->
-                VP8
-            end,
+            output_stream_format:
+              &resolve_output_video_codec(
+                &1,
+                vp8_negotiated?,
+                h264_negotiated?,
+                state.enforce_transcoding?
+              ),
             enforce_transcoding?: state.enforce_transcoding?
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
@@ -194,6 +178,44 @@ defmodule Boombox.WebRTC do
     ]
 
     %Ready{actions: [spec: spec], eos_info: Map.values(tracks)}
+  end
+
+  defp resolve_output_video_codec(
+         input_stream_format,
+         vp8_negotiated?,
+         h264_negotiated?,
+         false = _enforce_transcoding?
+       ) do
+    case input_stream_format do
+      %H264{} = h264 when h264_negotiated? ->
+        %H264{h264 | alignment: :nalu, stream_structure: :annexb}
+
+      %VP8{} = vp8 when vp8_negotiated? ->
+        vp8
+
+      %RemoteStream{content_format: VP8, type: :packetized} when vp8_negotiated? ->
+        VP8
+
+      _format when h264_negotiated? ->
+        %H264{alignment: :nalu, stream_structure: :annexb}
+
+      _format when vp8_negotiated? ->
+        VP8
+    end
+  end
+
+  defp resolve_output_video_codec(
+         _input_stream_format,
+         vp8_negotiated?,
+         h264_negotiated?,
+         true = _enforce_transcoding
+       ) do
+    # if we have to perform transcoding one way or another, we always choose H264 if it is possilbe,
+    # because H264 Encoder comsumes less CPU than VP8 Encoder
+    cond do
+      h264_negotiated? -> %H264{alignment: :nalu, stream_structure: :annexb}
+      vp8_negotiated? -> VP8
+    end
   end
 
   defp resolve_signaling(
