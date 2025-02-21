@@ -108,10 +108,6 @@ defmodule Boombox.BrowserTest do
   end
 
   for first <- [:ingress, :egress], transcoding? <- [true, false] do
-    if first == :ingress and transcoding? == true do
-      @tag :a
-    end
-
     test "browser -> boombox -> browser, but #{first} browser page connects first and :enforce_transcoding? is set to #{transcoding?}",
          %{
            browser: browser
