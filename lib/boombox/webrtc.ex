@@ -164,7 +164,7 @@ defmodule Boombox.WebRTC do
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
           |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
             output_stream_format:
-              &resolve_output_video_codec(
+              &resolve_output_video_stream_format(
                 &1,
                 vp8_negotiated?,
                 h264_negotiated?,
@@ -180,7 +180,7 @@ defmodule Boombox.WebRTC do
     %Ready{actions: [spec: spec], eos_info: Map.values(tracks)}
   end
 
-  defp resolve_output_video_codec(
+  defp resolve_output_video_stream_format(
          input_stream_format,
          vp8_negotiated?,
          h264_negotiated?,
@@ -204,7 +204,7 @@ defmodule Boombox.WebRTC do
     end
   end
 
-  defp resolve_output_video_codec(
+  defp resolve_output_video_stream_format(
          _input_stream_format,
          vp8_negotiated?,
          h264_negotiated?,
