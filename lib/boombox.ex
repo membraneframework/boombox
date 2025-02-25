@@ -126,7 +126,7 @@ defmodule Boombox do
           output: output(),
           enforce_video_transcoding?: boolean(),
           enforce_audio_transcoding?: boolean()
-       ) :: :ok | Enumerable.t()
+        ) :: :ok | Enumerable.t()
   @endpoint_opts [:input, :output]
   def run(stream \\ nil, opts) do
     opts =
