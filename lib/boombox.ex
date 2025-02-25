@@ -86,7 +86,12 @@ defmodule Boombox do
           | {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
-  @typep opts_map :: %{input: input(), output: output(), enforce_transcoding?: boolean()}
+  @typep opts_map :: %{
+           input: input(),
+           output: output(),
+           enforce_video_transcoding?: boolean(),
+           enforce_audio_transcoding?: boolean()
+         }
 
   @doc """
   Runs boombox with given input and output.
@@ -103,23 +108,36 @@ defmodule Boombox do
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
 
-  If `:enforce_transcoding?` options is set to `true`, boombox will perform audio and/or video
-  transcoding, even if it is not necessary. By default this option is set to `false`.
+  If `:enforce_audio_transcoding?` or `:enforce_video_transcoding?` option is set to `true`,
+  boombox will perform audio and/or video transcoding, even if it is not necessary. By default
+  both options are set to `false`.
 
   ```
-  Boombox.run(input: "path/to/file.mp4", output: {:webrtc, "ws://0.0.0.0:1234"}, enforce_transcoding?: true)
+  Boombox.run(
+    input: "path/to/file.mp4",
+    output: {:webrtc, "ws://0.0.0.0:1234"},
+    enforce_video_transcoding?: true,
+    enforce_audio_transcoding?: true
+  )
   ```
   """
   @spec run(Enumerable.t() | nil,
           input: input(),
           output: output(),
-          enforce_transcoding?: boolean()
-        ) :: :ok | Enumerable.t()
+          enforce_video_transcoding?: boolean(),
+          enforce_audio_transcoding?: boolean()
+       ) :: :ok | Enumerable.t()
   @endpoint_opts [:input, :output]
   def run(stream \\ nil, opts) do
     opts =
       opts
-      |> Keyword.validate!(@endpoint_opts ++ [enforce_transcoding?: false])
+      |> Keyword.validate!(
+        @endpoint_opts ++
+          [
+            enforce_video_transcoding?: false,
+            enforce_audio_transcoding?: false
+          ]
+      )
       |> Map.new(fn
         {key, value} when key in @endpoint_opts -> {key, parse_endpoint_opt!(key, value)}
         {key, value} -> {key, value}
@@ -250,12 +268,12 @@ defmodule Boombox do
   @spec maybe_log_transcoding_related_warning(opts_map()) :: :ok
   def maybe_log_transcoding_related_warning(opts) do
     if is_webrtc_endpoint(opts.output) and not is_webrtc_endpoint(opts.input) and
-         not opts.enforce_transcoding? do
+         not opts.enforce_video_transcoding? do
       Logger.warning("""
       Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
       might lead to issues with the output video if the output stream isn't sent only by localhost. You \
-      can solve this by setting `:enforce_transcoding?` option to `true`, but be aware that it will \
-      increase Boombox CPU usage.
+      can solve this by setting `:enforce_audio_transcoding?` option to `true`, but be aware that it \
+      will increase Boombox CPU usage.
       """)
     end
 

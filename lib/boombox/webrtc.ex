@@ -149,7 +149,7 @@ defmodule Boombox.WebRTC do
           builder
           |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
             output_stream_format: Membrane.Opus,
-            enforce_transcoding?: state.enforce_transcoding?
+            enforce_transcoding?: state.enforce_audio_transcoding?
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
@@ -168,9 +168,9 @@ defmodule Boombox.WebRTC do
                 &1,
                 vp8_negotiated?,
                 h264_negotiated?,
-                state.enforce_transcoding?
+                state.enforce_video_transcoding?
               ),
-            enforce_transcoding?: state.enforce_transcoding?
+            enforce_transcoding?: state.enforce_video_transcoding?
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)

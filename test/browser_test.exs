@@ -108,16 +108,19 @@ defmodule Boombox.BrowserTest do
   end
 
   for first <- [:ingress, :egress], transcoding? <- [true, false] do
-    test "browser -> boombox -> browser, but #{first} browser page connects first and :enforce_transcoding? is set to #{transcoding?}",
+    test "browser -> boombox -> browser, but #{first} browser page connects first and :enforce_audio/video_transcoding? is set to #{transcoding?}",
          %{
            browser: browser
          } do
+      transcoding? = unquote(transcoding?)
+
       boombox_task =
         Task.async(fn ->
           Boombox.run(
             input: {:webrtc, "ws://localhost:8829"},
             output: {:webrtc, "ws://localhost:8830"},
-            enforce_transcoding?: unquote(transcoding?)
+            enforce_video_transcoding?: transcoding?,
+            enforce_audio_transcoding?: transcoding?
           )
         end)
 

@@ -5,7 +5,7 @@ defmodule Boombox.ElixirStream do
   require Membrane.Pad, as: Pad
 
   alias __MODULE__.{Sink, Source}
-  alias Boombox.Pipeline.Ready
+  alias Boombox.Pipeline.{Ready, State}
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
@@ -41,9 +41,9 @@ defmodule Boombox.ElixirStream do
           options :: Boombox.out_stream_opts(),
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t(),
-          boolean()
+          State.t()
         ) :: Ready.t()
-  def link_output(consumer, options, track_builders, spec_builder, enforce_transcoding?) do
+  def link_output(consumer, options, track_builders, spec_builder, state) do
     options = parse_options(options, :output)
 
     {track_builders, to_ignore} =
@@ -58,7 +58,7 @@ defmodule Boombox.ElixirStream do
             builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawAudio,
-              enforce_transcoding?: enforce_transcoding?
+              enforce_transcoding?: state.enforce_audio_transcoding?
             })
             |> maybe_plug_resampler(options)
             |> via_in(Pad.ref(:input, :audio))
@@ -68,7 +68,7 @@ defmodule Boombox.ElixirStream do
             builder
             |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawVideo,
-              enforce_transcoding?: enforce_transcoding?
+              enforce_transcoding?: state.enforce_video_transcoding?
             })
             |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
               format: :RGB

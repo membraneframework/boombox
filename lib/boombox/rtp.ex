@@ -4,7 +4,7 @@ defmodule Boombox.RTP do
 
   require Membrane.Pad
 
-  alias Boombox.Pipeline.Ready
+  alias Boombox.Pipeline.{Ready, State}
   alias Membrane.RTP
 
   @supported_encodings [audio: [:AAC, :Opus], video: [:H264, :H265]]
@@ -123,9 +123,9 @@ defmodule Boombox.RTP do
           Boombox.out_rtp_opts(),
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t(),
-          boolean()
+          State.t()
         ) :: Ready.t()
-  def link_output(opts, track_builders, spec_builder, enforce_transcoding?) do
+  def link_output(opts, track_builders, spec_builder, state) do
     parsed_opts = validate_and_parse_options(:output, opts)
 
     spec = [
@@ -138,12 +138,12 @@ defmodule Boombox.RTP do
       Enum.map(track_builders, fn {media_type, builder} ->
         track_config = parsed_opts.track_configs[media_type]
 
-        {output_stream_format, parser, payloader} =
+        {output_stream_format, parser, payloader, enforce_transcoding?} =
           case track_config.encoding_name do
             :H264 ->
               {%Membrane.H264{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H264.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
-               Membrane.RTP.H264.Payloader}
+               Membrane.RTP.H264.Payloader, state.enforce_video_transcoding?}
 
             :AAC ->
               {%Membrane.AAC{encapsulation: :none},
@@ -151,16 +151,16 @@ defmodule Boombox.RTP do
                %Membrane.RTP.AAC.Payloader{
                  mode: track_config.encoding_specific_params.aac_bitrate_mode,
                  frames_per_packet: 1
-               }}
+               }, state.enforce_video_transcoding?}
 
             :OPUS ->
               {Membrane.Opus, %Membrane.Opus.Parser{delimitation: :undelimit},
-               Membrane.RTP.Opus.Payloader}
+               Membrane.RTP.Opus.Payloader, state.enforce_audio_transcoding}
 
             :H265 ->
               {%Membrane.H265{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H265.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
-               Membrane.RTP.H265.Payloader}
+               Membrane.RTP.H265.Payloader, state.enforce_audio_transcoding}
           end
 
         builder
