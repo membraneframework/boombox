@@ -53,7 +53,14 @@ defmodule Boombox.Pipeline do
   defmodule State do
     @moduledoc false
 
-    @enforce_keys [:status, :input, :output, :parent]
+    @enforce_keys [
+      :status,
+      :input,
+      :output,
+      :parent,
+      :enforce_video_transcoding?,
+      :enforce_audio_transcoding?
+    ]
 
     defstruct @enforce_keys ++
                 [
@@ -95,7 +102,9 @@ defmodule Boombox.Pipeline do
             eos_info: term(),
             rtsp_state: Boombox.RTSP.state() | nil,
             parent: pid(),
-            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
+            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil,
+            enforce_video_transcoding?: boolean(),
+            enforce_audio_transcoding?: boolean()
           }
   end
 
@@ -105,6 +114,8 @@ defmodule Boombox.Pipeline do
       input: opts.input,
       output: opts.output,
       parent: opts.parent,
+      enforce_audio_transcoding?: opts.enforce_audio_transcoding?,
+      enforce_video_transcoding?: opts.enforce_video_transcoding?,
       status: :init
     }
 
@@ -356,20 +367,20 @@ defmodule Boombox.Pipeline do
     Boombox.WebRTC.link_output(track_builders, spec_builder, tracks, state)
   end
 
-  defp link_output({:mp4, location}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.MP4.link_output(location, track_builders, spec_builder)
+  defp link_output({:mp4, location}, track_builders, spec_builder, _ctx, state) do
+    Boombox.MP4.link_output(location, track_builders, spec_builder, state)
   end
 
-  defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.HLS.link_output(location, track_builders, spec_builder)
+  defp link_output({:hls, location}, track_builders, spec_builder, _ctx, state) do
+    Boombox.HLS.link_output(location, track_builders, spec_builder, state)
   end
 
-  defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.RTP.link_output(opts, track_builders, spec_builder)
+  defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, state) do
+    Boombox.RTP.link_output(opts, track_builders, spec_builder, state)
   end
 
   defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
-    Boombox.ElixirStream.link_output(state.parent, opts, track_builders, spec_builder)
+    Boombox.ElixirStream.link_output(state.parent, opts, track_builders, spec_builder, state)
   end
 
   # Wait between sending the last packet
