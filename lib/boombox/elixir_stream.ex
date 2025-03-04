@@ -5,12 +5,8 @@ defmodule Boombox.ElixirStream do
   require Membrane.Pad, as: Pad
 
   alias __MODULE__.{Sink, Source}
-<<<<<<< Updated upstream
   alias Boombox.Pipeline.Ready
-=======
-  alias Boombox.Pipeline.{Ready, State}
   alias Membrane.FFmpeg.SWScale
->>>>>>> Stashed changes
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
