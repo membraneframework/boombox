@@ -5,7 +5,12 @@ defmodule Boombox.ElixirStream do
   require Membrane.Pad, as: Pad
 
   alias __MODULE__.{Sink, Source}
+<<<<<<< Updated upstream
   alias Boombox.Pipeline.Ready
+=======
+  alias Boombox.Pipeline.{Ready, State}
+  alias Membrane.FFmpeg.SWScale
+>>>>>>> Stashed changes
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
@@ -21,7 +26,7 @@ defmodule Boombox.ElixirStream do
           {:video,
            get_child(:elixir_stream_source)
            |> via_out(Pad.ref(:output, :video))
-           |> child(%Membrane.FFmpeg.SWScale.Converter{format: :I420})
+           |> child(%SWScale.Converter{format: :I420})
            |> child(%Membrane.H264.FFmpeg.Encoder{profile: :baseline, preset: :ultrafast})}
 
         :audio ->
@@ -67,8 +72,10 @@ defmodule Boombox.ElixirStream do
             |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawVideo
             })
-            |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
-              format: :RGB
+            |> child(:elixir_stream_rgb_converter, %SWScale.Converter{
+              format: :RGB,
+              output_width: options[:video_width],
+              output_height: options[:video_height]
             })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:elixir_stream_sink)
