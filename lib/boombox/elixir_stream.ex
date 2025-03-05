@@ -93,7 +93,10 @@ defmodule Boombox.ElixirStream do
          do: @options_audio_keys,
          else: []
 
-    options = Keyword.validate!(options, [:video, :audio] ++ audio_keys) |> Map.new()
+    options =
+      options
+      |> Keyword.validate!([:video, :audio, :video_width, :video_height] ++ audio_keys)
+      |> Map.new()
 
     if options.audio == false and options.video == false do
       raise "Got audio and video options set to false. At least one track must be enabled."
