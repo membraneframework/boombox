@@ -101,12 +101,8 @@ defmodule Boombox.Bin do
 
   def_options input: [], output: [], parent: []
 
-  # for pad_name <- [:video_output, :audio_output] do
-  #   def_output_pad pad_name, accepted_format: _any, availability: :on_request, max_instances: 1
-  # end
-
-  def_output_pad :video_output, accepted_format: _any, availability: :on_request, max_instances: 1
-  def_output_pad :audio_output, accepted_format: _any, availability: :on_request, max_instances: 1
+  def_input_pad :video_input, accepted_format: _any, availability: :on_request, max_instances: 1
+  def_input_pad :audio_input, accepted_format: _any, availability: :on_request, max_instances: 1
 
   @impl true
   def handle_init(ctx, opts) do
