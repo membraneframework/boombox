@@ -99,7 +99,7 @@ defmodule Boombox.Bin do
           }
   end
 
-  def_options input: [], output: [], parent: []
+  def_options input: [default: :membrane_pad], output: [], parent: []
 
   def_input_pad :video_input, accepted_format: _any, availability: :on_request, max_instances: 1
   def_input_pad :audio_input, accepted_format: _any, availability: :on_request, max_instances: 1
@@ -115,6 +115,21 @@ defmodule Boombox.Bin do
 
     proceed(ctx, state)
   end
+
+  @impl true
+  def handle_pad_added(pad_ref, ctx, state) when state.input == :membrane_pad do
+    Boombox.Pad.handle_pad_added(pad_ref, ctx)
+    |> proceed_result(ctx, state)
+  end
+
+  @impl true
+  def handle_playing(ctx, state) when state.input == :membrane_pad do
+    Boombox.Pad.handle_playing(ctx)
+    |> proceed_result(ctx, state)
+  end
+
+  @impl true
+  def handle_playing(_ctx, state), do: {[], state}
 
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do

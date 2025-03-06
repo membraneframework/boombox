@@ -9,12 +9,12 @@ defmodule Boombox.Pad do
 
   require Membrane.Pad
 
-  @spec handle_input_pad_added(Membrane.Pad.ref(), CallbackContext.t()) :: Wait.t() | no_return()
-  def handle_input_pad_added(_pad_ref, ctx) when ctx.playback == :playing do
+  @spec handle_pad_added(Membrane.Pad.ref(), CallbackContext.t()) :: Wait.t() | no_return()
+  def handle_pad_added(_pad_ref, ctx) when ctx.playback == :playing do
     raise "error"
   end
 
-  def handle_input_pad_added(pad_ref, _ctx) do
+  def handle_pad_added(pad_ref, _ctx) do
     spec =
       bin_input(pad_ref)
       |> child({:pad_connector, pad_ref}, Connector)
