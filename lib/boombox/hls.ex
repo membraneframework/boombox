@@ -4,13 +4,13 @@ defmodule Boombox.HLS do
   import Membrane.ChildrenSpec
 
   require Membrane.Pad, as: Pad
-  alias Boombox.Pipeline.Ready
+  alias Boombox.Bin.Ready
   alias Membrane.H264
   alias Membrane.Time
 
   @spec link_output(
           Path.t(),
-          Boombox.Pipeline.track_builders(),
+          Boombox.Bin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, spec_builder) do

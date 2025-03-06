@@ -3,7 +3,7 @@ defmodule Boombox.WebRTC do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
-  alias Boombox.Pipeline.{Ready, State, Wait}
+  alias Boombox.Bin.{Ready, State, Wait}
   alias Membrane.{H264, RemoteStream, VP8, WebRTC}
   alias Membrane.Pipeline.CallbackContext
 
@@ -109,7 +109,7 @@ defmodule Boombox.WebRTC do
   end
 
   @spec link_output(
-          Boombox.Pipeline.track_builders(),
+          Boombox.Bin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
           State.t()
@@ -124,7 +124,7 @@ defmodule Boombox.WebRTC do
   end
 
   @spec handle_output_tracks_negotiated(
-          Boombox.Pipeline.track_builders(),
+          Boombox.Bin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
           State.t()

@@ -3,7 +3,7 @@ defmodule Boombox.MP4 do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
-  alias Boombox.Pipeline.{Ready, Wait}
+  alias Boombox.Bin.{Ready, Wait}
   alias Membrane.H264
   alias Membrane.H265
 
@@ -53,7 +53,7 @@ defmodule Boombox.MP4 do
 
   @spec link_output(
           String.t(),
-          Boombox.Pipeline.track_builders(),
+          Boombox.Bin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, spec_builder) do
