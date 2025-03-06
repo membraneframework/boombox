@@ -6,6 +6,7 @@ defmodule Boombox.ElixirStream do
 
   alias __MODULE__.{Sink, Source}
   alias Boombox.Pipeline.Ready
+  alias Membrane.FFmpeg.SWScale
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
@@ -21,7 +22,7 @@ defmodule Boombox.ElixirStream do
           {:video,
            get_child(:elixir_stream_source)
            |> via_out(Pad.ref(:output, :video))
-           |> child(%Membrane.FFmpeg.SWScale.Converter{format: :I420})
+           |> child(%SWScale.Converter{format: :I420})
            |> child(%Membrane.H264.FFmpeg.Encoder{profile: :baseline, preset: :ultrafast})}
 
         :audio ->
@@ -67,8 +68,10 @@ defmodule Boombox.ElixirStream do
             |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawVideo
             })
-            |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
-              format: :RGB
+            |> child(:elixir_stream_rgb_converter, %SWScale.Converter{
+              format: :RGB,
+              output_width: options[:video_width],
+              output_height: options[:video_height]
             })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:elixir_stream_sink)
@@ -90,7 +93,10 @@ defmodule Boombox.ElixirStream do
          do: @options_audio_keys,
          else: []
 
-    options = Keyword.validate!(options, [:video, :audio] ++ audio_keys) |> Map.new()
+    options =
+      options
+      |> Keyword.validate!([:video, :audio, :video_width, :video_height] ++ audio_keys)
+      |> Map.new()
 
     if options.audio == false and options.video == false do
       raise "Got audio and video options set to false. At least one track must be enabled."
