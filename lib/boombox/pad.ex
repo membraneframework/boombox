@@ -4,14 +4,14 @@ defmodule Boombox.Pad do
   import Membrane.ChildrenSpec
 
   alias Boombox.Bin.{Ready, Wait}
-  alias Membrane.Bin.CallbackContext
+  alias Membrane.Bin.{Action, CallbackContext}
   alias Membrane.Connector
 
   require Membrane.Pad
 
-  @spec handle_pad_added(Membrane.Pad.ref(), CallbackContext.t()) :: Wait.t() | no_return()
+  @spec handle_pad_added(Membrane.Pad.ref(), CallbackContext.t()) :: [Action.t()] | no_return()
   def handle_pad_added(_pad_ref, ctx) when ctx.playback == :playing do
-    raise "error"
+    raise "error pad added too late"
   end
 
   def handle_pad_added(pad_ref, _ctx) do
@@ -19,15 +19,15 @@ defmodule Boombox.Pad do
       bin_input(pad_ref)
       |> child({:pad_connector, pad_ref}, Connector)
 
-    %Wait{actions: [spec: spec]}
+    [spec: spec]
   end
 
-  @spec handle_playing(CallbackContext.t()) :: Ready.t() | no_return()
-  def handle_playing(ctx) when ctx.pads == %{} do
-    raise "error"
+  @spec create_input(CallbackContext.t()) :: Ready.t() | Wait.t() | no_return()
+  def create_input(ctx) when ctx.playback == :playing and ctx.pads == %{} do
+    raise "error no pads"
   end
 
-  def handle_playing(ctx) do
+  def create_input(ctx) when ctx.playback == :playing do
     track_builders =
       ctx.pads
       |> Map.new(fn {pad_ref, _pad_data} ->
@@ -41,5 +41,9 @@ defmodule Boombox.Pad do
       end)
 
     %Ready{track_builders: track_builders}
+  end
+
+  def create_input(ctx) when ctx.playback == :stopped do
+    %Wait{}
   end
 end

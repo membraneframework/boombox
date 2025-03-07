@@ -101,8 +101,15 @@ defmodule Boombox.Bin do
 
   def_options input: [default: :membrane_pad], output: [], parent: []
 
-  def_input_pad :video_input, accepted_format: _any, availability: :on_request, max_instances: 1
-  def_input_pad :audio_input, accepted_format: _any, availability: :on_request, max_instances: 1
+  def_input_pad :video_input,
+    accepted_format: video_format when Membrane.Transcoder.Video.is_video_format(video_format),
+    availability: :on_request,
+    max_instances: 1
+
+  def_input_pad :audio_input,
+    accepted_format: audio_format when Membrane.Transcoder.Audio.is_audio_format(audio_format),
+    availability: :on_request,
+    max_instances: 1
 
   @impl true
   def handle_init(ctx, opts) do
@@ -124,8 +131,17 @@ defmodule Boombox.Bin do
 
   @impl true
   def handle_playing(ctx, state) when state.input == :membrane_pad do
-    Boombox.Pad.handle_playing(ctx)
-    |> proceed_result(ctx, state)
+    cond do
+      state.status in [:init, :awaiting_output] ->
+        {[], state}
+
+      state.status in [:output_ready, :awaiting_input] ->
+        Boombox.Pad.create_input(ctx)
+        |> proceed_result(ctx, state)
+
+      true ->
+        raise "internal boombox error"
+    end
   end
 
   @impl true
@@ -347,6 +363,10 @@ defmodule Boombox.Bin do
 
   defp create_input({:stream, params}, _ctx, state) do
     Boombox.ElixirStream.create_input(state.parent, params)
+  end
+
+  defp create_input(:membrane_pad, ctx, _state) do
+    Boombox.Pad.create_input(ctx)
   end
 
   @spec create_output(Boombox.output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
