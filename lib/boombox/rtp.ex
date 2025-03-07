@@ -143,7 +143,7 @@ defmodule Boombox.RTP do
             :H264 ->
               {%Membrane.H264{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H264.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
-               Membrane.RTP.H264.Payloader, state.enforce_video_transcoding?}
+               Membrane.RTP.H264.Payloader, state.enforce_transcoding in [true, :video]}
 
             :AAC ->
               {%Membrane.AAC{encapsulation: :none},
@@ -151,16 +151,16 @@ defmodule Boombox.RTP do
                %Membrane.RTP.AAC.Payloader{
                  mode: track_config.encoding_specific_params.aac_bitrate_mode,
                  frames_per_packet: 1
-               }, state.enforce_video_transcoding?}
+               }, state.enforce_transcoding in [true, :video]}
 
             :OPUS ->
               {Membrane.Opus, %Membrane.Opus.Parser{delimitation: :undelimit},
-               Membrane.RTP.Opus.Payloader, state.enforce_audio_transcoding}
+               Membrane.RTP.Opus.Payloader, state.enforce_transcoding in [true, :audio]}
 
             :H265 ->
               {%Membrane.H265{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H265.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
-               Membrane.RTP.H265.Payloader, state.enforce_audio_transcoding}
+               Membrane.RTP.H265.Payloader, state.enforce_transcoding in [true, :audio]}
           end
 
         builder

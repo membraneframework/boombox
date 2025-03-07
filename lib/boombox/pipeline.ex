@@ -58,8 +58,7 @@ defmodule Boombox.Pipeline do
       :input,
       :output,
       :parent,
-      :enforce_video_transcoding?,
-      :enforce_audio_transcoding?
+      :enforce_transcoding
     ]
 
     defstruct @enforce_keys ++
@@ -103,8 +102,7 @@ defmodule Boombox.Pipeline do
             rtsp_state: Boombox.RTSP.state() | nil,
             parent: pid(),
             output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil,
-            enforce_video_transcoding?: boolean(),
-            enforce_audio_transcoding?: boolean()
+            enforce_transcoding: Boombox.enforce_transcoding_value()
           }
   end
 
@@ -114,8 +112,7 @@ defmodule Boombox.Pipeline do
       input: opts.input,
       output: opts.output,
       parent: opts.parent,
-      enforce_audio_transcoding?: opts.enforce_audio_transcoding?,
-      enforce_video_transcoding?: opts.enforce_video_transcoding?,
+      enforce_transcoding: opts.enforce_transcoding,
       status: :init
     }
 

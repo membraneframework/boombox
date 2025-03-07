@@ -57,8 +57,7 @@ defmodule Boombox.ElixirStream do
           {:audio, builder} ->
             builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.RawAudio,
-              enforce_transcoding?: state.enforce_audio_transcoding?
+              output_stream_format: Membrane.RawAudio
             })
             |> maybe_plug_resampler(options)
             |> via_in(Pad.ref(:input, :audio))
@@ -68,7 +67,7 @@ defmodule Boombox.ElixirStream do
             builder
             |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawVideo,
-              enforce_transcoding?: state.enforce_video_transcoding?
+              enforce_transcoding?: state.enforce_transcoding in [true, :video]
             })
             |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
               format: :RGB

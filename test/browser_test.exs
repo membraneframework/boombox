@@ -118,9 +118,7 @@ defmodule Boombox.BrowserTest do
         Task.async(fn ->
           Boombox.run(
             input: {:webrtc, "ws://localhost:8829"},
-            output: {:webrtc, "ws://localhost:8830"},
-            enforce_video_transcoding?: transcoding?,
-            enforce_audio_transcoding?: transcoding?
+            output: {:webrtc, "ws://localhost:8830", enforce_transcoding: transcoding?}
           )
         end)
 
