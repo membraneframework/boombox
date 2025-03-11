@@ -25,7 +25,7 @@ defmodule Boombox.Utils.CLI do
     vps: {:string, :binary},
     whip: {:string, :string},
     token: {:string, :string},
-    enforce_transcoding: {:string, :atom}
+    enforce_transcoding: {:boolean, :boolean}
   ]
 
   @spec parse_argv([String.t()]) ::
@@ -95,6 +95,9 @@ defmodule Boombox.Utils.CLI do
 
       [{direction, true}, {endpoint, value} | opts] ->
         {direction, {endpoint, value, translate_opts(opts)}}
+
+      [{direction, value} | opts] ->
+        {direction, value, translate_opts(opts)}
 
       [{direction, value}] ->
         {direction, value}
