@@ -46,7 +46,7 @@ defmodule Boombox.HLS do
             builder
             |> child(:hls_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.AAC,
-              enforce_transcoding?: state.enforce_transcoding in [true, :audio]
+              force_transcoding?: state.force_transcoding in [true, :audio]
             })
             |> via_in(Pad.ref(:input, :audio),
               options: [encoding: :AAC, segment_duration: Time.milliseconds(2000)]
@@ -57,7 +57,7 @@ defmodule Boombox.HLS do
             builder
             |> child(:hls_video_transcoder, %Membrane.Transcoder{
               output_stream_format: %H264{alignment: :au, stream_structure: :avc3},
-              enforce_transcoding?: state.enforce_transcoding in [true, :video]
+              force_transcoding?: state.force_transcoding in [true, :video]
             })
             |> via_in(Pad.ref(:input, :video),
               options: [encoding: :H264, segment_duration: Time.milliseconds(2000)]

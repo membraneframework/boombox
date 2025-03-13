@@ -149,7 +149,7 @@ defmodule Boombox.WebRTC do
           builder
           |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
             output_stream_format: Membrane.Opus,
-            enforce_transcoding?: state.enforce_transcoding in [true, :audio]
+            force_transcoding?: state.force_transcoding in [true, :audio]
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
@@ -159,7 +159,7 @@ defmodule Boombox.WebRTC do
           negotiated_codecs = state.output_webrtc_state.negotiated_video_codecs
           vp8_negotiated? = :vp8 in negotiated_codecs
           h264_negotiated? = :h264 in negotiated_codecs
-          enforce_transcoding? = state.enforce_transcoding in [true, :video]
+          force_transcoding? = state.force_transcoding in [true, :video]
 
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
@@ -169,9 +169,9 @@ defmodule Boombox.WebRTC do
                 &1,
                 vp8_negotiated?,
                 h264_negotiated?,
-                enforce_transcoding?
+                force_transcoding?
               ),
-            enforce_transcoding?: enforce_transcoding?
+            force_transcoding?: force_transcoding?
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)
@@ -185,7 +185,7 @@ defmodule Boombox.WebRTC do
          input_stream_format,
          vp8_negotiated?,
          h264_negotiated?,
-         false = _enforce_transcoding?
+         false = _force_transcoding?
        ) do
     case input_stream_format do
       %H264{} = h264 when h264_negotiated? ->
@@ -210,7 +210,7 @@ defmodule Boombox.WebRTC do
          _input_stream_format,
          vp8_negotiated?,
          h264_negotiated?,
-         true = _enforce_transcoding?
+         true = _force_transcoding?
        ) do
     # if we have to perform transcoding one way or another, we always choose H264 if it is possilbe,
     # because H264 Encoder comsumes less CPU than VP8 Encoder

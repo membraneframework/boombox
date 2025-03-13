@@ -138,12 +138,12 @@ defmodule Boombox.RTP do
       Enum.map(track_builders, fn {media_type, builder} ->
         track_config = parsed_opts.track_configs[media_type]
 
-        {output_stream_format, parser, payloader, enforce_transcoding?} =
+        {output_stream_format, parser, payloader, force_transcoding?} =
           case track_config.encoding_name do
             :H264 ->
               {%Membrane.H264{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H264.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
-               Membrane.RTP.H264.Payloader, state.enforce_transcoding in [true, :video]}
+               Membrane.RTP.H264.Payloader, state.force_transcoding in [true, :video]}
 
             :AAC ->
               {%Membrane.AAC{encapsulation: :none},
@@ -151,22 +151,22 @@ defmodule Boombox.RTP do
                %Membrane.RTP.AAC.Payloader{
                  mode: track_config.encoding_specific_params.aac_bitrate_mode,
                  frames_per_packet: 1
-               }, state.enforce_transcoding in [true, :video]}
+               }, state.force_transcoding in [true, :video]}
 
             :OPUS ->
               {Membrane.Opus, %Membrane.Opus.Parser{delimitation: :undelimit},
-               Membrane.RTP.Opus.Payloader, state.enforce_transcoding in [true, :audio]}
+               Membrane.RTP.Opus.Payloader, state.force_transcoding in [true, :audio]}
 
             :H265 ->
               {%Membrane.H265{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H265.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
-               Membrane.RTP.H265.Payloader, state.enforce_transcoding in [true, :audio]}
+               Membrane.RTP.H265.Payloader, state.force_transcoding in [true, :audio]}
           end
 
         builder
         |> child({:rtp_transcoder, media_type}, %Membrane.Transcoder{
           output_stream_format: output_stream_format,
-          enforce_transcoding?: enforce_transcoding?
+          force_transcoding?: force_transcoding?
         })
         |> child({:rtp_out_parser, media_type}, parser)
         |> child({:rtp_payloader, media_type}, payloader)

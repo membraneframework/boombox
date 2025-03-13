@@ -67,7 +67,7 @@ defmodule Boombox.ElixirStream do
             builder
             |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawVideo,
-              enforce_transcoding?: state.enforce_transcoding in [true, :video]
+              force_transcoding?: state.force_transcoding in [true, :video]
             })
             |> child(:elixir_stream_rgb_converter, %Membrane.FFmpeg.SWScale.Converter{
               format: :RGB

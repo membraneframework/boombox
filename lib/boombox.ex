@@ -9,7 +9,7 @@ defmodule Boombox do
 
   alias Membrane.RTP
 
-  @type enforce_transcoding_value() :: boolean() | :audio | :video
+  @type force_transcoding_value() :: boolean() | :audio | :video
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
   @type in_stream_opts :: [
@@ -66,7 +66,7 @@ defmodule Boombox do
           | {:address, :inet.ip_address() | String.t()}
           | {:port, :inet.port_number()}
           | {:target, String.t()}
-          | {:enforce_transcoding, enforce_transcoding_value()}
+          | {:force_transcoding, force_transcoding_value()}
         ]
 
   @type input ::
@@ -82,12 +82,12 @@ defmodule Boombox do
   @type output ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t()}
-          | {:mp4, location :: String.t(), [{:enforce_transcoding, enforce_transcoding_value()}]}
+          | {:mp4, location :: String.t(), [{:force_transcoding, force_transcoding_value()}]}
           | {:webrtc, webrtc_signaling()}
-          | {:webrtc, webrtc_signaling(), [{:enforce_transcoding, enforce_transcoding_value()}]}
+          | {:webrtc, webrtc_signaling(), [{:force_transcoding, force_transcoding_value()}]}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [{:enforce_transcoding, enforce_transcoding_value()}]}
+          | {:hls, location :: String.t(), [{:force_transcoding, force_transcoding_value()}]}
           | {:rtp, out_rtp_opts()}
           | {:stream, out_stream_opts()}
 
@@ -135,7 +135,7 @@ defmodule Boombox do
       opts
       |> Keyword.validate!(@endpoint_opts)
       |> Map.new(fn {key, value} -> {key, parse_endpoint_opt!(key, value)} end)
-      |> resolve_enforce_transcoding()
+      |> resolve_force_transcoding()
 
     :ok = maybe_log_transcoding_related_warning(opts)
 
@@ -275,11 +275,11 @@ defmodule Boombox do
   @spec maybe_log_transcoding_related_warning(opts_map()) :: :ok
   def maybe_log_transcoding_related_warning(opts) do
     if is_webrtc_endpoint(opts.output) and not is_webrtc_endpoint(opts.input) and
-         opts.enforce_transcoding not in [true, :video] do
+         opts.force_transcoding not in [true, :video] do
       Logger.warning("""
       Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
       might lead to issues with the output video if the output stream isn't sent only by localhost. You \
-      can solve this by setting `:enforce_transcoding` output option to `true` or `:video`, but be aware \
+      can solve this by setting `:force_transcoding` output option to `true` or `:video`, but be aware \
       that it will increase Boombox CPU usage.
       """)
     end
@@ -421,17 +421,17 @@ defmodule Boombox do
     end
   end
 
-  defp resolve_enforce_transcoding(opts) do
+  defp resolve_force_transcoding(opts) do
     maybe_keyword =
       opts.output
       |> Tuple.to_list()
       |> List.last()
 
-    enforce_transcoding =
-      Keyword.keyword?(maybe_keyword) && Keyword.get(maybe_keyword, :enforce_transcoding, false)
+    force_transcoding =
+      Keyword.keyword?(maybe_keyword) && Keyword.get(maybe_keyword, :force_transcoding, false)
 
     opts
-    |> Map.put(:enforce_transcoding, enforce_transcoding)
+    |> Map.put(:force_transcoding, force_transcoding)
     |> Map.update!(:output, fn
       {:webrtc, signaling, _opts} -> {:webrtc, signaling}
       {:hls, location, _opts} -> {:hls, location}
