@@ -22,6 +22,8 @@ defmodule Boombox do
           | {:audio_format, Membrane.RawAudio.SampleFormat.t()}
           | {:audio_rate, Membrane.RawAudio.sample_rate_t()}
           | {:audio_channels, Membrane.RawAudio.channels_t()}
+          | {:video_width, non_neg_integer()}
+          | {:video_height, non_neg_integer()}
         ]
 
   @typedoc """
