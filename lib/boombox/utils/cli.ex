@@ -96,11 +96,11 @@ defmodule Boombox.Utils.CLI do
       [{direction, true}, {endpoint, value} | opts] ->
         {direction, {endpoint, value, translate_opts(opts)}}
 
-      [{direction, value} | opts] ->
-        {direction, value, translate_opts(opts)}
-
       [{direction, value}] ->
         {direction, value}
+
+      [{direction, value} | opts] ->
+        {direction, {value, translate_opts(opts)}}
 
       _other ->
         cli_exit_error()

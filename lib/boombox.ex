@@ -81,6 +81,7 @@ defmodule Boombox do
 
   @type output ::
           (path_or_uri :: String.t())
+          | {path_or_uri :: String.t(), [{:force_transcoding, force_transcoding_value()}]}
           | {:mp4, location :: String.t()}
           | {:mp4, location :: String.t(), [{:force_transcoding, force_transcoding_value()}]}
           | {:webrtc, webrtc_signaling()}
@@ -190,16 +191,20 @@ defmodule Boombox do
   @spec parse_endpoint_opt!(:input, input()) :: input()
   @spec parse_endpoint_opt!(:output, output()) :: output()
   defp parse_endpoint_opt!(direction, value) when is_binary(value) do
+    parse_endpoint_opt!(direction, {value, []})
+  end
+
+  defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
     uri = URI.parse(value)
     scheme = uri.scheme
     extension = if uri.path, do: Path.extname(uri.path)
 
     case {scheme, extension, direction} do
-      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value}
-      {nil, ".mp4", :output} -> {:mp4, value}
+      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value, opts}
+      {nil, ".mp4", :output} -> {:mp4, value, opts}
       {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
       {"rtsp", _ext, :input} -> {:rtsp, value}
-      {nil, ".m3u8", :output} -> {:hls, value}
+      {nil, ".m3u8", :output} -> {:hls, value, opts}
       _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
     |> then(&parse_endpoint_opt!(direction, &1))
