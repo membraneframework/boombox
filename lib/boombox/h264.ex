@@ -4,7 +4,8 @@ defmodule Boombox.H264 do
   alias Boombox.Pipeline.Ready
   alias Membrane.H264
 
-  @spec create_input(String.t(), transport: :file | :http) :: Wait.t()
+  @spec create_input(String.t(), transport: :file | :http, framerate: Membrane.H264.framerate()) ::
+          Ready.t()
   def create_input(location, opts) do
     spec =
       case opts[:transport] do
