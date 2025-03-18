@@ -16,7 +16,7 @@ defmodule Boombox.WAV do
             location: location,
             hackney_opts: [follow_redirect: true]
           })
-          |> child(:aac_parser, Membrane.WAV.Parser)
+          |> child(:wav_parser, Membrane.WAV.Parser)
       end
 
     %Ready{track_builders: [{:audio, spec}]}
@@ -37,11 +37,11 @@ defmodule Boombox.WAV do
 
     spec =
       audio_track_builder
-      |> child(:aac_audio_transcoder, %Membrane.Transcoder{
+      |> child(:wav_audio_transcoder, %Membrane.Transcoder{
         output_stream_format: Membrane.RawAudio
       })
-      |> child(:aac_parser, Membrane.WAV.Serializer)
-      |> child(:aac_file_sink, %Membrane.File.Sink{location: location})
+      |> child(:wav_parser, Membrane.WAV.Serializer)
+      |> child(:wav_file_sink, %Membrane.File.Sink{location: location})
 
     %Ready{actions: [spec: spec]}
   end
