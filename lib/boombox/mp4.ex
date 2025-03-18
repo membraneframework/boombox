@@ -3,13 +3,14 @@ defmodule Boombox.MP4 do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
-  alias Boombox.Pipeline.{Ready, State, Wait}
+  alias Boombox.Pipeline.{Ready, Wait}
   alias Membrane.H264
   alias Membrane.H265
 
   defguardp is_h26x(format) when is_struct(format) and format.__struct__ in [H264, H265]
 
-  @spec create_input(String.t(), transport: :file | :http) :: Wait.t()
+  @spec create_input(String.t(), [Boombox.force_transcoding() | {:transport, :file | :http}]) ::
+          Wait.t()
   def create_input(location, opts) do
     spec =
       case opts[:transport] do
@@ -53,11 +54,13 @@ defmodule Boombox.MP4 do
 
   @spec link_output(
           String.t(),
+          [Boombox.force_transcoding()],
           Boombox.Pipeline.track_builders(),
-          Membrane.ChildrenSpec.t(),
-          State.t()
+          Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(location, track_builders, spec_builder, state) do
+  def link_output(location, opts, track_builders, spec_builder) do
+    force_transcoding = opts |> Keyword.get(:force_transcoding, false)
+
     spec =
       [
         spec_builder,
@@ -68,7 +71,7 @@ defmodule Boombox.MP4 do
             builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.AAC,
-              force_transcoding?: state.force_transcoding in [true, :audio]
+              force_transcoding?: force_transcoding in [true, :audio]
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
@@ -93,7 +96,7 @@ defmodule Boombox.MP4 do
                 _not_h26x ->
                   %H264{stream_structure: :avc3, alignment: :au}
               end,
-              force_transcoding?: state.force_transcoding in [true, :video]
+              force_transcoding?: force_transcoding in [true, :video]
             })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)
