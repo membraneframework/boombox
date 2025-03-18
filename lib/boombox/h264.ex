@@ -41,7 +41,7 @@ defmodule Boombox.H264 do
     [{:video, video_track_builder}] =
       track_builders
       |> Enum.filter(fn
-        {:video, _track_builfer} -> true
+        {:video, _track_builder} -> true
         _other -> false
       end)
 
@@ -55,5 +55,3 @@ defmodule Boombox.H264 do
     %Ready{actions: [spec: spec]}
   end
 end
-
-# Boombox.run(input: {:h264, "input.h264"}, output: "out.mp4")
