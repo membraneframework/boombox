@@ -63,6 +63,7 @@ defmodule Boombox.Mixfile do
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
+      {:membrane_wav_plugin, "~> 0.10.1"},
       {:membrane_simple_rtsp_server, "~> 0.1.4", only: :test},
       {:image, "~> 0.54.0"},
       # {:playwright, "~> 1.49.1-alpha.1", only: :test},

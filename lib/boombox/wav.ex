@@ -1,23 +1,22 @@
-defmodule Boombox.AAC do
+defmodule Boombox.WAV do
   @moduledoc false
   import Membrane.ChildrenSpec
   alias Boombox.Pipeline.Ready
-  alias Membrane.AAC
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
   def create_input(location, opts) do
     spec =
       case opts[:transport] do
         :file ->
-          child(:aac_in_file_source, %Membrane.File.Source{location: location})
-          |> child(:aac_parser, Membrane.AAC.Parser)
+          child(:wav_in_file_source, %Membrane.File.Source{location: location})
+          |> child(:aac_parser, Membrane.WAV.Parser)
 
         :http ->
-          child(:aac_in_http_source, %Membrane.Hackney.Source{
+          child(:wav_in_http_source, %Membrane.Hackney.Source{
             location: location,
             hackney_opts: [follow_redirect: true]
           })
-          |> child(:aac_parser, Membrane.AAC.Parser)
+          |> child(:aac_parser, Membrane.WAV.Parser)
       end
 
     %Ready{track_builders: [{:audio, spec}]}
@@ -39,9 +38,9 @@ defmodule Boombox.AAC do
     spec =
       audio_track_builder
       |> child(:aac_audio_transcoder, %Membrane.Transcoder{
-        output_stream_format: %AAC{}
+        output_stream_format: Membrane.RawAudio
       })
-      |> child(:aac_parser, Membrane.AAC.Parser)
+      |> child(:aac_parser, Membrane.WAV.Serializer)
       |> child(:aac_file_sink, %Membrane.File.Sink{location: location})
 
     %Ready{actions: [spec: spec]}
