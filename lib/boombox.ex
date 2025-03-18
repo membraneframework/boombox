@@ -114,17 +114,10 @@ defmodule Boombox do
 
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
-
-  If `:enforce_audio_transcoding?` or `:enforce_video_transcoding?` option is set to `true`,
-  boombox will perform audio and/or video transcoding, even if it is not necessary. By default
-  both options are set to `false`.
-
   ```
   Boombox.run(
     input: "path/to/file.mp4",
-    output: {:webrtc, "ws://0.0.0.0:1234"},
-    enforce_video_transcoding?: true,
-    enforce_audio_transcoding?: true
+    output: {:webrtc, "ws://0.0.0.0:1234"}
   )
   ```
   """
