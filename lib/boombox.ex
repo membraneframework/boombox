@@ -70,6 +70,10 @@ defmodule Boombox do
   @type input ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
+          | {:h264, location :: String.t(),
+             transport: :file | :http, framerate: Membrane.H264.framerate()}
+          | {:aac, location :: String.t(), transport: :file | :http}
+          | {:wav, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
@@ -80,6 +84,9 @@ defmodule Boombox do
   @type output ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t()}
+          | {:h264, location :: String.t()}
+          | {:aac, location :: String.t()}
+          | {:wav, location :: String.t()}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
@@ -167,6 +174,12 @@ defmodule Boombox do
     case {scheme, extension, direction} do
       {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value}
       {nil, ".mp4", :output} -> {:mp4, value}
+      {scheme, ".h264", :input} when scheme in [nil, "http", "https"] -> {:h264, value}
+      {nil, ".h264", :output} -> {:h264, value}
+      {scheme, ".aac", :input} when scheme in [nil, "http", "https"] -> {:aac, value}
+      {nil, ".aac", :output} -> {:aac, value}
+      {scheme, ".wav", :input} when scheme in [nil, "http", "https"] -> {:wav, value}
+      {nil, ".wav", :output} -> {:wav, value}
       {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
       {"rtsp", _ext, :input} -> {:rtsp, value}
       {nil, ".m3u8", :output} -> {:hls, value}
@@ -187,6 +200,38 @@ defmodule Boombox do
 
       {:mp4, location} when is_binary(location) and direction == :output ->
         {:mp4, location}
+
+      {:h264, location} when is_binary(location) and direction == :input ->
+        parse_opt!(:input, {:h264, location, []})
+
+      {:h264, location, opts} when is_binary(location) and direction == :input ->
+        if Keyword.keyword?(opts),
+          do:
+            {:h264, location,
+             transport: resolve_transport(location, opts), framerate: opts[:framerate] || {30, 1}}
+
+      {:h264, location} when is_binary(location) and direction == :output ->
+        {:h264, location}
+
+      {:aac, location} when is_binary(location) and direction == :input ->
+        parse_opt!(:input, {:aac, location, []})
+
+      {:aac, location, opts} when is_binary(location) and direction == :input ->
+        if Keyword.keyword?(opts),
+          do: {:aac, location, transport: resolve_transport(location, opts)}
+
+      {:aac, location} when is_binary(location) and direction == :output ->
+        {:aac, location}
+
+      {:wav, location} when is_binary(location) and direction == :input ->
+        parse_opt!(:input, {:wav, location, []})
+
+      {:wav, location, opts} when is_binary(location) and direction == :input ->
+        if Keyword.keyword?(opts),
+          do: {:wav, location, transport: resolve_transport(location, opts)}
+
+      {:wav, location} when is_binary(location) and direction == :output ->
+        {:wav, location}
 
       {:webrtc, %Membrane.WebRTC.Signaling{}} ->
         value
@@ -341,7 +386,7 @@ defmodule Boombox do
 
   @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
   defp resolve_transport(location, opts) do
-    case Keyword.validate!(opts, transport: nil)[:transport] do
+    case Keyword.merge(opts, transport: nil)[:transport] do
       nil ->
         uri = URI.parse(location)
 

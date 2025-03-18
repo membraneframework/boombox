@@ -199,6 +199,21 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_element_end_of_stream(:h264_file_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
+  def handle_element_end_of_stream(:aac_file_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
+  def handle_element_end_of_stream(:wav_file_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
   def handle_element_end_of_stream(:udp_rtp_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
   end
@@ -313,6 +328,18 @@ defmodule Boombox.Pipeline do
     Boombox.MP4.create_input(location, opts)
   end
 
+  defp create_input({:h264, location, opts}, _ctx, _state) do
+    Boombox.H264.create_input(location, opts)
+  end
+
+  defp create_input({:aac, location, opts}, _ctx, _state) do
+    Boombox.AAC.create_input(location, opts)
+  end
+
+  defp create_input({:wav, location, opts}, _ctx, _state) do
+    Boombox.WAV.create_input(location, opts)
+  end
+
   defp create_input({:rtmp, src}, ctx, _state) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
@@ -358,6 +385,18 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:mp4, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.MP4.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:h264, location}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.H264.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:aac, location}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.AAC.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:wav, location}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.WAV.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
