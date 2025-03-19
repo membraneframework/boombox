@@ -33,8 +33,8 @@ defmodule Boombox.WebRTC do
         %{negotiated_video_codecs: [codec]} ->
           {codec, [:h264, :vp8]}
 
-        %{negotiated_video_codecs: both} when is_list(both) ->
-          {:vp8, both}
+        %{negotiated_video_codecs: [_codec_1, _codec_2] = codecs} ->
+          {:vp8, codecs}
       end
 
     spec =
@@ -109,14 +109,15 @@ defmodule Boombox.WebRTC do
   end
 
   @spec link_output(
+          [Boombox.force_transcoding()],
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
           State.t()
         ) :: Ready.t() | Wait.t()
-  def link_output(track_builders, spec_builder, tracks, state) do
+  def link_output(opts, track_builders, spec_builder, tracks, state) do
     if webrtc_input?(state) do
-      do_link_output(track_builders, spec_builder, tracks, state)
+      do_link_output(opts, track_builders, spec_builder, tracks, state)
     else
       tracks = Bunch.KVEnum.keys(track_builders)
       %Wait{actions: [notify_child: {:webrtc_output, {:add_tracks, tracks}}]}
@@ -124,22 +125,24 @@ defmodule Boombox.WebRTC do
   end
 
   @spec handle_output_tracks_negotiated(
+          [Boombox.force_transcoding()],
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
           State.t()
         ) :: Ready.t() | no_return()
-  def handle_output_tracks_negotiated(track_builders, spec_builder, tracks, state) do
+  def handle_output_tracks_negotiated(opts, track_builders, spec_builder, tracks, state) do
     if webrtc_input?(state) do
       raise """
       Currently ICE restart is not supported in Boombox instances having WebRTC input and output.
       """
     end
 
-    do_link_output(track_builders, spec_builder, tracks, state)
+    do_link_output(opts, track_builders, spec_builder, tracks, state)
   end
 
-  defp do_link_output(track_builders, spec_builder, tracks, state) do
+  defp do_link_output(opts, track_builders, spec_builder, tracks, state) do
+    force_transcoding = opts |> Keyword.get(:force_transcoding, false)
     tracks = Map.new(tracks, &{&1.kind, &1.id})
 
     spec = [
@@ -148,7 +151,8 @@ defmodule Boombox.WebRTC do
         {:audio, builder} ->
           builder
           |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
-            output_stream_format: Membrane.Opus
+            output_stream_format: Membrane.Opus,
+            force_transcoding?: force_transcoding in [true, :audio]
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
@@ -156,28 +160,20 @@ defmodule Boombox.WebRTC do
 
         {:video, builder} ->
           negotiated_codecs = state.output_webrtc_state.negotiated_video_codecs
-          vp8_negotiated? = :vp8 in negotiated_codecs
-          h264_negotiated? = :h264 in negotiated_codecs
+          force_video_transcoding? = force_transcoding in [true, :video]
 
           builder
           |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
           |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
-            output_stream_format: fn
-              %H264{} = h264 when h264_negotiated? ->
-                %H264{h264 | alignment: :nalu, stream_structure: :annexb}
-
-              %VP8{} = vp8 when vp8_negotiated? ->
-                vp8
-
-              %RemoteStream{content_format: VP8, type: :packetized} when vp8_negotiated? ->
-                VP8
-
-              _format when h264_negotiated? ->
-                %H264{alignment: :nalu, stream_structure: :annexb}
-
-              _format when vp8_negotiated? ->
-                VP8
-            end
+            output_stream_format: fn input_format ->
+              resolve_output_video_stream_format(
+                input_format,
+                :vp8 in negotiated_codecs,
+                :h264 in negotiated_codecs,
+                force_video_transcoding?
+              )
+            end,
+            force_transcoding?: force_video_transcoding?
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)
@@ -185,6 +181,45 @@ defmodule Boombox.WebRTC do
     ]
 
     %Ready{actions: [spec: spec], eos_info: Map.values(tracks)}
+  end
+
+  defp resolve_output_video_stream_format(
+         input_stream_format,
+         vp8_negotiated?,
+         h264_negotiated?,
+         false = _force_transcoding?
+       ) do
+    case input_stream_format do
+      %H264{} = h264 when h264_negotiated? ->
+        %H264{h264 | alignment: :nalu, stream_structure: :annexb}
+
+      %VP8{} = vp8 when vp8_negotiated? ->
+        vp8
+
+      %RemoteStream{content_format: VP8, type: :packetized} = remote_stream
+      when vp8_negotiated? ->
+        remote_stream
+
+      _format when h264_negotiated? ->
+        %H264{alignment: :nalu, stream_structure: :annexb}
+
+      _format when vp8_negotiated? ->
+        VP8
+    end
+  end
+
+  defp resolve_output_video_stream_format(
+         _input_stream_format,
+         vp8_negotiated?,
+         h264_negotiated?,
+         true = _force_transcoding?
+       ) do
+    # if we have to perform transcoding one way or another, we always choose H264 if it is possilbe,
+    # because H264 Encoder comsumes less CPU than VP8 Encoder
+    cond do
+      h264_negotiated? -> %H264{alignment: :nalu, stream_structure: :annexb}
+      vp8_negotiated? -> VP8
+    end
   end
 
   defp resolve_signaling(
