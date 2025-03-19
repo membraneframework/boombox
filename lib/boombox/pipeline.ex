@@ -102,7 +102,6 @@ defmodule Boombox.Pipeline do
             rtsp_state: Boombox.RTSP.state() | nil,
             parent: pid(),
             output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
-            # force_transcoding: Boombox.force_transcoding_value()
           }
   end
 
@@ -112,7 +111,6 @@ defmodule Boombox.Pipeline do
       input: opts.input,
       output: opts.output,
       parent: opts.parent,
-      # force_transcoding: opts.force_transcoding,
       status: :init
     }
 
