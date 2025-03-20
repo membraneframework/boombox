@@ -4,7 +4,7 @@ defmodule Boombox.RTP do
 
   require Membrane.Pad
 
-  alias Boombox.Pipeline.Ready
+  alias Boombox.Bin.Ready
   alias Membrane.RTP
 
   @supported_encodings [audio: [:AAC, :Opus], video: [:H264, :H265]]
@@ -122,7 +122,7 @@ defmodule Boombox.RTP do
 
   @spec link_output(
           Boombox.out_rtp_opts(),
-          Boombox.Pipeline.track_builders(),
+          Boombox.Bin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(opts, track_builders, spec_builder) do

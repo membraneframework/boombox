@@ -3,11 +3,11 @@ defmodule Boombox.Pad do
 
   import Membrane.ChildrenSpec
 
+  require Membrane.Pad
+
   alias Boombox.Bin.{Ready, Wait}
   alias Membrane.Bin.{Action, CallbackContext}
   alias Membrane.Connector
-
-  require Membrane.Pad
 
   @spec handle_pad_added(Membrane.Pad.ref(), CallbackContext.t()) :: [Action.t()] | no_return()
   def handle_pad_added(_pad_ref, ctx) when ctx.playback == :playing do
@@ -26,8 +26,6 @@ defmodule Boombox.Pad do
   #  - after `output_ready`
   #    a. we are in :playing, so we go to `:input_ready`
   #    b. we are in :stopped, so we execute `create_input` in `handle_playing`
-
-
 
   @spec create_input(CallbackContext.t()) :: Ready.t() | Wait.t() | no_return()
   def create_input(ctx) when ctx.playback == :playing and ctx.pads == %{} do
