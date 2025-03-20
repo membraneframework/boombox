@@ -116,6 +116,9 @@ defmodule Boombox.Bin do
   end
 
   @impl true
+  def handle_playing(_ctx, state), do: {[], state}
+
+  @impl true
   def handle_pad_added(pad_ref, ctx, state) when state.input == :membrane_pad do
     Boombox.Pad.handle_pad_added(pad_ref, ctx)
     |> proceed_result(ctx, state)
