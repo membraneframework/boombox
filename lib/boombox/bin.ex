@@ -4,6 +4,8 @@ defmodule Boombox.Bin do
 
   require Membrane.Logger
 
+  alias Membrane.Transcoder
+
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
@@ -33,13 +35,7 @@ defmodule Boombox.Bin do
   defmodule State do
     @moduledoc false
 
-    @enforce_keys [
-      :status,
-      :input,
-      :output,
-      :parent
-      # :force_transcoding
-    ]
+    @enforce_keys [:status, :input, :output, :parent]
 
     defstruct @enforce_keys ++
                 [
@@ -85,6 +81,16 @@ defmodule Boombox.Bin do
           }
   end
 
+  def_input_pad :audio_input,
+    accepted_format: format when Transcoder.Audio.is_audio_format(format),
+    availability: :on_request,
+    max_instances: 1
+
+  def_input_pad :video_input,
+    accepted_format: format when Transcoder.Video.is_video_format(format),
+    availability: :on_request,
+    max_instances: 1
+
   def_options input: [default: :membrane_pad], output: [], parent: []
 
   @impl true
@@ -95,6 +101,10 @@ defmodule Boombox.Bin do
       parent: opts.parent,
       status: :init
     }
+
+    with :membrane_pad <- state.input, {:stream, _opts} <- state.output do
+      raise "Boombox bin cannot have pad input and stream output at the same time"
+    end
 
     proceed(ctx, state)
   end
