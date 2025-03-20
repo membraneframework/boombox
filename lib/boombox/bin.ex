@@ -85,7 +85,7 @@ defmodule Boombox.Bin do
           }
   end
 
-  def_options input: [], output: [], parent: []
+  def_options input: [default: :membrane_pad], output: [], parent: []
 
   @impl true
   def handle_init(ctx, opts) do
@@ -97,6 +97,28 @@ defmodule Boombox.Bin do
     }
 
     proceed(ctx, state)
+  end
+
+  @impl true
+  def handle_playing(ctx, state) when state.input == :membrane_pad do
+    cond do
+      state.status in [:init, :awaiting_output] ->
+        {[], state}
+
+      # state.status in [:output_ready, :awaiting_input] ->
+      state.status == :awaiting_input ->
+        Boombox.Pad.create_input(ctx)
+        |> proceed_result(ctx, state)
+
+      true ->
+        raise "internal boombox error (state.status is #{inspect(state.status)})"
+    end
+  end
+
+  @impl true
+  def handle_pad_added(pad_ref, ctx, state) when state.input == :membrane_pad do
+    Boombox.Pad.handle_pad_added(pad_ref, ctx)
+    |> proceed_result(ctx, state)
   end
 
   @impl true
@@ -318,6 +340,10 @@ defmodule Boombox.Bin do
 
   defp create_input({:stream, params}, _ctx, state) do
     Boombox.ElixirStream.create_input(state.parent, params)
+  end
+
+  defp create_input(:membrane_pad, ctx, _state) do
+    Boombox.Pad.create_input(ctx)
   end
 
   @spec create_output(Boombox.output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
