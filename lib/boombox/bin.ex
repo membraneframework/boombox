@@ -3,7 +3,8 @@ defmodule Boombox.Bin do
   use Membrane.Bin
 
   require Membrane.Logger
-
+  require Membrane.Transcoder.Audio
+  require Membrane.Transcoder.Video
   alias Membrane.Transcoder
 
   @type track_builders :: %{
@@ -91,7 +92,7 @@ defmodule Boombox.Bin do
     availability: :on_request,
     max_instances: 1
 
-  def_options input: [default: :membrane_pad], output: [], parent: []
+  def_options input: [default: :membrane_pad], output: [], parent: [default: nil]
 
   @impl true
   def handle_init(ctx, opts) do
@@ -130,8 +131,8 @@ defmodule Boombox.Bin do
 
   @impl true
   def handle_pad_added(pad_ref, ctx, state) when state.input == :membrane_pad do
-    Boombox.Pad.handle_pad_added(pad_ref, ctx)
-    |> proceed_result(ctx, state)
+    actions = Boombox.Pad.handle_pad_added(pad_ref, ctx)
+    {actions, state}
   end
 
   @impl true
