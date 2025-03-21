@@ -5,7 +5,7 @@ defmodule Boombox.ElixirStream do
   require Membrane.Pad, as: Pad
 
   alias __MODULE__.{Sink, Source}
-  alias Boombox.Pipeline.Ready
+  alias Boombox.Bin.Ready
   alias Membrane.FFmpeg.SWScale
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
@@ -40,7 +40,7 @@ defmodule Boombox.ElixirStream do
   @spec link_output(
           consumer :: pid,
           options :: Boombox.out_stream_opts(),
-          Boombox.Pipeline.track_builders(),
+          Boombox.Bin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(consumer, options, track_builders, spec_builder) do

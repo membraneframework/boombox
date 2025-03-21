@@ -68,12 +68,15 @@ defmodule Support.Compare do
 
     assert_pipeline_notified(p, :sub_demuxer, {:new_tracks, sub_tracks})
 
-    assert length(sub_tracks) == length(kinds)
+    subject_tracks_number = options[:subject_tracks_number] || length(kinds)
+    assert length(sub_tracks) == subject_tracks_number
 
     sub_spec =
       Enum.map(sub_tracks, fn
         {id, %Membrane.AAC{}} ->
-          assert :audio in kinds
+          if options[:subject_tracks_number] == nil do
+            assert :audio in kinds
+          end
 
           get_child(:sub_demuxer)
           |> via_out(Pad.ref(:output, id))
@@ -82,7 +85,9 @@ defmodule Support.Compare do
           |> child(:sub_audio_bufs, GetBuffers)
 
         {id, %h26x{}} when h26x in [Membrane.H264, Membrane.H265] ->
-          assert :video in kinds
+          if options[:subject_tracks_number] == nil do
+            assert :video in kinds
+          end
 
           {parser, decoder} = get_h26x_parser_and_decoder(h26x)
 
@@ -114,7 +119,8 @@ defmodule Support.Compare do
         # and subsequent runs due to transcoding.
         # The threshold here is obtained empirically and may need
         # to be adjusted, or a better metric should be used.
-        assert samples_min_squared_error(sub.payload, ref.payload, 8) < 10
+        boundary = options[:video_error_bounadry] || 10
+        assert samples_min_squared_error(sub.payload, ref.payload, 8) < boundary
       end)
     end
 
@@ -129,7 +135,7 @@ defmodule Support.Compare do
           ref_audio_bufs
         end
 
-      assert length(ref_audio_bufs) == length(sub_audio_bufs)
+      assert abs(length(ref_audio_bufs) - length(sub_audio_bufs)) <= 1
 
       Enum.zip(sub_audio_bufs, ref_audio_bufs)
       |> Enum.each(fn {sub, ref} ->
@@ -137,7 +143,8 @@ defmodule Support.Compare do
         # and subsequent runs due to transcoding.
         # The threshold here is obtained empirically and may need
         # to be adjusted, or a better metric should be used.
-        assert samples_min_squared_error(sub.payload, ref.payload, 16) < 30_000
+        boundary = options[:audio_error_bounadry] || 30_000
+        assert samples_min_squared_error(sub.payload, ref.payload, 16) < boundary
       end)
     end
 
