@@ -23,17 +23,15 @@ defmodule Boombox.BinTest do
 
   alias Support.Compare
 
-  @video_formats [
+  @video_formats Macro.escape([
     {H264, :avc3, :au},
     {H264, :annexb, :nalu},
-    # %H264{stream_structure: :avc3, alignment: :au},
-    # %H264{stream_structure: :avc1, alignment: :nalu},
     RawVideo,
     VP8,
     nil
-  ]
+  ])
 
-  @audio_formats [AAC, Opus, RawAudio, nil]
+  @audio_formats Macro.escape([AAC, Opus, RawAudio, nil])
 
   defmodule Format do
     def to_string(nil), do: "absent"
@@ -54,21 +52,6 @@ defmodule Boombox.BinTest do
       end
     end
   end
-
-  # @tag :tmp_dir
-  # test "Boombox.Bin with input pads", %{tmp_dir: tmp_dir} do
-  #   for video_format <- [nil | @video_formats],
-  #       audio_format <- [nil | @audio_formats] do
-  #     if video_format != nil or audio_format != nil do
-  #       Logger.info("""
-  #       Testing Boombox.Bin when video is #{inspect_format(video_format)} and audio is \
-  #       #{inspect_format(audio_format)}
-  #       """)
-
-  #       do_test(video_format, audio_format, tmp_dir)
-  #     end
-  #   end
-  # end
 
   defp do_test(video_format, audio_format, tmp_dir) do
     out_file = Path.join(tmp_dir, "out.mp4")
