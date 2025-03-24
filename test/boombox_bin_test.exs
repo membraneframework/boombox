@@ -106,4 +106,18 @@ defmodule Boombox.BinTest do
       |> child(Membrane.Debug.Sink)
     ]
   end
+
+  test "Boombox.Bin raises when it has input pad linked and `:input` option set at the same time" do
+    spec =
+      child(Testing.Source)
+      |> via_in(:audio_input)
+      |> child(%Boombox.Bin{
+        input: {:webrtc, "ws://localhost:5432"},
+        output: {:webrtc, "ws://localhost5433"}
+      })
+
+    {:ok, supervisor, _pipeline} = Testing.Pipeline.start(spec: spec)
+    ref = Process.monitor(supervisor)
+    assert_receive {:DOWN, ^ref, :process, _supervisor, _reason}
+  end
 end
