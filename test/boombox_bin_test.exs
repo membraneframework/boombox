@@ -3,7 +3,6 @@ defmodule Boombox.BinTest do
 
   import Membrane.ChildrenSpec
   import Membrane.Testing.Assertions
-  import Support.Async
 
   require Logger
 
@@ -15,7 +14,6 @@ defmodule Boombox.BinTest do
     Opus,
     RawAudio,
     RawVideo,
-    RemoteStream,
     Testing,
     Transcoder,
     VP8
@@ -82,16 +80,12 @@ defmodule Boombox.BinTest do
         subject_tracks_number: tracks_number
       )
     end
-
-    if video_format == nil and audio_format == Membrane.AAC do
-      File.copy(out_file, "out.mp4")
-    end
   end
 
   defp audio_fixture(Opus), do: "test/fixtures/ref_bun10s_opus_aac.mp4"
   defp audio_fixture(_format), do: "test/fixtures/ref_bun10s_aac.mp4"
 
-  defp spec_branch(kind, nil), do: []
+  defp spec_branch(_kind, nil), do: []
 
   defp spec_branch(kind, transcoding_format) do
     {opposite_kind, boombox_pad} =
