@@ -96,6 +96,9 @@ defmodule Boombox.Bin do
 
   @impl true
   def handle_init(ctx, opts) do
+    opts = Boombox.Utils.parse_options(opts)
+    :ok = Boombox.Utils.maybe_log_transcoding_related_warning(opts, Membrane.Logger)
+
     state = %State{
       input: opts.input,
       output: opts.output,

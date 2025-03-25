@@ -22,12 +22,12 @@ defmodule Boombox.BinTest do
   alias Support.Compare
 
   @video_formats Macro.escape([
-    {H264, :avc3, :au},
-    {H264, :annexb, :nalu},
-    RawVideo,
-    VP8,
-    nil
-  ])
+                   {H264, :avc3, :au},
+                   {H264, :annexb, :nalu},
+                   RawVideo,
+                   VP8,
+                   nil
+                 ])
 
   @audio_formats Macro.escape([AAC, Opus, RawAudio, nil])
 
@@ -55,7 +55,7 @@ defmodule Boombox.BinTest do
     out_file = Path.join(tmp_dir, "out.mp4")
 
     spec = [
-      child(:boombox, %Boombox.Bin{output: {:mp4, out_file, []}}),
+      child(:boombox, %Boombox.Bin{output: out_file}),
       spec_branch(:video, video_format),
       spec_branch(:audio, audio_format)
     ]
@@ -113,7 +113,7 @@ defmodule Boombox.BinTest do
       |> via_in(:audio_input)
       |> child(%Boombox.Bin{
         input: {:webrtc, "ws://localhost:5432"},
-        output: {:webrtc, "ws://localhost5433"}
+        output: {:webrtc, "ws://localhost:5433"}
       })
 
     {:ok, supervisor, _pipeline} = Testing.Pipeline.start(spec: spec)
