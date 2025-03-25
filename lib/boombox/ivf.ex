@@ -17,10 +17,9 @@ defmodule Boombox.IVF do
             hackney_opts: [follow_redirect: true]
           })
           |> child(:ivf_deserializer, Membrane.IVF.Deserializer)
-
       end
 
-    %Ready{track_builders: [{:audio, spec}]}
+    %Ready{track_builders: [{:video, spec}]}
   end
 
   @spec link_output(
@@ -29,7 +28,7 @@ defmodule Boombox.IVF do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do
-    [{:video, audio_track_builder}] =
+    [{:video, video_track_builder}] =
       track_builders
       |> Enum.filter(fn
         {:video, _track_builder} -> true
@@ -37,12 +36,13 @@ defmodule Boombox.IVF do
       end)
 
     spec =
-      audio_track_builder
+      video_track_builder
       |> child(:ivf_video_transcoder, %Membrane.Transcoder{
-        output_stream_format: fn %Membrane.VP8{}-> Membrane.VP8
-        %Membrane.VP9{} -> Membrane.VP9
-        _other -> Membrane.VP9
-      end
+        output_stream_format: fn
+          %Membrane.VP8{} -> Membrane.VP8
+          %Membrane.VP9{} -> Membrane.VP9
+          _other -> Membrane.VP9
+        end
       })
       |> child(:ivf_serializer, Membrane.IVF.Serializer)
       |> child(:ivf_file_sink, %Membrane.File.Sink{location: location})
