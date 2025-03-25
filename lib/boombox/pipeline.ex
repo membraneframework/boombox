@@ -214,6 +214,16 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_element_end_of_stream(:mp3_file_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
+  def handle_element_end_of_stream(:ivf_file_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
   def handle_element_end_of_stream(:udp_rtp_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
   end
@@ -340,6 +350,14 @@ defmodule Boombox.Pipeline do
     Boombox.WAV.create_input(location, opts)
   end
 
+  defp create_input({:mp3, location, opts}, _ctx, _state) do
+    Boombox.MP3.create_input(location, opts)
+  end
+
+  defp create_input({:ivf, location, opts}, _ctx, _state) do
+    Boombox.IVF.create_input(location, opts)
+  end
+
   defp create_input({:rtmp, src}, ctx, _state) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
@@ -397,6 +415,14 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:wav, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.WAV.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:mp3, location}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.MP3.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:ivf, location}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.IVF.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
