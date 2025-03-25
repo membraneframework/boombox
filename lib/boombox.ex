@@ -76,6 +76,7 @@ defmodule Boombox do
           | {:wav, location :: String.t(), transport: :file | :http}
           | {:mp3, location :: String.t(), transport: :file | :http}
           | {:ivf, location :: String.t(), transport: :file | :http}
+          | {:ogg, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
@@ -91,6 +92,7 @@ defmodule Boombox do
           | {:wav, location :: String.t()}
           | {:mp3, location :: String.t()}
           | {:ivf, location :: String.t()}
+          | {:ogg, location :: String.t()}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
@@ -188,6 +190,8 @@ defmodule Boombox do
       {nil, ".mp3", :output} -> {:mp3, value}
       {scheme, ".ivf", :input} when scheme in [nil, "http", "https"] -> {:ivf, value}
       {nil, ".ivf", :output} -> {:ivf, value}
+      {scheme, ".ogg", :input} when scheme in [nil, "http", "https"] -> {:ogg, value}
+      {nil, ".ogg", :output} -> {:ogg, value}
       {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
       {"rtsp", _ext, :input} -> {:rtsp, value}
       {nil, ".m3u8", :output} -> {:hls, value}
@@ -258,8 +262,18 @@ defmodule Boombox do
         if Keyword.keyword?(opts),
           do: {:ivf, location, transport: resolve_transport(location, opts)}
 
-      {:ivf, location} when is_binary(location) and direction == :output ->
-        {:ivf, location}
+      {:ogg, location} when is_binary(location) and direction == :output ->
+        {:ogg, location}
+
+      {:ogg, location} when is_binary(location) and direction == :input ->
+        parse_opt!(:input, {:ogg, location, []})
+
+      {:ogg, location, opts} when is_binary(location) and direction == :input ->
+        if Keyword.keyword?(opts),
+          do: {:ogg, location, transport: resolve_transport(location, opts)}
+
+      {:ogg, location} when is_binary(location) and direction == :output ->
+        {:ogg, location}
 
       {:webrtc, %Membrane.WebRTC.Signaling{}} ->
         value

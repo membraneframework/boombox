@@ -1,4 +1,4 @@
-defmodule Boombox.WAV do
+defmodule Boombox.OGG do
   @moduledoc false
   import Membrane.ChildrenSpec
   alias Boombox.Pipeline.Ready
@@ -8,15 +8,15 @@ defmodule Boombox.WAV do
     spec =
       case opts[:transport] do
         :file ->
-          child(:wav_in_file_source, %Membrane.File.Source{location: location})
-          |> child(:wav_parser, Membrane.WAV.Parser)
+          child(:ogg_in_file_source, %Membrane.File.Source{location: location})
+          |> child(:ogg_demuxer, Membrane.Ogg.Demuxer)
 
         :http ->
           child(:wav_in_http_source, %Membrane.Hackney.Source{
             location: location,
             hackney_opts: [follow_redirect: true]
           })
-          |> child(:wav_parser, Membrane.WAV.Parser)
+          |> child(:ogg_demuxer, Membrane.Ogg.Demuxer)
       end
 
     %Ready{track_builders: [{:audio, spec}]}
@@ -37,11 +37,16 @@ defmodule Boombox.WAV do
 
     spec =
       audio_track_builder
-      |> child(:wav_audio_transcoder, %Membrane.Transcoder{
-        output_stream_format: Membrane.RawAudio
+      |> child(:ogg_audio_transcoder, %Membrane.Transcoder{
+        output_stream_format: Membrane.Opus
       })
-      |> child(:wav_parser, Membrane.WAV.Serializer)
-      |> child(:wav_file_sink, %Membrane.File.Sink{location: location})
+      |> child(:parser, %Membrane.Opus.Parser{
+        # generate_best_effort_timestamps?: true,
+        delimitation: :undelimit,
+        input_delimitted?: false
+      })
+      |> child(:ogg_muxer, Membrane.Ogg.Muxer)
+      |> child(:ogg_file_sink, %Membrane.File.Sink{location: location})
 
     %Ready{actions: [spec: spec]}
   end

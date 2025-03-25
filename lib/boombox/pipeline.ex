@@ -224,6 +224,11 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_element_end_of_stream(:ogg_file_sink, :input, _ctx, state) do
+    {[terminate: :normal], state}
+  end
+
+  @impl true
   def handle_element_end_of_stream(:udp_rtp_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
   end
@@ -358,6 +363,10 @@ defmodule Boombox.Pipeline do
     Boombox.IVF.create_input(location, opts)
   end
 
+  defp create_input({:ogg, location, opts}, _ctx, _state) do
+    Boombox.OGG.create_input(location, opts)
+  end
+
   defp create_input({:rtmp, src}, ctx, _state) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
@@ -423,6 +432,10 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:ivf, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.IVF.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:ogg, location}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.OGG.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
