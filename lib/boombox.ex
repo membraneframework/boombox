@@ -67,7 +67,17 @@ defmodule Boombox do
           | {:target, String.t()}
         ]
 
-   @type input ::
+  @type msr_location ::
+          [
+            {:video,
+             video_location ::
+               String.t() | {video_location :: String.t(), transport: :file | :http}},
+            {:audio,
+             audio_location ::
+               String.t() | {audio_location :: String.t(), transport: :file | :http}}
+          ]
+
+  @type input ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:h264, location :: String.t(),
@@ -77,6 +87,7 @@ defmodule Boombox do
           | {:mp3, location :: String.t(), transport: :file | :http}
           | {:ivf, location :: String.t(), transport: :file | :http}
           | {:ogg, location :: String.t(), transport: :file | :http}
+          | {:msr, msr_location()}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
@@ -93,6 +104,8 @@ defmodule Boombox do
           | {:mp3, location :: String.t()}
           | {:ivf, location :: String.t()}
           | {:ogg, location :: String.t()}
+          | {:msr,
+             [{:video, video_location :: String.t()}, {:audio, audio_location :: String.t()}]}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
@@ -275,6 +288,12 @@ defmodule Boombox do
       {:ogg, location} when is_binary(location) and direction == :output ->
         {:ogg, location}
 
+      {:msr, location_opts} when direction == :input ->
+        {:msr, resolve_msr_location(location_opts)}
+
+      {:msr, location_opts} when direction == :output ->
+        {:msr, location_opts}
+
       {:webrtc, %Membrane.WebRTC.Signaling{}} ->
         value
 
@@ -445,5 +464,38 @@ defmodule Boombox do
       transport ->
         raise ArgumentError, "Invalid transport: #{inspect(transport)}"
     end
+  end
+
+  @spec resolve_msr_location(msr_location()) :: Boombox.MSR.location()
+  defp resolve_msr_location(location) do
+    video =
+      case location[:video] do
+        nil ->
+          nil
+        {video_location, opts} ->
+          {video_location, transport: resolve_transport(video_location, opts)}
+
+        video_location ->
+          {video_location, transport: resolve_transport(video_location)}
+        end
+
+    audio =
+      case location[:audio] do
+        nil ->
+          nil
+        {audio_location, opts} ->
+          {audio_location,
+           transport:
+             resolve_transport(
+               audio_location,
+               opts
+             )}
+
+        audio_location ->
+          {audio_location, transport: resolve_transport(audio_location)}
+
+      end
+
+    [video, audio] |> Enum.reject(&(&1 == nil))
   end
 end

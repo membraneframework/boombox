@@ -233,6 +233,18 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_element_end_of_stream(:msr_video_file_sink, :input, _ctx, state) do
+    state = %{state | video_terminated: true}
+    {maybe_terminate(state), state}
+  end
+
+  @impl true
+  def handle_element_end_of_stream(:msr_audio_file_sink, :input, _ctx, state) do
+    state = %{state | audio_terminated: true}
+    {maybe_terminate(state), state}
+  end
+
+  @impl true
   def handle_element_end_of_stream(:udp_rtp_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
   end
@@ -371,6 +383,10 @@ defmodule Boombox.Pipeline do
     Boombox.OGG.create_input(location, opts)
   end
 
+  defp create_input({:msr, location_opts}, _ctx, _state) do
+    Boombox.MSR.create_input(location_opts)
+  end
+
   defp create_input({:rtmp, src}, ctx, _state) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
@@ -440,6 +456,10 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:ogg, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.OGG.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:msr, location_opts}, track_builders, spec_builder, _ctx, _state) do
+    {link_result, tracks} = Boombox.MSR.link_output(location_opts, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
