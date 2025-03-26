@@ -459,7 +459,7 @@ defmodule Boombox.Pipeline do
   end
 
   defp link_output({:msr, location_opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.MSR.link_output(location_opts, track_builders, spec_builder)
+    {link_result, tracks} = Boombox.MSR.link_output(location_opts, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do

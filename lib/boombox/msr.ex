@@ -62,7 +62,7 @@ defmodule Boombox.MSR do
           output_location(),
           Boombox.Pipeline.track_builders(),
           Membrane.ChildrenSpec.t()
-        ) :: Ready.t()
+        ) :: {Ready.t(), [:video | :audio]}
   def link_output(location, track_builders, _spec_builder) do
     {:video, video_track_builder} =
       track_builders
@@ -109,6 +109,7 @@ defmodule Boombox.MSR do
       end
 
     spec = [video_branch, audio_branch] |> Enum.reject(&(&1 == nil))
-    %Ready{actions: [spec: spec]}
+    tracks = (if video_branch, do: [:video], else: []) ++ (if audio_branch, do: [:audio], else: [])
+    {%Ready{actions: [spec: spec]}, tracks}
   end
 end

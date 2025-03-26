@@ -10,14 +10,14 @@ defmodule Boombox.AAC do
       case opts[:transport] do
         :file ->
           child(:aac_in_file_source, %Membrane.File.Source{location: location})
-          |> child(:aac_parser, Membrane.AAC.Parser)
+          |> child(:aac_input_parser, Membrane.AAC.Parser)
 
         :http ->
           child(:aac_in_http_source, %Membrane.Hackney.Source{
             location: location,
             hackney_opts: [follow_redirect: true]
           })
-          |> child(:aac_parser, Membrane.AAC.Parser)
+          |> child(:aac_input_parser, Membrane.AAC.Parser)
       end
 
     %Ready{track_builders: [{:audio, spec}]}
@@ -41,7 +41,7 @@ defmodule Boombox.AAC do
       |> child(:aac_audio_transcoder, %Membrane.Transcoder{
         output_stream_format: %AAC{}
       })
-      |> child(:aac_parser, Membrane.AAC.Parser)
+      |> child(:aac_output_parser, Membrane.AAC.Parser)
       |> child(:aac_file_sink, %Membrane.File.Sink{location: location})
 
     %Ready{actions: [spec: spec]}

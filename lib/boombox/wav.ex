@@ -9,14 +9,14 @@ defmodule Boombox.WAV do
       case opts[:transport] do
         :file ->
           child(:wav_in_file_source, %Membrane.File.Source{location: location})
-          |> child(:wav_parser, Membrane.WAV.Parser)
+          |> child(:wav_input_parser, Membrane.WAV.Parser)
 
         :http ->
           child(:wav_in_http_source, %Membrane.Hackney.Source{
             location: location,
             hackney_opts: [follow_redirect: true]
           })
-          |> child(:wav_parser, Membrane.WAV.Parser)
+          |> child(:wav_input_parser, Membrane.WAV.Parser)
       end
 
     %Ready{track_builders: [{:audio, spec}]}
@@ -37,10 +37,10 @@ defmodule Boombox.WAV do
 
     spec =
       audio_track_builder
-      |> child(:wav_audio_transcoder, %Membrane.Transcoder{
+      |> child(:wav_transcoder, %Membrane.Transcoder{
         output_stream_format: Membrane.RawAudio
       })
-      |> child(:wav_parser, Membrane.WAV.Serializer)
+      |> child(:wav_output_parser, Membrane.WAV.Serializer)
       |> child(:wav_file_sink, %Membrane.File.Sink{location: location})
 
     %Ready{actions: [spec: spec]}

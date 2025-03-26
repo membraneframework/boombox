@@ -8,18 +8,18 @@ defmodule Boombox.MP3 do
     spec =
       case opts[:transport] do
         :file ->
-          child(:wav_in_file_source, %Membrane.File.Source{location: location})
-          |> child(:mp3_audio_transcoder, %Membrane.Transcoder{
+          child(:mp3_in_file_source, %Membrane.File.Source{location: location})
+          |> child(:mp3_stream_format_overrider, %Membrane.Transcoder{
             output_stream_format: Membrane.MPEGAudio,
             override_input_stream_format: %Membrane.MPEGAudio{channels: 1}
           })
 
         :http ->
-          child(:wav_in_http_source, %Membrane.Hackney.Source{
+          child(:mp3_in_http_source, %Membrane.Hackney.Source{
             location: location,
             hackney_opts: [follow_redirect: true]
           })
-          |> child(:mp3_audio_transcoder, %Membrane.Transcoder{
+          |> child(:mp3_stream_format_overrider, %Membrane.Transcoder{
             output_stream_format: Membrane.MPEGAudio,
             override_input_stream_format: %Membrane.MPEGAudio{channels: 1}
           })
