@@ -10,7 +10,7 @@ defmodule Boombox.Pipeline do
         %Boombox.Bin{
           input: opts.input,
           output: opts.output,
-          parent: opts.parent
+          elixir_stream_process: opts.parent
         }
       )
 

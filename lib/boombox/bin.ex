@@ -1,5 +1,4 @@
 defmodule Boombox.Bin do
-  @moduledoc false
   use Membrane.Bin
 
   require Membrane.Logger
@@ -17,7 +16,7 @@ defmodule Boombox.Bin do
     @moduledoc false
 
     @type t :: %__MODULE__{
-            actions: [Membrane.Pipeline.Action.t()],
+            actions: [Membrane.Bin.Action.t()],
             track_builders: Boombox.Bin.track_builders() | nil,
             spec_builder: Membrane.ChildrenSpec.t() | nil,
             eos_info: term
@@ -29,14 +28,14 @@ defmodule Boombox.Bin do
   defmodule Wait do
     @moduledoc false
 
-    @type t :: %__MODULE__{actions: [Membrane.Pipeline.Action.t()]}
+    @type t :: %__MODULE__{actions: [Membrane.Bin.Action.t()]}
     defstruct actions: []
   end
 
   defmodule State do
     @moduledoc false
 
-    @enforce_keys [:status, :input, :output, :parent]
+    @enforce_keys [:status, :input, :output, :elixir_stream_process]
 
     defstruct @enforce_keys ++
                 [
@@ -51,7 +50,7 @@ defmodule Boombox.Bin do
                 ]
 
     @typedoc """
-    Statuses of the Boombox pipeline in the order of occurence.
+    Statuses of the Boombox.Bin in the order of occurence.
 
     Statuses starting with `awaiting_` occur only if
     the `proceed` function returns `t:Wait.t/0` when in the
@@ -71,13 +70,13 @@ defmodule Boombox.Bin do
             status: status(),
             input: Boombox.input(),
             output: Boombox.output(),
-            actions_acc: [Membrane.Pipeline.Action.t()],
+            actions_acc: [Membrane.Bin.Action.t()],
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.Bin.track_builders() | nil,
             last_result: Ready.t() | Wait.t() | nil,
             eos_info: term(),
             rtsp_state: Boombox.RTSP.state() | nil,
-            parent: pid(),
+            elixir_stream_process: pid() | nil,
             output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
           }
   end
@@ -92,19 +91,27 @@ defmodule Boombox.Bin do
     availability: :on_request,
     max_instances: 1
 
-  def_options input: [default: :membrane_pad], output: [], parent: [default: nil]
+  def_options input: [
+                spec: Boombox.input() | :membrane_pad,
+                default: :membrane_pad
+              ],
+              output: [
+                spec: Boombox.output()
+              ],
+              elixir_stream_process: [
+                default: nil
+              ]
 
   @impl true
   def handle_init(ctx, opts) do
-    opts = Boombox.Utils.parse_options(opts)
-    :ok = Boombox.Utils.maybe_log_transcoding_related_warning(opts, Membrane.Logger)
-
     state = %State{
-      input: opts.input,
-      output: opts.output,
-      parent: opts.parent,
+      input: parse_endpoint_opt!(:input, opts.input),
+      output: parse_endpoint_opt!(:output, opts.output),
+      elixir_stream_process: opts.elixir_stream_process,
       status: :init
     }
+
+    :ok = maybe_log_transcoding_related_warning(state.input, state.output)
 
     with :membrane_pad <- state.input, {:stream, _opts} <- state.output do
       raise "Boombox bin cannot have pad input and stream output at the same time"
@@ -250,7 +257,7 @@ defmodule Boombox.Bin do
   end
 
   @spec proceed_result(Ready.t() | Wait.t(), Membrane.Bin.CallbackContext.t(), State.t()) ::
-          Membrane.Pipeline.callback_return()
+          Membrane.Bin.callback_return()
   defp proceed_result(result, ctx, %{status: :awaiting_output} = state) do
     do_proceed(result, :output_ready, :awaiting_output, ctx, state)
   end
@@ -274,7 +281,7 @@ defmodule Boombox.Bin do
   end
 
   @spec proceed(Membrane.Bin.CallbackContext.t(), State.t()) ::
-          Membrane.Pipeline.callback_return()
+          Membrane.Bin.callback_return()
   defp proceed(ctx, %{status: :init} = state) do
     {ready_or_wait, state} = create_output(state.output, ctx, state)
     do_proceed(ready_or_wait, :output_ready, :awaiting_output, ctx, state)
@@ -315,7 +322,7 @@ defmodule Boombox.Bin do
           State.status() | nil,
           Membrane.Bin.CallbackContext.t(),
           State.t()
-        ) :: Membrane.Pipeline.callback_return()
+        ) :: Membrane.Bin.callback_return()
   defp do_proceed(result, ready_status, wait_status, ctx, state) do
     %{actions_acc: actions_acc} = state
 
@@ -356,7 +363,7 @@ defmodule Boombox.Bin do
   end
 
   defp create_input({:stream, params}, _ctx, state) do
-    Boombox.ElixirStream.create_input(state.parent, params)
+    Boombox.ElixirStream.create_input(state.elixir_stream_process, params)
   end
 
   defp create_input(:membrane_pad, ctx, _state) do
@@ -403,7 +410,12 @@ defmodule Boombox.Bin do
   end
 
   defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
-    Boombox.ElixirStream.link_output(state.parent, opts, track_builders, spec_builder)
+    Boombox.ElixirStream.link_output(
+      state.elixir_stream_process,
+      opts,
+      track_builders,
+      spec_builder
+    )
   end
 
   # Wait between sending the last packet
@@ -413,4 +425,150 @@ defmodule Boombox.Bin do
   defp wait_before_closing() do
     Process.sleep(500)
   end
+
+  @spec parse_endpoint_opt!(:input, Boombox.input() | :membrane_pad) ::
+          Boombox.input() | :membrane_pad
+  @spec parse_endpoint_opt!(:output, Boombox.output() | :membrane_pad) ::
+          Boombox.output() | :membrane_pad
+  defp parse_endpoint_opt!(direction, value) when is_binary(value) do
+    parse_endpoint_opt!(direction, {value, []})
+  end
+
+  defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
+    uri = URI.parse(value)
+    scheme = uri.scheme
+    extension = if uri.path, do: Path.extname(uri.path)
+
+    case {scheme, extension, direction} do
+      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value, opts}
+      {nil, ".mp4", :output} -> {:mp4, value, opts}
+      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
+      {"rtsp", _ext, :input} -> {:rtsp, value}
+      {nil, ".m3u8", :output} -> {:hls, value, opts}
+      _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
+    end
+    |> then(&parse_endpoint_opt!(direction, &1))
+  end
+
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
+  defp parse_endpoint_opt!(direction, value) when is_tuple(value) or is_atom(value) do
+    case value do
+      {:mp4, location} when is_binary(location) and direction == :input ->
+        parse_endpoint_opt!(:input, {:mp4, location, []})
+
+      {:mp4, location, opts} when is_binary(location) and direction == :input ->
+        opts = opts |> Keyword.put(:transport, resolve_transport(location, opts))
+        {:mp4, location, opts}
+
+      {:mp4, location} when is_binary(location) and direction == :output ->
+        {:mp4, location, []}
+
+      {:mp4, location, _opts} when is_binary(location) and direction == :output ->
+        value
+
+      {:webrtc, %Membrane.WebRTC.Signaling{}} when direction == :input ->
+        value
+
+      {:webrtc, %Membrane.WebRTC.Signaling{} = signaling} ->
+        {:webrtc, signaling, []}
+
+      {:webrtc, %Membrane.WebRTC.Signaling{}, _opts} when direction == :output ->
+        value
+
+      {:webrtc, uri} when is_binary(uri) and direction == :input ->
+        value
+
+      {:webrtc, uri} when is_binary(uri) and direction == :output ->
+        {:webrtc, uri, []}
+
+      {:webrtc, uri, _opts} when is_binary(uri) and direction == :output ->
+        value
+
+      {:whip, uri} when is_binary(uri) ->
+        parse_endpoint_opt!(direction, {:whip, uri, []})
+
+      {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :input ->
+        if Keyword.keyword?(opts), do: {:webrtc, value}
+
+      {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :output ->
+        {webrtc_opts, whip_opts} = split_webrtc_and_whip_opts(opts)
+        if Keyword.keyword?(opts), do: {:webrtc, {:whip, uri, whip_opts}, webrtc_opts}
+
+      {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
+        value
+
+      {:hls, location} when direction == :output and is_binary(location) ->
+        {:hls, location, []}
+
+      {:hls, location, opts}
+      when direction == :output and is_binary(location) and is_list(opts) ->
+        value
+
+      {:rtsp, location} when direction == :input and is_binary(location) ->
+        value
+
+      {:rtp, opts} ->
+        if Keyword.keyword?(opts), do: value
+
+      {:stream, opts} ->
+        if Keyword.keyword?(opts), do: value
+
+      :membrane_pad ->
+        :membrane_pad
+
+      _other ->
+        nil
+    end
+    |> case do
+      nil -> raise ArgumentError, "Invalid #{direction} specification: #{inspect(value)}"
+      value -> value
+    end
+  end
+
+  @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
+  defp resolve_transport(location, opts) do
+    case Keyword.validate!(opts, transport: nil, force_transcoding: false)[:transport] do
+      nil ->
+        uri = URI.parse(location)
+
+        case uri.scheme do
+          nil -> :file
+          "http" -> :http
+          "https" -> :http
+          _other -> raise ArgumentError, "Unsupported URI: #{location}"
+        end
+
+      transport when transport in [:file, :http] ->
+        transport
+
+      transport ->
+        raise ArgumentError, "Invalid transport: #{inspect(transport)}"
+    end
+  end
+
+  defp split_webrtc_and_whip_opts(opts) do
+    opts
+    |> Enum.split_with(fn {key, _value} -> key == :force_transcoding end)
+  end
+
+  defguardp is_webrtc_endpoint(endpoint)
+            when is_tuple(endpoint) and elem(endpoint, 0) in [:webrtc, :whip]
+
+  @spec maybe_log_transcoding_related_warning(Boombox.input(), Boombox.output()) :: :ok
+  defp maybe_log_transcoding_related_warning(input, output) do
+    if is_webrtc_endpoint(output) and not is_webrtc_endpoint(input) and
+         webrtc_output_force_transcoding(output) not in [true, :video] do
+      Membrane.Logger.warning("""
+      Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
+      might lead to issues with the output video if the output stream isn't sent only by localhost. You \
+      can solve this by setting `:force_transcoding` output option to `true` or `:video`, but be aware \
+      that it will increase Boombox CPU usage.
+      """)
+    end
+
+    :ok
+  end
+
+  defp webrtc_output_force_transcoding({:webrtc, _singaling, opts}),
+    do: Keyword.get(opts, :force_transcoding)
 end

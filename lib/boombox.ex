@@ -127,17 +127,6 @@ defmodule Boombox do
         ) :: :ok | Enumerable.t()
   @endpoint_opts [:input, :output]
   def run(stream \\ nil, opts) do
-    # opts =
-    #   opts
-    #   |> Keyword.validate!(@endpoint_opts)
-    #   |> Map.new(fn {key, value} -> {key, parse_endpoint_opt!(key, value)} end)
-
-    # :ok = maybe_log_transcoding_related_warning(opts)
-
-    # if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
-    #   raise "#{key} is not provided"
-    # end
-
     opts = Map.new(opts)
 
     if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
@@ -190,9 +179,6 @@ defmodule Boombox do
 
   @spec consume_stream(Enumerable.t(), opts_map()) :: term()
   defp consume_stream(stream, opts) do
-    opts = Boombox.Utils.parse_options(opts)
-    :ok = Boombox.Utils.maybe_log_transcoding_related_warning(opts)
-
     procs = start_pipeline(opts)
 
     source =
@@ -235,9 +221,6 @@ defmodule Boombox do
 
   @spec produce_stream(opts_map()) :: Enumerable.t()
   defp produce_stream(opts) do
-    opts = Boombox.Utils.parse_options(opts)
-    :ok = Boombox.Utils.maybe_log_transcoding_related_warning(opts)
-
     Stream.resource(
       fn ->
         procs = start_pipeline(opts)
