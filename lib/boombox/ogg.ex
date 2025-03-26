@@ -41,7 +41,8 @@ defmodule Boombox.OGG do
         output_stream_format: Membrane.Opus
       })
       |> child(:parser, %Membrane.Opus.Parser{
-        generate_best_effort_timestamps?: true, # TODO - what possible consequences might it introduce?
+        # TODO - what possible consequences might it introduce?
+        generate_best_effort_timestamps?: true,
         delimitation: :undelimit,
         input_delimitted?: false
       })
