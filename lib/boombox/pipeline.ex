@@ -64,7 +64,9 @@ defmodule Boombox.Pipeline do
                   eos_info: nil,
                   rtsp_state: nil,
                   pending_new_tracks: %{input: [], output: []},
-                  output_webrtc_state: nil
+                  output_webrtc_state: nil,
+                  audio_terminated: false,
+                  video_terminated: false
                 ]
 
     @typedoc """
@@ -95,7 +97,9 @@ defmodule Boombox.Pipeline do
             eos_info: term(),
             rtsp_state: Boombox.RTSP.state() | nil,
             parent: pid(),
-            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
+            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil,
+            audio_terminated: boolean(),
+            video_terminated: boolean()
           }
   end
 
@@ -161,7 +165,7 @@ defmodule Boombox.Pipeline do
 
   @impl true
   def handle_child_notification({:end_of_stream, id}, :webrtc_output, _ctx, state) do
-    %{eos_info: track_ids} = state
+    %{Eos_info: track_ids} = state
     track_ids = List.delete(track_ids, id)
     state = %{state | eos_info: track_ids}
 
@@ -226,6 +230,18 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_element_end_of_stream(:ogg_file_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
+  end
+
+  @impl true
+  def handle_element_end_of_stream(:msr_video_file_sink, :input, _ctx, state) do
+    state = %{state | video_terminated: true}
+    {maybe_terminate(state), state}
+  end
+
+  @impl true
+  def handle_element_end_of_stream(:msr_audio_file_sink, :input, _ctx, state) do
+    state = %{state | audio_terminated: true}
+    {maybe_terminate(state), state}
   end
 
   @impl true
@@ -367,6 +383,10 @@ defmodule Boombox.Pipeline do
     Boombox.OGG.create_input(location, opts)
   end
 
+  defp create_input({:msr, location_opts}, _ctx, _state) do
+    Boombox.MSR.create_input(location_opts)
+  end
+
   defp create_input({:rtmp, src}, ctx, _state) do
     Boombox.RTMP.create_input(src, ctx.utility_supervisor)
   end
@@ -438,6 +458,10 @@ defmodule Boombox.Pipeline do
     Boombox.OGG.link_output(location, track_builders, spec_builder)
   end
 
+  defp link_output({:msr, location_opts}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.MSR.link_output(location_opts, track_builders, spec_builder)
+  end
+
   defp link_output({:hls, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.HLS.link_output(location, track_builders, spec_builder)
   end
@@ -457,4 +481,10 @@ defmodule Boombox.Pipeline do
   defp wait_before_closing() do
     Process.sleep(500)
   end
+
+  @spec maybe_terminate(State.t()) :: [Membrane.Pipeline.Action.t()]
+  defp maybe_terminate(%{audio_terminated: true, video_terminated: true}),
+    do: [terminate: :normal]
+
+  defp maybe_terminate(_state), do: []
 end
