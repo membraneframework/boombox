@@ -568,12 +568,9 @@ defmodule Boombox.Bin do
     |> Enum.split_with(fn {key, _value} -> key == :force_transcoding end)
   end
 
-  defguardp is_webrtc_endpoint(endpoint)
-            when is_tuple(endpoint) and elem(endpoint, 0) in [:webrtc, :whip]
-
   @spec maybe_log_transcoding_related_warning(input(), output()) :: :ok
   defp maybe_log_transcoding_related_warning(input, output) do
-    if is_webrtc_endpoint(output) and not is_webrtc_endpoint(input) and
+    if elem(output, 0) == :webrtc and elem(input, 0) not in [:webrtc, :stream] and
          webrtc_output_force_transcoding(output) not in [true, :video] do
       Membrane.Logger.warning("""
       Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
