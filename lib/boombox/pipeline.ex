@@ -123,7 +123,7 @@ defmodule Boombox.Pipeline do
 
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do
-    Boombox.MP4.handle_input_tracks(tracks)
+    Boombox.StorageEndpoints.MP4.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
   end
 
@@ -207,37 +207,7 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_element_end_of_stream(:mp4_file_sink, :input, _ctx, state) do
-    {[terminate: :normal], state}
-  end
-
-  @impl true
-  def handle_element_end_of_stream(:h264_file_sink, :input, _ctx, state) do
-    {[terminate: :normal], state}
-  end
-
-  @impl true
-  def handle_element_end_of_stream(:aac_file_sink, :input, _ctx, state) do
-    {[terminate: :normal], state}
-  end
-
-  @impl true
-  def handle_element_end_of_stream(:wav_file_sink, :input, _ctx, state) do
-    {[terminate: :normal], state}
-  end
-
-  @impl true
-  def handle_element_end_of_stream(:mp3_file_sink, :input, _ctx, state) do
-    {[terminate: :normal], state}
-  end
-
-  @impl true
-  def handle_element_end_of_stream(:ivf_file_sink, :input, _ctx, state) do
-    {[terminate: :normal], state}
-  end
-
-  @impl true
-  def handle_element_end_of_stream(:ogg_file_sink, :input, _ctx, state) do
+  def handle_element_end_of_stream(:file_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
   end
 
@@ -353,31 +323,31 @@ defmodule Boombox.Pipeline do
   end
 
   defp create_input({:mp4, location, opts}, _ctx, _state) do
-    Boombox.MP4.create_input(location, opts)
+    Boombox.StorageEndpoints.MP4.create_input(location, opts)
   end
 
   defp create_input({:h264, location, opts}, _ctx, _state) do
-    Boombox.H264.create_input(location, opts)
+    Boombox.StorageEndpoints.H264.create_input(location, opts)
   end
 
   defp create_input({:aac, location, opts}, _ctx, _state) do
-    Boombox.AAC.create_input(location, opts)
+    Boombox.StorageEndpoints.AAC.create_input(location, opts)
   end
 
   defp create_input({:wav, location, opts}, _ctx, _state) do
-    Boombox.WAV.create_input(location, opts)
+    Boombox.StorageEndpoints.WAV.create_input(location, opts)
   end
 
   defp create_input({:mp3, location, opts}, _ctx, _state) do
-    Boombox.MP3.create_input(location, opts)
+    Boombox.StorageEndpoints.MP3.create_input(location, opts)
   end
 
   defp create_input({:ivf, location, opts}, _ctx, _state) do
-    Boombox.IVF.create_input(location, opts)
+    Boombox.StorageEndpoints.IVF.create_input(location, opts)
   end
 
   defp create_input({:ogg, location, opts}, _ctx, _state) do
-    Boombox.OGG.create_input(location, opts)
+    Boombox.StorageEndpoints.Ogg.create_input(location, opts)
   end
 
   defp create_input({:rtmp, src}, ctx, _state) do
@@ -424,31 +394,31 @@ defmodule Boombox.Pipeline do
   end
 
   defp link_output({:mp4, location, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.MP4.link_output(location, opts, track_builders, spec_builder)
+    Boombox.StorageEndpoints.MP4.link_output(location, opts, track_builders, spec_builder)
   end
 
   defp link_output({:h264, location}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.H264.link_output(location, track_builders, spec_builder)
+    Boombox.StorageEndpoints.H264.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:aac, location}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.AAC.link_output(location, track_builders, spec_builder)
+    Boombox.StorageEndpoints.AAC.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:wav, location}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.WAV.link_output(location, track_builders, spec_builder)
+    Boombox.StorageEndpoints.WAV.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:mp3, location}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.MP3.link_output(location, track_builders, spec_builder)
+    Boombox.StorageEndpoints.MP3.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:ivf, location}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.IVF.link_output(location, track_builders, spec_builder)
+    Boombox.StorageEndpoints.IVF.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:ogg, location}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.OGG.link_output(location, track_builders, spec_builder)
+    Boombox.StorageEndpoints.Ogg.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, _state) do

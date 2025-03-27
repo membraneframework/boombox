@@ -1,23 +1,14 @@
-defmodule Boombox.OGG do
+defmodule Boombox.StorageEndpoints.Ogg do
   @moduledoc false
   import Membrane.ChildrenSpec
   alias Boombox.Pipeline.Ready
+  alias Boombox.StorageEndpoints
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
   def create_input(location, opts) do
     spec =
-      case opts[:transport] do
-        :file ->
-          child(:ogg_in_file_source, %Membrane.File.Source{location: location})
-          |> child(:ogg_demuxer, Membrane.Ogg.Demuxer)
-
-        :http ->
-          child(:wav_in_http_source, %Membrane.Hackney.Source{
-            location: location,
-            hackney_opts: [follow_redirect: true]
-          })
-          |> child(:ogg_demuxer, Membrane.Ogg.Demuxer)
-      end
+      StorageEndpoints.get_source(location, opts[:transport])
+      |> child(:ogg_demuxer, Membrane.Ogg.Demuxer)
 
     %Ready{track_builders: [{:audio, spec}]}
   end
@@ -28,15 +19,8 @@ defmodule Boombox.OGG do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do
-    [{:audio, audio_track_builder}] =
-      track_builders
-      |> Enum.filter(fn
-        {:audio, _track_builder} -> true
-        _other -> false
-      end)
-
     spec =
-      audio_track_builder
+      StorageEndpoints.get_track(track_builders, :audio)
       |> child(:ogg_audio_transcoder, %Membrane.Transcoder{
         output_stream_format: Membrane.Opus
       })
@@ -47,7 +31,7 @@ defmodule Boombox.OGG do
         input_delimitted?: false
       })
       |> child(:ogg_muxer, Membrane.Ogg.Muxer)
-      |> child(:ogg_file_sink, %Membrane.File.Sink{location: location})
+      |> child(:file_sink, %Membrane.File.Sink{location: location})
 
     %Ready{actions: [spec: spec]}
   end
