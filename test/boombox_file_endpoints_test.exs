@@ -45,7 +45,9 @@ defmodule BoomboxFileEndpointsTest do
         output: output_mp4_path
       )
 
-      Compare.compare(output_mp4_path, "test/fixtures/file_endpoints/bun10s.mp4", kinds: unquote(kinds))
+      Compare.compare(output_mp4_path, "test/fixtures/file_endpoints/bun10s.mp4",
+        kinds: unquote(kinds)
+      )
     end
   end)
 end

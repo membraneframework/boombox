@@ -67,7 +67,7 @@ defmodule Boombox do
           | {:target, String.t()}
         ]
 
-   @type input ::
+  @type input ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:h264, location :: String.t(),

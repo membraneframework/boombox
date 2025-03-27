@@ -79,8 +79,13 @@ defmodule Support.Compare do
           |> via_out(Pad.ref(:output, id))
           |> child(Membrane.AAC.Parser)
           |> child(Membrane.AAC.FDK.Decoder)
-          |> child(%Membrane.FFmpeg.SWResample.Converter{output_stream_format:
-            %Membrane.RawAudio{sample_format: :s16le, sample_rate: 44100, channels: 1}})
+          |> child(%Membrane.FFmpeg.SWResample.Converter{
+            output_stream_format: %Membrane.RawAudio{
+              sample_format: :s16le,
+              sample_rate: 44_100,
+              channels: 1
+            }
+          })
           |> child(:sub_audio_bufs, GetBuffers)
 
         {id, %h26x{}} when h26x in [Membrane.H264, Membrane.H265] ->
@@ -124,11 +129,9 @@ defmodule Support.Compare do
       assert_pipeline_notified(p, :sub_audio_bufs, {:buffers, sub_audio_bufs})
       assert_pipeline_notified(p, :ref_audio_bufs, {:buffers, ref_audio_bufs})
 
-
-      ref_audio = Enum.map(ref_audio_bufs, & &1.payload) |> Enum.join()
-      sub_audio = Enum.map(sub_audio_bufs, & &1.payload) |> Enum.join()
-
-      assert (byte_size(sub_audio) - byte_size(ref_audio)) < 0.01*byte_size(sub_audio)
+      ref_audio = Enum.map_join(ref_audio_bufs, & &1.payload)
+      sub_audio = Enum.map_join(sub_audio_bufs, & &1.payload)
+      assert byte_size(sub_audio) - byte_size(ref_audio) < 0.01 * byte_size(sub_audio)
       # The results differ between operating systems
       # and subsequent runs due to transcoding.
       # The threshold here is obtained empirically and may need
