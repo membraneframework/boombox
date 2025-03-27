@@ -107,15 +107,18 @@ defmodule Boombox.BrowserTest do
     assert size > 400_000
   end
 
-  for first <- [:ingress, :egress] do
-    test "browser -> boombox -> browser, but #{first} browser page connects first", %{
-      browser: browser
-    } do
+  for first <- [:ingress, :egress], transcoding? <- [true, false] do
+    test "browser -> boombox -> browser, but #{first} browser page connects first and :enforce_audio/video_transcoding? is set to #{transcoding?}",
+         %{
+           browser: browser
+         } do
+      transcoding? = unquote(transcoding?)
+
       boombox_task =
         Task.async(fn ->
           Boombox.run(
             input: {:webrtc, "ws://localhost:8829"},
-            output: {:webrtc, "ws://localhost:8830"}
+            output: {:webrtc, "ws://localhost:8830", force_transcoding: transcoding?}
           )
         end)
 
@@ -142,6 +145,10 @@ defmodule Boombox.BrowserTest do
 
       assert_frames_encoded(ingress_page, seconds)
       assert_frames_decoded(egress_page, seconds)
+
+      assert_page_codecs(ingress_page, [:vp8, :opus])
+      egress_video_codec = if unquote(transcoding?), do: :h264, else: :vp8
+      assert_page_codecs(egress_page, [egress_video_codec, :opus])
 
       [ingress_page, egress_page]
       |> Enum.each(&close_page/1)
@@ -220,15 +227,37 @@ defmodule Boombox.BrowserTest do
            |> String.contains?("Connected")
   end
 
+  defp assert_page_codecs(page, codecs) do
+    page_codecs =
+      get_webrtc_stats(page, type: "codec")
+      |> MapSet.new(& &1.mimeType)
+
+    expected_codecs =
+      codecs
+      |> MapSet.new(fn
+        :h264 -> "video/H264"
+        :vp8 -> "video/VP8"
+        :opus -> "audio/opus"
+      end)
+
+    assert page_codecs == expected_codecs
+  end
+
   defp assert_frames_encoded(page, time_seconds) do
     fps_lowerbound = 12
-    frames_encoded = get_webrtc_stats(page, type: "outbound-rtp", kind: "video").framesEncoded
+
+    [%{framesEncoded: frames_encoded}] =
+      get_webrtc_stats(page, type: "outbound-rtp", kind: "video")
+
     assert frames_encoded >= time_seconds * fps_lowerbound
   end
 
   defp assert_frames_decoded(page, time_seconds) do
     fps_lowerbound = 12
-    frames_decoded = get_webrtc_stats(page, type: "inbound-rtp", kind: "video").framesDecoded
+
+    [%{framesDecoded: frames_decoded}] =
+      get_webrtc_stats(page, type: "inbound-rtp", kind: "video")
+
     assert frames_decoded >= time_seconds * fps_lowerbound
   end
 
@@ -238,6 +267,6 @@ defmodule Boombox.BrowserTest do
 
     Playwright.Page.evaluate(page, js_fuj)
     |> Enum.map(fn [_id, data] -> data end)
-    |> Enum.find(fn stat -> Enum.all?(constraints, fn {k, v} -> stat[k] == v end) end)
+    |> Enum.filter(fn stat -> Enum.all?(constraints, fn {k, v} -> stat[k] == v end) end)
   end
 end

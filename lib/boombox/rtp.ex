@@ -62,7 +62,8 @@ defmodule Boombox.RTP do
           track_configs: %{
             optional(:audio) => parsed_output_track_config(),
             optional(:video) => parsed_output_track_config()
-          }
+          },
+          force_transcoding: boolean() | :video | :audio
         }
 
   @type parsed_track_config :: parsed_input_track_config() | parsed_output_track_config()
@@ -137,12 +138,12 @@ defmodule Boombox.RTP do
       Enum.map(track_builders, fn {media_type, builder} ->
         track_config = parsed_opts.track_configs[media_type]
 
-        {output_stream_format, parser, payloader} =
+        {output_stream_format, parser, payloader, force_transcoding?} =
           case track_config.encoding_name do
             :H264 ->
               {%Membrane.H264{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H264.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
-               Membrane.RTP.H264.Payloader}
+               Membrane.RTP.H264.Payloader, parsed_opts.force_transcoding in [true, :video]}
 
             :AAC ->
               {%Membrane.AAC{encapsulation: :none},
@@ -150,21 +151,22 @@ defmodule Boombox.RTP do
                %Membrane.RTP.AAC.Payloader{
                  mode: track_config.encoding_specific_params.aac_bitrate_mode,
                  frames_per_packet: 1
-               }}
+               }, parsed_opts.force_transcoding in [true, :video]}
 
             :OPUS ->
               {Membrane.Opus, %Membrane.Opus.Parser{delimitation: :undelimit},
-               Membrane.RTP.Opus.Payloader}
+               Membrane.RTP.Opus.Payloader, parsed_opts.force_transcoding in [true, :audio]}
 
             :H265 ->
               {%Membrane.H265{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H265.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
-               Membrane.RTP.H265.Payloader}
+               Membrane.RTP.H265.Payloader, parsed_opts.force_transcoding in [true, :audio]}
           end
 
         builder
         |> child({:rtp_transcoder, media_type}, %Membrane.Transcoder{
-          output_stream_format: output_stream_format
+          output_stream_format: output_stream_format,
+          force_transcoding?: force_transcoding?
         })
         |> child({:rtp_out_parser, media_type}, parser)
         |> child({:rtp_payloader, media_type}, payloader)
@@ -213,7 +215,16 @@ defmodule Boombox.RTP do
       raise "No RTP media configured"
     end
 
-    Map.put(transport_opts, :track_configs, parsed_track_configs)
+    parsed_opts = transport_opts |> Map.put(:track_configs, parsed_track_configs)
+
+    case direction do
+      :input ->
+        parsed_opts
+
+      :output ->
+        force_transcoding = opts |> Keyword.get(:force_transcoding, false)
+        parsed_opts |> Map.put(:force_transcoding, force_transcoding)
+    end
   end
 
   @spec parse_output_target(

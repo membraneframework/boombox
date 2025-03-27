@@ -46,7 +46,7 @@ defmodule Boombox.Mixfile do
 
   defp deps do
     [
-      {:membrane_core, "~> 1.1"},
+      {:membrane_core, "~> 1.2"},
       {:membrane_transcoder_plugin,
        github: "membraneframework/membrane_transcoder_plugin",
        branch: "varsill/support_more_codecs"},
