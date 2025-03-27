@@ -201,6 +201,7 @@ defmodule Boombox do
     parse_endpoint_opt!(direction, {value, []})
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
     uri = URI.parse(value)
     scheme = uri.scheme

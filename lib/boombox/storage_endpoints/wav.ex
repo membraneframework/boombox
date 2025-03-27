@@ -1,8 +1,8 @@
 defmodule Boombox.StorageEndpoints.WAV do
   @moduledoc false
   import Membrane.ChildrenSpec
-  alias Boombox.StorageEndpoints
   alias Boombox.Pipeline.Ready
+  alias Boombox.StorageEndpoints
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
   def create_input(location, opts) do

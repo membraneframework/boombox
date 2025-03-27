@@ -1,8 +1,8 @@
 defmodule Boombox.StorageEndpoints.AAC do
   @moduledoc false
   import Membrane.ChildrenSpec
-  alias Boombox.StorageEndpoints
   alias Boombox.Pipeline.Ready
+  alias Boombox.StorageEndpoints
   alias Membrane.AAC
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()

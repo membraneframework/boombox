@@ -19,7 +19,9 @@ defmodule Boombox.StorageEndpoints do
 
   @spec get_track([{:audio | :video, Builder.t()}], :audio | :video) :: Builder.t()
   def get_track(track_builders, track_type) do
-    maybe_track = track_builders |> Enum.find(fn
+    maybe_track =
+      track_builders
+      |> Enum.find(fn
         {^track_type, _track_builder} -> true
         _other -> false
       end)
