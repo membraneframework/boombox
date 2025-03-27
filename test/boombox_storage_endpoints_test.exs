@@ -47,9 +47,7 @@ defmodule BoomboxStorageEndpointsTest do
         output: output_mp4_path
       )
 
-      Compare.compare(output_mp4_path, ref_file,
-        kinds: unquote(kinds)
-      )
+      Compare.compare(output_mp4_path, ref_file, kinds: unquote(kinds))
     end
   end)
 end
