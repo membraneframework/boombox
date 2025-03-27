@@ -37,6 +37,7 @@ defmodule Support.Compare do
   end
 
   @spec compare(Path.t(), Path.t(), [compare_option()]) :: :ok
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def compare(subject, reference, options \\ []) do
     kinds = options[:kinds] || [:audio, :video]
     format = options[:format] || :mp4

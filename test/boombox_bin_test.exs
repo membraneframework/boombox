@@ -6,8 +6,6 @@ defmodule Boombox.BinTest do
 
   require Logger
 
-  @bbb_mp4 "test/fixtures/bun10s.mp4"
-
   alias Membrane.{
     AAC,
     H264,
@@ -21,6 +19,8 @@ defmodule Boombox.BinTest do
 
   alias Support.Compare
 
+  @bbb_mp4 "test/fixtures/bun10s.mp4"
+
   @video_formats Macro.escape([
                    {H264, :avc3, :au},
                    {H264, :annexb, :nalu},
@@ -32,6 +32,7 @@ defmodule Boombox.BinTest do
   @audio_formats Macro.escape([AAC, Opus, RawAudio, nil])
 
   defmodule Format do
+    @spec to_string(any()) :: String.t()
     def to_string(nil), do: "absent"
     def to_string(format), do: inspect(format)
   end

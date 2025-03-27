@@ -1,4 +1,7 @@
 defmodule Boombox.Bin do
+  @moduledoc """
+  TODO: write docs
+  """
   use Membrane.Bin
 
   require Membrane.Logger
