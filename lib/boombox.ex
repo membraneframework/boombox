@@ -4,9 +4,12 @@ defmodule Boombox do
 
   See `run/1` for details and [examples.livemd](examples.livemd) for examples.
   """
+  require Logger
   require Membrane.Time
 
   alias Membrane.RTP
+
+  @type force_transcoding() :: {:force_transcoding, boolean() | :audio | :video}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
   @type in_stream_opts :: [
@@ -65,6 +68,7 @@ defmodule Boombox do
           | {:address, :inet.ip_address() | String.t()}
           | {:port, :inet.port_number()}
           | {:target, String.t()}
+          | force_transcoding()
         ]
 
    @type input ::
@@ -86,6 +90,7 @@ defmodule Boombox do
 
   @type output ::
           (path_or_uri :: String.t())
+          | {path_or_uri :: String.t(), [force_transcoding()]}
           | {:mp4, location :: String.t()}
           | {:h264, location :: String.t()}
           | {:aac, location :: String.t()}
@@ -93,14 +98,20 @@ defmodule Boombox do
           | {:mp3, location :: String.t()}
           | {:ivf, location :: String.t()}
           | {:ogg, location :: String.t()}
+          | {:mp4, location :: String.t(), [force_transcoding()]}
           | {:webrtc, webrtc_signaling()}
+          | {:webrtc, webrtc_signaling(), [force_transcoding()]}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
+          | {:hls, location :: String.t(), [force_transcoding()]}
           | {:rtp, out_rtp_opts()}
           | {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
-  @typep opts_map :: %{input: input(), output: output()}
+  @typep opts_map :: %{
+           input: input(),
+           output: output()
+         }
 
   @doc """
   Runs boombox with given input and output.
@@ -116,13 +127,27 @@ defmodule Boombox do
 
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
+  ```
+  Boombox.run(
+    input: "path/to/file.mp4",
+    output: {:webrtc, "ws://0.0.0.0:1234"}
+  )
+  ```
   """
-  @spec run(Enumerable.t() | nil, input: input(), output: output()) :: :ok | Enumerable.t()
+  @spec run(Enumerable.t() | nil,
+          input: input(),
+          output: output()
+        ) :: :ok | Enumerable.t()
+  @endpoint_opts [:input, :output]
   def run(stream \\ nil, opts) do
-    opts_keys = [:input, :output]
-    opts = Keyword.validate!(opts, opts_keys) |> Map.new(fn {k, v} -> {k, parse_opt!(k, v)} end)
+    opts =
+      opts
+      |> Keyword.validate!(@endpoint_opts)
+      |> Map.new(fn {key, value} -> {key, parse_endpoint_opt!(key, value)} end)
 
-    if key = Enum.find(opts_keys, fn k -> not is_map_key(opts, k) end) do
+    :ok = maybe_log_transcoding_related_warning(opts)
+
+    if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
       raise "#{key} is not provided"
     end
 
@@ -170,16 +195,20 @@ defmodule Boombox do
     end
   end
 
-  @spec parse_opt!(:input, input()) :: input()
-  @spec parse_opt!(:output, output()) :: output()
-  defp parse_opt!(direction, value) when is_binary(value) do
+  @spec parse_endpoint_opt!(:input, input()) :: input()
+  @spec parse_endpoint_opt!(:output, output()) :: output()
+  defp parse_endpoint_opt!(direction, value) when is_binary(value) do
+    parse_endpoint_opt!(direction, {value, []})
+  end
+
+  defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
     uri = URI.parse(value)
     scheme = uri.scheme
     extension = if uri.path, do: Path.extname(uri.path)
 
     case {scheme, extension, direction} do
-      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value}
-      {nil, ".mp4", :output} -> {:mp4, value}
+      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value, opts}
+      {nil, ".mp4", :output} -> {:mp4, value, opts}
       {scheme, ".h264", :input} when scheme in [nil, "http", "https"] -> {:h264, value}
       {nil, ".h264", :output} -> {:h264, value}
       {scheme, ".aac", :input} when scheme in [nil, "http", "https"] -> {:aac, value}
@@ -194,25 +223,25 @@ defmodule Boombox do
       {nil, ".ogg", :output} -> {:ogg, value}
       {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
       {"rtsp", _ext, :input} -> {:rtsp, value}
-      {nil, ".m3u8", :output} -> {:hls, value}
+      {nil, ".m3u8", :output} -> {:hls, value, opts}
       _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
-    |> then(&parse_opt!(direction, &1))
+    |> then(&parse_endpoint_opt!(direction, &1))
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_opt!(direction, value) when is_tuple(value) do
+  defp parse_endpoint_opt!(direction, value) when is_tuple(value) do
     case value do
       {:mp4, location} when is_binary(location) and direction == :input ->
-        parse_opt!(:input, {:mp4, location, []})
+        parse_endpoint_opt!(:input, {:mp4, location, []})
 
       {:mp4, location, opts} when is_binary(location) and direction == :input ->
-        if Keyword.keyword?(opts),
-          do: {:mp4, location, transport: resolve_transport(location, opts)}
+        opts = opts |> Keyword.put(:transport, resolve_transport(location, opts))
+        {:mp4, location, opts}
 
       {:mp4, location} when is_binary(location) and direction == :output ->
-        {:mp4, location}
-
+        {:mp4, location, []}
+       
       {:h264, location} when is_binary(location) and direction == :input ->
         parse_opt!(:input, {:h264, location, []})
 
@@ -275,24 +304,42 @@ defmodule Boombox do
       {:ogg, location} when is_binary(location) and direction == :output ->
         {:ogg, location}
 
-      {:webrtc, %Membrane.WebRTC.Signaling{}} ->
+      {:webrtc, %Membrane.WebRTC.Signaling{}} when direction == :input ->
         value
 
-      {:webrtc, uri} when is_binary(uri) ->
+      {:webrtc, %Membrane.WebRTC.Signaling{} = signaling} ->
+        {:webrtc, signaling, []}
+
+      {:webrtc, %Membrane.WebRTC.Signaling{}, _opts} when direction == :output ->
+        value
+
+      {:webrtc, uri} when is_binary(uri) and direction == :input ->
+        value
+
+      {:webrtc, uri} when is_binary(uri) and direction == :output ->
+        {:webrtc, uri, []}
+
+      {:webrtc, uri, _opts} when is_binary(uri) and direction == :output ->
         value
 
       {:whip, uri} when is_binary(uri) ->
-        parse_opt!(direction, {:whip, uri, []})
+        parse_endpoint_opt!(direction, {:whip, uri, []})
 
-      {:whip, uri, opts} when is_binary(uri) and is_list(opts) ->
-        if Keyword.keyword?(opts) do
-          {:webrtc, {:whip, uri, opts}}
-        end
+      {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :input ->
+        if Keyword.keyword?(opts), do: {:webrtc, value}
+
+      {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :output ->
+        {webrtc_opts, whip_opts} = split_webrtc_and_whip_opts(opts)
+        if Keyword.keyword?(opts), do: {:webrtc, {:whip, uri, whip_opts}, webrtc_opts}
 
       {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
         value
 
       {:hls, location} when direction == :output and is_binary(location) ->
+        {:hls, location, []}
+
+      {:hls, location, opts}
+      when direction == :output and is_binary(location) and is_list(opts) ->
         value
 
       {:rtsp, location} when direction == :input and is_binary(location) ->
@@ -312,6 +359,27 @@ defmodule Boombox do
       value -> value
     end
   end
+
+  defguardp is_webrtc_endpoint(endpoint)
+            when is_tuple(endpoint) and elem(endpoint, 0) in [:webrtc, :whip]
+
+  @spec maybe_log_transcoding_related_warning(opts_map()) :: :ok
+  def maybe_log_transcoding_related_warning(opts) do
+    if is_webrtc_endpoint(opts.output) and not is_webrtc_endpoint(opts.input) and
+         webrtc_output_force_transcoding(opts) not in [true, :video] do
+      Logger.warning("""
+      Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
+      might lead to issues with the output video if the output stream isn't sent only by localhost. You \
+      can solve this by setting `:force_transcoding` output option to `true` or `:video`, but be aware \
+      that it will increase Boombox CPU usage.
+      """)
+    end
+
+    :ok
+  end
+
+  defp webrtc_output_force_transcoding(%{output: {:webrtc, _singaling, opts}}),
+    do: Keyword.get(opts, :force_transcoding)
 
   @spec consume_stream(Enumerable.t(), opts_map()) :: term()
   defp consume_stream(stream, opts) do
@@ -428,7 +496,7 @@ defmodule Boombox do
 
   @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
   defp resolve_transport(location, opts) do
-    case Keyword.merge(opts, transport: nil)[:transport] do
+    case Keyword.validate!(opts, transport: nil, force_transcoding: false)[:transport] do
       nil ->
         uri = URI.parse(location)
 
@@ -445,5 +513,10 @@ defmodule Boombox do
       transport ->
         raise ArgumentError, "Invalid transport: #{inspect(transport)}"
     end
+  end
+
+  defp split_webrtc_and_whip_opts(opts) do
+    opts
+    |> Enum.split_with(fn {key, _value} -> key == :force_transcoding end)
   end
 end

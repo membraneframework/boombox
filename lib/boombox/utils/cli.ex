@@ -24,7 +24,8 @@ defmodule Boombox.Utils.CLI do
     sps: {:string, :binary},
     vps: {:string, :binary},
     whip: {:string, :string},
-    token: {:string, :string}
+    token: {:string, :string},
+    force_transcoding: {:boolean, :boolean}
   ]
 
   @spec parse_argv([String.t()]) ::
@@ -97,6 +98,9 @@ defmodule Boombox.Utils.CLI do
 
       [{direction, value}] ->
         {direction, value}
+
+      [{direction, value} | opts] ->
+        {direction, {value, translate_opts(opts)}}
 
       _other ->
         cli_exit_error()
