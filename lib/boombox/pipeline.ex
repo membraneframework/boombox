@@ -5,14 +5,10 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_init(_ctx, opts) do
     spec =
-      child(
-        :bin,
-        %Boombox.Bin{
-          input: opts.input,
-          output: opts.output,
-          elixir_stream_process: opts.parent
-        }
-      )
+      child(:boombox, %Boombox.Bin{
+        input: opts.input,
+        output: opts.output
+      })
 
     {[spec: spec], %{}}
   end

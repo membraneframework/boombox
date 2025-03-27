@@ -251,8 +251,13 @@ defmodule Boombox do
 
   @spec start_pipeline(opts_map()) :: procs()
   defp start_pipeline(opts) do
+    opts =
+      opts
+      |> Map.update!(:input, &resolve_stream_endpoint(&1, self()))
+      |> Map.update!(:output, &resolve_stream_endpoint(&1, self()))
+
     {:ok, supervisor, pipeline} =
-      Membrane.Pipeline.start_link(Boombox.Pipeline, Map.put(opts, :parent, self()))
+      Membrane.Pipeline.start_link(Boombox.Pipeline, opts)
 
     Process.monitor(supervisor)
     %{supervisor: supervisor, pipeline: pipeline}
@@ -289,4 +294,9 @@ defmodule Boombox do
 
     :ok
   end
+
+  defp resolve_stream_endpoint({:stream, stream_options}, parent),
+    do: {:stream, parent, stream_options}
+
+  defp resolve_stream_endpoint(endpont, _parent), do: endpont
 end

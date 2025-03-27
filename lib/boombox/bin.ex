@@ -6,6 +6,29 @@ defmodule Boombox.Bin do
   require Membrane.Transcoder.Video
   alias Membrane.Transcoder
 
+  @type input() ::
+          (path_or_uri :: String.t())
+          | {:mp4, location :: String.t(), transport: :file | :http}
+          | {:webrtc, Boombox.webrtc_signaling()}
+          | {:whip, uri :: String.t(), token: String.t()}
+          | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
+          | {:rtsp, url :: String.t()}
+          | {:rtp, Boombox.in_rtp_opts()}
+          | {:stream, pid(), Boombox.in_stream_opts()}
+
+  @type output ::
+          (path_or_uri :: String.t())
+          | {path_or_uri :: String.t(), [Boombox.force_transcoding()]}
+          | {:mp4, location :: String.t()}
+          | {:mp4, location :: String.t(), [Boombox.force_transcoding()]}
+          | {:webrtc, Boombox.webrtc_signaling()}
+          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.force_transcoding()]}
+          | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
+          | {:hls, location :: String.t()}
+          | {:hls, location :: String.t(), [Boombox.force_transcoding()]}
+          | {:rtp, Boombox.out_rtp_opts()}
+          | {:stream, pid(), Boombox.out_stream_opts()}
+
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
@@ -35,7 +58,7 @@ defmodule Boombox.Bin do
   defmodule State do
     @moduledoc false
 
-    @enforce_keys [:status, :input, :output, :elixir_stream_process]
+    @enforce_keys [:status, :input, :output]
 
     defstruct @enforce_keys ++
                 [
@@ -68,15 +91,14 @@ defmodule Boombox.Bin do
 
     @type t :: %__MODULE__{
             status: status(),
-            input: Boombox.input(),
-            output: Boombox.output(),
+            input: Boombox.Bin.input(),
+            output: Boombox.Bin.output(),
             actions_acc: [Membrane.Bin.Action.t()],
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.Bin.track_builders() | nil,
             last_result: Ready.t() | Wait.t() | nil,
             eos_info: term(),
             rtsp_state: Boombox.RTSP.state() | nil,
-            elixir_stream_process: pid() | nil,
             output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
           }
   end
@@ -92,14 +114,11 @@ defmodule Boombox.Bin do
     max_instances: 1
 
   def_options input: [
-                spec: Boombox.input() | :membrane_pad,
+                spec: input() | :membrane_pad,
                 default: :membrane_pad
               ],
               output: [
-                spec: Boombox.output()
-              ],
-              elixir_stream_process: [
-                default: nil
+                spec: output()
               ]
 
   @impl true
@@ -107,13 +126,12 @@ defmodule Boombox.Bin do
     state = %State{
       input: parse_endpoint_opt!(:input, opts.input),
       output: parse_endpoint_opt!(:output, opts.output),
-      elixir_stream_process: opts.elixir_stream_process,
       status: :init
     }
 
     :ok = maybe_log_transcoding_related_warning(state.input, state.output)
 
-    with :membrane_pad <- state.input, {:stream, _opts} <- state.output do
+    with :membrane_pad <- state.input, {:stream, _pid, _opts} <- state.output do
       raise "Boombox bin cannot have pad input and stream output at the same time"
     end
 
@@ -339,7 +357,7 @@ defmodule Boombox.Bin do
     end
   end
 
-  @spec create_input(Boombox.input(), Membrane.Bin.CallbackContext.t(), State.t()) ::
+  @spec create_input(input(), Membrane.Bin.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
   defp create_input({:webrtc, signaling}, ctx, state) do
     Boombox.WebRTC.create_input(signaling, state.output, ctx, state)
@@ -361,15 +379,15 @@ defmodule Boombox.Bin do
     Boombox.RTP.create_input(opts)
   end
 
-  defp create_input({:stream, params}, _ctx, state) do
-    Boombox.ElixirStream.create_input(state.elixir_stream_process, params)
+  defp create_input({:stream, stream_process, params}, _ctx, _state) do
+    Boombox.ElixirStream.create_input(stream_process, params)
   end
 
   defp create_input(:membrane_pad, ctx, _state) do
     Boombox.Pad.create_input(ctx)
   end
 
-  @spec create_output(Boombox.output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
+  @spec create_output(output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
           {Ready.t() | Wait.t(), State.t()}
   defp create_output({:webrtc, signaling, _opts}, ctx, state) do
     Boombox.WebRTC.create_output(signaling, ctx, state)
@@ -380,7 +398,7 @@ defmodule Boombox.Bin do
   end
 
   @spec link_output(
-          Boombox.output(),
+          output(),
           track_builders(),
           Membrane.ChildrenSpec.t(),
           Membrane.Bin.CallbackContext.t(),
@@ -408,9 +426,9 @@ defmodule Boombox.Bin do
     Boombox.RTP.link_output(opts, track_builders, spec_builder)
   end
 
-  defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
+  defp link_output({:stream, stream_process, opts}, track_builders, spec_builder, _ctx, _state) do
     Boombox.ElixirStream.link_output(
-      state.elixir_stream_process,
+      stream_process,
       opts,
       track_builders,
       spec_builder
@@ -425,10 +443,10 @@ defmodule Boombox.Bin do
     Process.sleep(500)
   end
 
-  @spec parse_endpoint_opt!(:input, Boombox.input() | :membrane_pad) ::
-          Boombox.input() | :membrane_pad
-  @spec parse_endpoint_opt!(:output, Boombox.output() | :membrane_pad) ::
-          Boombox.output() | :membrane_pad
+  @spec parse_endpoint_opt!(:input, input() | :membrane_pad) ::
+          input() | :membrane_pad
+  @spec parse_endpoint_opt!(:output, output() | :membrane_pad) ::
+          output() | :membrane_pad
   defp parse_endpoint_opt!(direction, value) when is_binary(value) do
     parse_endpoint_opt!(direction, {value, []})
   end
@@ -509,7 +527,7 @@ defmodule Boombox.Bin do
       {:rtp, opts} ->
         if Keyword.keyword?(opts), do: value
 
-      {:stream, opts} ->
+      {:stream, _stream_process, opts} ->
         if Keyword.keyword?(opts), do: value
 
       :membrane_pad ->
@@ -553,7 +571,7 @@ defmodule Boombox.Bin do
   defguardp is_webrtc_endpoint(endpoint)
             when is_tuple(endpoint) and elem(endpoint, 0) in [:webrtc, :whip]
 
-  @spec maybe_log_transcoding_related_warning(Boombox.input(), Boombox.output()) :: :ok
+  @spec maybe_log_transcoding_related_warning(input(), output()) :: :ok
   defp maybe_log_transcoding_related_warning(input, output) do
     if is_webrtc_endpoint(output) and not is_webrtc_endpoint(input) and
          webrtc_output_force_transcoding(output) not in [true, :video] do
