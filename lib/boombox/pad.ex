@@ -10,8 +10,13 @@ defmodule Boombox.Pad do
   alias Membrane.Connector
 
   @spec handle_pad_added(Membrane.Pad.ref(), CallbackContext.t()) :: [Action.t()] | no_return()
-  def handle_pad_added(_pad_ref, ctx) when ctx.playback == :playing do
-    raise "error pad added too late"
+  def handle_pad_added(pad_ref, ctx) when ctx.playback == :playing do
+    raise """
+    Boombox.Bin pad #{inspect(pad_ref)} was added while the Boombox.Bin playback \
+    is already :playing. All Boombox.Bin pads have to be linked before it enters \
+    :playing playback. To achieve so, link all pads of Boombox.Bin in the same spec \
+    where you spawn it.
+    """
   end
 
   def handle_pad_added(pad_ref, _ctx) do
@@ -22,14 +27,12 @@ defmodule Boombox.Pad do
     [spec: spec]
   end
 
-  # create_input should be executed:
-  #  - after `output_ready`
-  #    a. we are in :playing, so we go to `:input_ready`
-  #    b. we are in :stopped, so we execute `create_input` in `handle_playing`
-
   @spec create_input(CallbackContext.t()) :: Ready.t() | Wait.t() | no_return()
   def create_input(ctx) when ctx.playback == :playing and ctx.pads == %{} do
-    raise "error no pads"
+    raise """
+    Cannot create input of type #{inspect(__MODULE__)}, while there are no pads. \
+    Link pads to Boombox.Bin or set the `:input` option to fix this error.
+    """
   end
 
   def create_input(ctx) when ctx.playback == :playing do

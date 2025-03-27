@@ -126,7 +126,6 @@ defmodule Boombox.Bin do
       state.status in [:init, :awaiting_output] ->
         {[], state}
 
-      # state.status in [:output_ready, :awaiting_input] ->
       state.status == :awaiting_input ->
         Boombox.Pad.create_input(ctx)
         |> proceed_result(ctx, state)
