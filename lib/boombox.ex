@@ -241,9 +241,12 @@ defmodule Boombox do
 
       {:mp4, location} when is_binary(location) and direction == :output ->
         {:mp4, location, []}
-       
+
+      {:mp4, location, _opts} when is_binary(location) and direction == :output ->
+        value
+
       {:h264, location} when is_binary(location) and direction == :input ->
-        parse_opt!(:input, {:h264, location, []})
+        parse_endpoint_opt!(:input, {:h264, location, []})
 
       {:h264, location, opts} when is_binary(location) and direction == :input ->
         if Keyword.keyword?(opts),
@@ -255,7 +258,7 @@ defmodule Boombox do
         {:h264, location}
 
       {:aac, location} when is_binary(location) and direction == :input ->
-        parse_opt!(:input, {:aac, location, []})
+        parse_endpoint_opt!(:input, {:aac, location, []})
 
       {:aac, location, opts} when is_binary(location) and direction == :input ->
         if Keyword.keyword?(opts),
@@ -265,7 +268,7 @@ defmodule Boombox do
         {:aac, location}
 
       {:wav, location} when is_binary(location) and direction == :input ->
-        parse_opt!(:input, {:wav, location, []})
+        parse_endpoint_opt!(:input, {:wav, location, []})
 
       {:wav, location, opts} when is_binary(location) and direction == :input ->
         if Keyword.keyword?(opts),
@@ -275,7 +278,7 @@ defmodule Boombox do
         {:wav, location}
 
       {:mp3, location} when is_binary(location) and direction == :input ->
-        parse_opt!(:input, {:mp3, location, []})
+        parse_endpoint_opt!(:input, {:mp3, location, []})
 
       {:mp3, location, opts} when is_binary(location) and direction == :input ->
         if Keyword.keyword?(opts),
@@ -285,7 +288,7 @@ defmodule Boombox do
         {:mp3, location}
 
       {:ivf, location} when is_binary(location) and direction == :input ->
-        parse_opt!(:input, {:ivf, location, []})
+        parse_endpoint_opt!(:input, {:ivf, location, []})
 
       {:ivf, location, opts} when is_binary(location) and direction == :input ->
         if Keyword.keyword?(opts),
@@ -295,7 +298,7 @@ defmodule Boombox do
         {:ivf, location}
 
       {:ogg, location} when is_binary(location) and direction == :input ->
-        parse_opt!(:input, {:ogg, location, []})
+        parse_endpoint_opt!(:input, {:ogg, location, []})
 
       {:ogg, location, opts} when is_binary(location) and direction == :input ->
         if Keyword.keyword?(opts),
