@@ -1,4 +1,4 @@
-defmodule BoomboxFileEndpointsTest do
+defmodule BoomboxStorageEndpointsTest do
   use ExUnit.Case, async: true
 
   alias Support.Compare
@@ -31,10 +31,12 @@ defmodule BoomboxFileEndpointsTest do
 
   Enum.each(@test_cases, fn {input_path, {output_type, kinds}} ->
     test "#{inspect(input_path)} file -> #{inspect(output_type)} file", %{tmp_dir: tmp} do
+      fixtures_dir = "test/fixtures/storage_endpoints/"
+      ref_file = Path.join(fixtures_dir, "bun10s.mp4")
       output_path = Path.join(tmp, "output")
 
       Boombox.run(
-        input: "test/fixtures/file_endpoints/#{unquote(input_path)}",
+        input: Path.join(fixtures_dir, unquote(input_path)),
         output: {unquote(output_type), output_path}
       )
 
@@ -45,7 +47,7 @@ defmodule BoomboxFileEndpointsTest do
         output: output_mp4_path
       )
 
-      Compare.compare(output_mp4_path, "test/fixtures/file_endpoints/bun10s.mp4",
+      Compare.compare(output_mp4_path, ref_file,
         kinds: unquote(kinds)
       )
     end
