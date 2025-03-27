@@ -30,7 +30,7 @@ defmodule Support.Async do
       end
 
       def unquote(unquoted_var(:after_compile_fun_name))(_bytecode, _env) do
-        test_name = unquote(test_name)
+        test_name = unquote(unquoted(test_name))
         fun_name = unquote(unquoted_var(:fun_name))
 
         content =
