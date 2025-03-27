@@ -9,7 +9,7 @@ defmodule Boombox.MP4 do
 
   defguardp is_h26x(format) when is_struct(format) and format.__struct__ in [H264, H265]
 
-  @spec create_input(String.t(), [Boombox.force_transcoding() | {:transport, :file | :http}]) ::
+  @spec create_input(String.t(), [{:transport, :file | :http}]) ::
           Wait.t()
   def create_input(location, opts) do
     spec =

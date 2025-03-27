@@ -11,7 +11,9 @@ defmodule Boombox.MP3 do
           child(:mp3_in_file_source, %Membrane.File.Source{location: location})
           |> child(:mp3_stream_format_overrider, %Membrane.Transcoder{
             output_stream_format: Membrane.MPEGAudio,
-            assumed_input_stream_format: %Membrane.RemoteStream{content_format: Membrane.MPEGAudio}
+            assumed_input_stream_format: %Membrane.RemoteStream{
+              content_format: Membrane.MPEGAudio
+            }
           })
 
         :http ->
@@ -21,7 +23,9 @@ defmodule Boombox.MP3 do
           })
           |> child(:mp3_stream_format_overrider, %Membrane.Transcoder{
             output_stream_format: Membrane.MPEGAudio,
-            assumed_input_stream_format: %Membrane.RemoteStream{content_format: Membrane.MPEGAudio}
+            assumed_input_stream_format: %Membrane.RemoteStream{
+              content_format: Membrane.MPEGAudio
+            }
           })
       end
 

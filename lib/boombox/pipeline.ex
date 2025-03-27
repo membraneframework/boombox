@@ -174,7 +174,7 @@ defmodule Boombox.Pipeline do
 
   @impl true
   def handle_child_notification({:end_of_stream, id}, :webrtc_output, _ctx, state) do
-    %{Eos_info: track_ids} = state
+    %{eos_info: track_ids} = state
     track_ids = List.delete(track_ids, id)
     state = %{state | eos_info: track_ids}
 
@@ -453,7 +453,6 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, _state) do
     Boombox.HLS.link_output(location, opts, track_builders, spec_builder)
-
   end
 
   defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, _state) do
