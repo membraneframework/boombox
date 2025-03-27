@@ -461,10 +461,4 @@ defmodule Boombox.Pipeline do
   defp wait_before_closing() do
     Process.sleep(500)
   end
-
-  @spec maybe_terminate(State.t()) :: [Membrane.Pipeline.Action.t()]
-  defp maybe_terminate(%{audio_terminated: true, video_terminated: true}),
-    do: [terminate: :normal]
-
-  defp maybe_terminate(_state), do: []
 end

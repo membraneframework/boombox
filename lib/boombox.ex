@@ -427,7 +427,7 @@ defmodule Boombox do
   end
 
   @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
-  defp resolve_transport(location, opts \\ []) do
+  defp resolve_transport(location, opts) do
     case Keyword.merge(opts, transport: nil)[:transport] do
       nil ->
         uri = URI.parse(location)
