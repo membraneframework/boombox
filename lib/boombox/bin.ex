@@ -166,6 +166,15 @@ defmodule Boombox.Bin do
   end
 
   @impl true
+  def handle_pad_added(pad_ref, _ctx, state) do
+    raise """
+    Tried to link pad #{inspect(pad_ref)}, while input was set to #{inspect(state.input)}. \
+    It is not possible to set `:input` option and link input pads of #{inspect(__MODULE__}} \
+    at the same time.
+    """
+  end
+
+  @impl true
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do
     Boombox.MP4.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
