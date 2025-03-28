@@ -169,7 +169,7 @@ defmodule Boombox.Bin do
   def handle_pad_added(pad_ref, _ctx, state) do
     raise """
     Tried to link pad #{inspect(pad_ref)}, while input was set to #{inspect(state.input)}. \
-    It is not possible to set `:input` option and link input pads of #{inspect(__MODULE__}} \
+    It is not possible to set `:input` option and link input pads of #{inspect(__MODULE__)} \
     at the same time.
     """
   end
