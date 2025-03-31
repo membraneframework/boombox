@@ -70,7 +70,7 @@ defmodule Support.Async do
     do_setup(quote(do: %{}), block)
   end
 
-  def do_setup(context, block) do
+  defp do_setup(context, block) do
     name = :"async_setup_#{:erlang.unique_integer([:positive])}"
 
     quote bind_quoted: [context: escape(context), block: escape(block), name: name] do
