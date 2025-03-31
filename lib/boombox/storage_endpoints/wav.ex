@@ -19,7 +19,8 @@ defmodule Boombox.StorageEndpoints.WAV do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do
-    spec = track_builders[:audio]
+    spec =
+      track_builders[:audio]
       |> child(:wav_transcoder, %Membrane.Transcoder{
         output_stream_format: Membrane.RawAudio
       })
