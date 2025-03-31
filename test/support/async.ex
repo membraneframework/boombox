@@ -27,7 +27,6 @@ defmodule Support.Async do
                   end)
 
       @setups Module.get_attribute(__MODULE__, :async_setup, [])
-      @setup_alls Module.get_attribute(__MODULE__, :async_setup_all, [])
 
       def unquote(unquoted_var(:fun_name))(unquote(context)) do
         unquote(block)
@@ -44,10 +43,6 @@ defmodule Support.Async do
             Enum.each(unquote(@tags_attrs), fn {name, value} ->
               Module.put_attribute(__MODULE__, name, value)
             end)
-
-            for setup_all_name <- unquote(@setup_alls) do
-              setup_all {unquote(__MODULE__), setup_all_name}
-            end
 
             for setup_name <- unquote(@setups) do
               setup {unquote(__MODULE__), setup_name}
