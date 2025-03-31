@@ -21,7 +21,6 @@ defmodule BoomboxTest do
 
   @tag :file_file_mp4
   async_test "mp4 file -> mp4 file", %{tmp_dir: tmp} do
-    IO.inspect("TEST VALUE: #{value}")
     output = Path.join(tmp, "output.mp4")
     Boombox.run(input: @bbb_mp4, output: output)
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
