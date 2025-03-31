@@ -6,6 +6,7 @@ defmodule Boombox do
   """
   require Logger
   require Membrane.Time
+  require Boombox.StorageEndpoints, as: StorageEndpoints
 
   alias Membrane.RTP
 
@@ -208,24 +209,25 @@ defmodule Boombox do
     extension = if uri.path, do: Path.extname(uri.path)
 
     case {scheme, extension, direction} do
-      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value, opts}
-      {nil, ".mp4", :output} -> {:mp4, value, opts}
-      {scheme, ".h264", :input} when scheme in [nil, "http", "https"] -> {:h264, value}
-      {nil, ".h264", :output} -> {:h264, value}
-      {scheme, ".aac", :input} when scheme in [nil, "http", "https"] -> {:aac, value}
-      {nil, ".aac", :output} -> {:aac, value}
-      {scheme, ".wav", :input} when scheme in [nil, "http", "https"] -> {:wav, value}
-      {nil, ".wav", :output} -> {:wav, value}
-      {scheme, ".mp3", :input} when scheme in [nil, "http", "https"] -> {:mp3, value}
-      {nil, ".mp3", :output} -> {:mp3, value}
-      {scheme, ".ivf", :input} when scheme in [nil, "http", "https"] -> {:ivf, value}
-      {nil, ".ivf", :output} -> {:ivf, value}
-      {scheme, ".ogg", :input} when scheme in [nil, "http", "https"] -> {:ogg, value}
-      {nil, ".ogg", :output} -> {:ogg, value}
-      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
-      {"rtsp", _ext, :input} -> {:rtsp, value}
-      {nil, ".m3u8", :output} -> {:hls, value, opts}
-      _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
+      {scheme, extension, :input}
+      when scheme in [nil, "http", "https"] and
+             StorageEndpoints.is_storage_endpoint_extension(extension) ->
+        {StorageEndpoints.get_storage_endpoint_type!(extension), value, opts}
+
+      {nil, extension, :output} when StorageEndpoints.is_storage_endpoint_extension(extension) ->
+        {StorageEndpoints.get_storage_endpoint_type!(extension), value, opts}
+
+      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] ->
+        {:rtmp, value}
+
+      {"rtsp", _ext, :input} ->
+        {:rtsp, value}
+
+      {nil, ".m3u8", :output} ->
+        {:hls, value, opts}
+
+      _other ->
+        raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
     |> then(&parse_endpoint_opt!(direction, &1))
   end
@@ -233,12 +235,19 @@ defmodule Boombox do
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp parse_endpoint_opt!(direction, value) when is_tuple(value) do
     case value do
-      {:mp4, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:mp4, location, []})
+      {endpoint_type, location}
+      when is_binary(location) and direction == :input and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        parse_endpoint_opt!(:input, {endpoint_type, location, []})
 
-      {:mp4, location, opts} when is_binary(location) and direction == :input ->
-        opts = opts |> Keyword.put(:transport, resolve_transport(location, opts))
-        {:mp4, location, opts}
+      {:h264, location, opts} when is_binary(location) and direction == :input ->
+        {:h264, location,
+         transport: resolve_transport(location, opts), framerate: opts[:framerate] || {30, 1}}
+
+      {endpoint_type, location, opts}
+      when is_binary(location) and direction == :input and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        {endpoint_type, location, transport: resolve_transport(location, opts)}
 
       {:mp4, location} when is_binary(location) and direction == :output ->
         {:mp4, location, []}
@@ -246,67 +255,10 @@ defmodule Boombox do
       {:mp4, location, _opts} when is_binary(location) and direction == :output ->
         value
 
-      {:h264, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:h264, location, []})
-
-      {:h264, location, opts} when is_binary(location) and direction == :input ->
-        if Keyword.keyword?(opts),
-          do:
-            {:h264, location,
-             transport: resolve_transport(location, opts), framerate: opts[:framerate] || {30, 1}}
-
-      {:h264, location} when is_binary(location) and direction == :output ->
-        {:h264, location}
-
-      {:aac, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:aac, location, []})
-
-      {:aac, location, opts} when is_binary(location) and direction == :input ->
-        if Keyword.keyword?(opts),
-          do: {:aac, location, transport: resolve_transport(location, opts)}
-
-      {:aac, location} when is_binary(location) and direction == :output ->
-        {:aac, location}
-
-      {:wav, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:wav, location, []})
-
-      {:wav, location, opts} when is_binary(location) and direction == :input ->
-        if Keyword.keyword?(opts),
-          do: {:wav, location, transport: resolve_transport(location, opts)}
-
-      {:wav, location} when is_binary(location) and direction == :output ->
-        {:wav, location}
-
-      {:mp3, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:mp3, location, []})
-
-      {:mp3, location, opts} when is_binary(location) and direction == :input ->
-        if Keyword.keyword?(opts),
-          do: {:mp3, location, transport: resolve_transport(location, opts)}
-
-      {:mp3, location} when is_binary(location) and direction == :output ->
-        {:mp3, location}
-
-      {:ivf, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:ivf, location, []})
-
-      {:ivf, location, opts} when is_binary(location) and direction == :input ->
-        if Keyword.keyword?(opts),
-          do: {:ivf, location, transport: resolve_transport(location, opts)}
-
-      {:ivf, location} when is_binary(location) and direction == :output ->
-        {:ivf, location}
-
-      {:ogg, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:ogg, location, []})
-
-      {:ogg, location, opts} when is_binary(location) and direction == :input ->
-        if Keyword.keyword?(opts),
-          do: {:ogg, location, transport: resolve_transport(location, opts)}
-
-      {:ogg, location} when is_binary(location) and direction == :output ->
-        {:ogg, location}
+      {endpoint_type, location}
+      when is_binary(location) and direction == :output and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        value
 
       {:webrtc, %Membrane.WebRTC.Signaling{}} when direction == :input ->
         value
