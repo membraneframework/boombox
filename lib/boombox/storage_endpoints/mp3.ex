@@ -17,7 +17,7 @@ defmodule Boombox.StorageEndpoints.MP3 do
         }
       })
 
-    %Ready{track_builders: [{:audio, spec}]}
+    %Ready{track_builders: %{audio: spec}}
   end
 
   @spec link_output(
@@ -26,8 +26,7 @@ defmodule Boombox.StorageEndpoints.MP3 do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do
-    spec =
-      StorageEndpoints.get_track(track_builders, :audio)
+    spec = track_builders[:audio]
       |> child(:mp3_audio_transcoder, %Membrane.Transcoder{
         output_stream_format: Membrane.MPEGAudio
       })

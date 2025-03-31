@@ -10,7 +10,7 @@ defmodule Boombox.StorageEndpoints.IVF do
       StorageEndpoints.get_source(location, opts[:transport])
       |> child(:ivf_deserializer, Membrane.IVF.Deserializer)
 
-    %Ready{track_builders: [{:video, spec}]}
+    %Ready{track_builders: %{video: spec}}
   end
 
   @spec link_output(
@@ -19,8 +19,7 @@ defmodule Boombox.StorageEndpoints.IVF do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do
-    spec =
-      StorageEndpoints.get_track(track_builders, :video)
+    spec = track_builders[:video]
       |> child(:ivf_video_transcoder, %Membrane.Transcoder{
         output_stream_format: fn
           %Membrane.VP8{} -> Membrane.VP8

@@ -10,7 +10,7 @@ defmodule Boombox.StorageEndpoints.Ogg do
       StorageEndpoints.get_source(location, opts[:transport])
       |> child(:ogg_demuxer, Membrane.Ogg.Demuxer)
 
-    %Ready{track_builders: [{:audio, spec}]}
+    %Ready{track_builders: %{audio: spec}}
   end
 
   @spec link_output(
@@ -19,8 +19,7 @@ defmodule Boombox.StorageEndpoints.Ogg do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do
-    spec =
-      StorageEndpoints.get_track(track_builders, :audio)
+    spec = track_builders[:audio]
       |> child(:ogg_audio_transcoder, %Membrane.Transcoder{
         output_stream_format: Membrane.Opus
       })

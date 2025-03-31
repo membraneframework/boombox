@@ -16,7 +16,7 @@ defmodule Boombox.StorageEndpoints.H264 do
         output_stream_structure: :annexb
       })
 
-    %Ready{track_builders: [{:video, spec}]}
+    %Ready{track_builders: %{video: spec}}
   end
 
   @spec link_output(
@@ -25,8 +25,7 @@ defmodule Boombox.StorageEndpoints.H264 do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do
-    spec =
-      StorageEndpoints.get_track(track_builders, :video)
+    spec = track_builders[:video]
       |> child(:h264_video_transcoder, %Membrane.Transcoder{
         output_stream_format: %H264{stream_structure: :annexb}
       })

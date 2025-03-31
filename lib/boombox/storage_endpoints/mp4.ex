@@ -57,7 +57,7 @@ defmodule Boombox.StorageEndpoints.MP4 do
     force_transcoding = opts |> Keyword.get(:force_transcoding, false)
 
     audio_branch =
-      case StorageEndpoints.get_track(track_builders, :audio) do
+      case track_builders[:audio] do
         nil ->
           []
 
@@ -78,7 +78,7 @@ defmodule Boombox.StorageEndpoints.MP4 do
       end
 
     video_branch =
-      case StorageEndpoints.get_track(track_builders, :video) do
+      case track_builders[:video] do
         nil ->
           []
 

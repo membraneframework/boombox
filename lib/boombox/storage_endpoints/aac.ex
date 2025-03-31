@@ -11,7 +11,7 @@ defmodule Boombox.StorageEndpoints.AAC do
       StorageEndpoints.get_source(location, opts[:transport])
       |> child(:aac_input_parser, Membrane.AAC.Parser)
 
-    %Ready{track_builders: [{:audio, spec}]}
+    %Ready{track_builders: %{audio: spec}}
   end
 
   @spec link_output(
@@ -20,8 +20,7 @@ defmodule Boombox.StorageEndpoints.AAC do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do
-    spec =
-      StorageEndpoints.get_track(track_builders, :audio)
+    spec = track_builders[:audio]
       |> child(:aac_audio_transcoder, %Membrane.Transcoder{
         output_stream_format: %AAC{}
       })
