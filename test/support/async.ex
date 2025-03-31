@@ -44,7 +44,7 @@ defmodule Support.Async do
               Module.put_attribute(__MODULE__, name, value)
             end)
 
-            for setup_name <- unquote(@setups) do
+            for setup_name <- unquote(Enum.reverse(@setups)) do
               setup {unquote(__MODULE__), setup_name}
             end
 
@@ -62,7 +62,7 @@ defmodule Support.Async do
     end
   end
 
-  defmacro async_setup(context, do: block) do
+  defmacro async_setup(context, block) do
     do_setup(context, block)
   end
 
