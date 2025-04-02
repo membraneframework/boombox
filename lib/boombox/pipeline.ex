@@ -330,6 +330,10 @@ defmodule Boombox.Pipeline do
     Boombox.StorageEndpoints.H264.create_input(location, opts)
   end
 
+  defp create_input({:h265, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.H265.create_input(location, opts)
+  end
+
   defp create_input({:aac, location, opts}, _ctx, _state) do
     Boombox.StorageEndpoints.AAC.create_input(location, opts)
   end
@@ -399,6 +403,10 @@ defmodule Boombox.Pipeline do
 
   defp link_output({:h264, location}, track_builders, spec_builder, _ctx, _state) do
     Boombox.StorageEndpoints.H264.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:h265, location}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.StorageEndpoints.H265.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:aac, location}, track_builders, spec_builder, _ctx, _state) do

@@ -3,10 +3,10 @@ defmodule Boombox.StorageEndpoints do
   import Membrane.ChildrenSpec
 
   defguard is_storage_endpoint_type(endpoint_type)
-           when endpoint_type in [:mp4, :h264, :aac, :wav, :mp3, :ivf, :ogg]
+           when endpoint_type in [:mp4, :h264, :h265, :aac, :wav, :mp3, :ivf, :ogg]
 
   defguard is_storage_endpoint_extension(extension)
-           when extension in [".mp4", ".h264", ".aac", ".wav", ".mp3", ".ivf", ".ogg"]
+           when extension in [".mp4", ".h264", ".h265", ".aac", ".wav", ".mp3", ".ivf", ".ogg"]
 
   @spec get_storage_endpoint_type!(String.t()) :: atom() | no_return()
   def get_storage_endpoint_type!(extension) do

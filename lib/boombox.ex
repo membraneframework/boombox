@@ -77,6 +77,8 @@ defmodule Boombox do
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:h264, location :: String.t(),
              transport: :file | :http, framerate: Membrane.H264.framerate()}
+          | {:h265, location :: String.t(),
+             transport: :file | :http, framerate: Membrane.H265.framerate()}
           | {:aac, location :: String.t(), transport: :file | :http}
           | {:wav, location :: String.t(), transport: :file | :http}
           | {:mp3, location :: String.t(), transport: :file | :http}
@@ -94,6 +96,7 @@ defmodule Boombox do
           | {path_or_uri :: String.t(), [force_transcoding()]}
           | {:mp4, location :: String.t()}
           | {:h264, location :: String.t()}
+          | {:h265, location :: String.t()}
           | {:aac, location :: String.t()}
           | {:wav, location :: String.t()}
           | {:mp3, location :: String.t()}
@@ -240,8 +243,9 @@ defmodule Boombox do
              StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
         parse_endpoint_opt!(:input, {endpoint_type, location, []})
 
-      {:h264, location, opts} when is_binary(location) and direction == :input ->
-        {:h264, location,
+      {endpoint_type, location, opts}
+      when endpoint_type in [:h264, :h265] and is_binary(location) and direction == :input ->
+        {endpoint_type, location,
          transport: resolve_transport(location, opts), framerate: opts[:framerate] || {30, 1}}
 
       {endpoint_type, location, opts}

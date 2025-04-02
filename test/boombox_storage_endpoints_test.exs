@@ -14,7 +14,7 @@ defmodule BoomboxStorageEndpointsTest do
                         output <- @just_audio_outputs,
                         do: {input, output}
 
-  @just_video_inputs ["bun10s.ivf", "bun10s.h264"]
+  @just_video_inputs ["bun10s.ivf", "bun10s.h264", "bun10s.h265"]
   @just_video_outputs [{:ivf, [:video]}, {:h264, [:video]}]
   @just_video_cases for input <- @just_video_inputs,
                         output <- @just_video_outputs,
