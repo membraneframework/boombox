@@ -11,7 +11,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 # Examples that don't mention them should still work.
 
 # MIX_INSTALL_CONFIG_BEGIN
-boombox = {:boombox, github: "membraneframework/boombox"}
+boombox = {:boombox, github: "membraneframework/boombox", branch: "python-interop"}
 
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
 # can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
