@@ -1,6 +1,6 @@
 defmodule BoomboxStorageEndpointsTest do
   use ExUnit.Case, async: true
-
+  import Support.Async
   alias Support.Compare
 
   @just_audio_inputs ["bun10s.aac", "bun10s.ogg", "bun10s.mp3", "bun10s.wav"]
@@ -30,7 +30,7 @@ defmodule BoomboxStorageEndpointsTest do
   @moduletag :tmp_dir
 
   Enum.each(@test_cases, fn {input_path, {output_type, kinds}} ->
-    test "#{inspect(input_path)} file -> #{inspect(output_type)} file", %{tmp_dir: tmp} do
+    async_test "#{inspect(input_path)} file -> #{inspect(output_type)} file", %{tmp_dir: tmp} do
       fixtures_dir = "test/fixtures/storage_endpoints/"
       ref_file = Path.join(fixtures_dir, "bun10s.mp4")
       output_path = Path.join(tmp, "output")
