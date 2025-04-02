@@ -1,4 +1,4 @@
-defmodule Boombox.ElixirStream.Source do
+defmodule Boombox.Message.Source do
   @moduledoc false
   use Membrane.Source
 
@@ -18,7 +18,7 @@ defmodule Boombox.ElixirStream.Source do
 
   @impl true
   def handle_playing(_ctx, state) do
-    send(state.producer, {:boombox_ex_stream_source, self()})
+    send(state.producer, {:boombox_message_source, self()})
     {[], state}
   end
 
