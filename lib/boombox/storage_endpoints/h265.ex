@@ -5,7 +5,7 @@ defmodule Boombox.StorageEndpoints.H265 do
   alias Boombox.StorageEndpoints
   alias Membrane.H265
 
-  @spec create_input(String.t(), transport: :file | :http, framerate: H265.framerate()) ::
+  @spec create_input(String.t(), transport: :file | :http, framerate: H265.framerate_t()) ::
           Ready.t()
   def create_input(location, opts) do
     spec =

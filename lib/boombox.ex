@@ -78,7 +78,7 @@ defmodule Boombox do
           | {:h264, location :: String.t(),
              transport: :file | :http, framerate: Membrane.H264.framerate()}
           | {:h265, location :: String.t(),
-             transport: :file | :http, framerate: Membrane.H265.framerate()}
+             transport: :file | :http, framerate: Membrane.H265.framerate_t()}
           | {:aac, location :: String.t(), transport: :file | :http}
           | {:wav, location :: String.t(), transport: :file | :http}
           | {:mp3, location :: String.t(), transport: :file | :http}
