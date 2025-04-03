@@ -9,9 +9,14 @@ defmodule Boombox.Gateway do
     GenServer.start_link(__MODULE__, arg)
   end
 
+  @spec start(term()) :: GenServer.on_start()
+  def start(arg) do
+    GenServer.start(__MODULE__, arg)
+  end
+
   @impl true
   def init(_arg) do
-    {:ok, %{boombox_pid: nil}}
+    {:ok, %{boombox_pid: nil, finished: false}}
   end
 
   @impl true
@@ -37,7 +42,7 @@ defmodule Boombox.Gateway do
   end
 
   @impl true
-  def handle_call({:consume_packet, packet}, _from, state) do
+  def handle_call({:consume_packet, packet}, _from, %{finished: false} = state) do
     send(state.boombox_pid, {:consume_packet, packet})
 
     receive do
@@ -48,7 +53,7 @@ defmodule Boombox.Gateway do
   end
 
   @impl true
-  def handle_call(:produce_packet, _from, state) do
+  def handle_call(:produce_packet, _from, %{finished: false} = state) do
     send(state.boombox_pid, :produce_packet)
 
     packet =
@@ -56,7 +61,18 @@ defmodule Boombox.Gateway do
         {:packet_produced, packet} -> packet
       end
 
-    {:reply, packet, state}
+    {:reply, {:ok, packet}, state}
+  end
+
+  @impl true
+  def handle_info(:finished, state) do
+    {:stop, :finished, state}
+  end
+
+  @impl true
+  def handle_info(info, state) do
+    IO.inspect(info)
+    {:noreply, state}
   end
 
   @spec consuming_boombox_function(boombox_opts(), pid()) :: :ok
@@ -69,18 +85,22 @@ defmodule Boombox.Gateway do
       end
     end)
     |> Boombox.run(run_opts)
+
+    send(gateway_pid, :finished)
   end
 
   @spec producing_boombox_function(boombox_opts(), pid()) :: :ok
   defp producing_boombox_function(run_opts, gateway_pid) do
     Boombox.run(run_opts)
-    |> Stream.each(fn packet ->
+    |> Enum.each(fn packet ->
       receive do
         :produce_packet -> :ok
       end
 
       send(gateway_pid, {:packet_produced, packet})
     end)
+
+    send(gateway_pid, :finished)
   end
 
   @spec get_boombox_mode(input: Boombox.input(), output: Boombox.output()) :: boombox_mode()
