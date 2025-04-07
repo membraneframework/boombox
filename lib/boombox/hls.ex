@@ -4,7 +4,7 @@ defmodule Boombox.HLS do
   import Membrane.ChildrenSpec
 
   require Membrane.Pad, as: Pad
-  alias Boombox.Bin.Ready
+  alias Boombox.InternalBin.Ready
   alias Membrane.H264
   alias Membrane.Time
 

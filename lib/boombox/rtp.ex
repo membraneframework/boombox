@@ -4,7 +4,7 @@ defmodule Boombox.RTP do
 
   require Membrane.Pad
 
-  alias Boombox.Bin.Ready
+  alias Boombox.InternalBin.Ready
   alias Membrane.RTP
 
   @supported_encodings [audio: [:AAC, :Opus], video: [:H264, :H265]]

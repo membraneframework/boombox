@@ -5,7 +5,7 @@ defmodule Boombox.Pad do
 
   require Membrane.Pad
 
-  alias Boombox.Bin.{Ready, Wait}
+  alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.Bin.{Action, CallbackContext}
   alias Membrane.Connector
 

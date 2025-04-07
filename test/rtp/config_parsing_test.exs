@@ -1,7 +1,7 @@
 defmodule Boombox.RTP.ParsingTest do
   use ExUnit.Case
 
-  alias Boombox.Bin.Ready
+  alias Boombox.InternalBin.Ready
 
   describe "Parsing RTP options succeeds" do
     test "for correct AAC + H264 options" do

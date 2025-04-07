@@ -3,7 +3,7 @@ defmodule Boombox.WebRTC do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
-  alias Boombox.Bin.{Ready, State, Wait}
+  alias Boombox.InternalBin.{Ready, State, Wait}
   alias Membrane.Bin.CallbackContext
   alias Membrane.{H264, RemoteStream, VP8, WebRTC}
 

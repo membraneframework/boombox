@@ -70,7 +70,7 @@ defmodule Boombox.BinTest do
     if video_format != nil do
       Compare.compare(out_file, "test/fixtures/ref_bun10s_aac.mp4",
         kinds: [:video],
-        endpoint expected_subject_tracks_number: tracks_number
+        expected_subject_tracks_number: tracks_number
       )
     end
 
@@ -78,7 +78,7 @@ defmodule Boombox.BinTest do
       Compare.compare(out_file, audio_fixture(audio_format),
         kinds: [:audio],
         audio_error_bounadry: 40_000,
-        endpoint expected_subject_tracks_number: tracks_number
+        expected_subject_tracks_number: tracks_number
       )
     end
   end

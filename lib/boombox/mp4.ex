@@ -3,7 +3,7 @@ defmodule Boombox.MP4 do
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
-  alias Boombox.Bin.{Ready, Wait}
+  alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.H264
   alias Membrane.H265
 

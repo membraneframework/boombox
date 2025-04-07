@@ -3,7 +3,7 @@ defmodule Boombox.RTMP do
 
   import Membrane.ChildrenSpec
   require Membrane.Logger
-  alias Boombox.Bin.{Ready, Wait}
+  alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.{RTMP, RTMPServer}
 
   @spec create_input(String.t() | pid(), pid()) :: Wait.t()

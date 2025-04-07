@@ -14,7 +14,7 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_child_notification(:processing_finished, :bin, _ctx, state) do
+  def handle_child_notification(:processing_finished, :boombox, _ctx, state) do
     {[terminate: :normal], state}
   end
 end
