@@ -122,7 +122,7 @@ defmodule Boombox.RTP do
 
   @spec link_output(
           Boombox.out_rtp_opts(),
-          Boombox.Bin.track_builders(),
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(opts, track_builders, spec_builder) do

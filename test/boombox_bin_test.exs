@@ -1,4 +1,4 @@
-defmodule Boombox.BinTest do
+defmodule Boombox.InternalBinTest do
   use ExUnit.Case, async: true
 
   import Membrane.ChildrenSpec
@@ -40,7 +40,7 @@ defmodule Boombox.BinTest do
   for video_format <- @video_formats, audio_format <- @audio_formats do
     if video_format != nil or audio_format != nil do
       @tag :tmp_dir
-      test "Boombox.Bin with input pad when video is #{Format.to_string(video_format)} and audio is #{Format.to_string(audio_format)}",
+      test "Boombox bin with input pad when video is #{Format.to_string(video_format)} and audio is #{Format.to_string(audio_format)}",
            %{tmp_dir: tmp_dir} do
         video_format =
           with {H264, stream_structure, alignment} <- unquote(video_format) do
@@ -56,7 +56,7 @@ defmodule Boombox.BinTest do
     out_file = Path.join(tmp_dir, "out.mp4")
 
     spec = [
-      child(:boombox, %Boombox.Bin{output: out_file}),
+      child(:boombox, %Boombox{output: out_file}),
       spec_branch(:video, video_format),
       spec_branch(:audio, audio_format)
     ]
@@ -108,11 +108,11 @@ defmodule Boombox.BinTest do
     ]
   end
 
-  test "Boombox.Bin raises when it has input pad linked and `:input` option set at the same time" do
+  test "Boombox bin raises when it has input pad linked and `:input` option set at the same time" do
     spec =
       child(Testing.Source)
       |> via_in(:audio_input)
-      |> child(%Boombox.Bin{
+      |> child(%Boombox{
         input: {:webrtc, "ws://localhost:5432"},
         output: {:webrtc, "ws://localhost:5433"}
       })

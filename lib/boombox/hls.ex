@@ -11,7 +11,7 @@ defmodule Boombox.HLS do
   @spec link_output(
           Path.t(),
           [Boombox.force_transcoding()],
-          Boombox.Bin.track_builders(),
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, opts, track_builders, spec_builder) do

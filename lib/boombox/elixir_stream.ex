@@ -40,7 +40,7 @@ defmodule Boombox.ElixirStream do
   @spec link_output(
           consumer :: pid,
           options :: Boombox.out_stream_opts(),
-          Boombox.Bin.track_builders(),
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(consumer, options, track_builders, spec_builder) do

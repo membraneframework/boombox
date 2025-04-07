@@ -12,9 +12,9 @@ defmodule Boombox.Pad do
   @spec handle_pad_added(Membrane.Pad.ref(), CallbackContext.t()) :: [Action.t()] | no_return()
   def handle_pad_added(pad_ref, ctx) when ctx.playback == :playing do
     raise """
-    Boombox.Bin pad #{inspect(pad_ref)} was added while the Boombox.Bin playback \
-    is already :playing. All Boombox.Bin pads have to be linked before it enters \
-    :playing playback. To achieve it, link all the pads of Boombox.Bin in the same \
+    Boombox.InternalBin pad #{inspect(pad_ref)} was added while the Boombox.InternalBin playback \
+    is already :playing. All Boombox.InternalBin pads have to be linked before it enters \
+    :playing playback. To achieve it, link all the pads of Boombox.InternalBin in the same \
     spec where you spawn it.
     """
   end
@@ -31,7 +31,7 @@ defmodule Boombox.Pad do
   def create_input(ctx) when ctx.playback == :playing and ctx.pads == %{} do
     raise """
     Cannot create input of type #{inspect(__MODULE__)}, as there are no pads available. \
-    Link pads to Boombox.Bin or set the `:input` option to fix this error.
+    Link pads to Boombox.InternalBin or set the `:input` option to fix this error.
     """
   end
 

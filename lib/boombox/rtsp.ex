@@ -14,7 +14,7 @@ defmodule Boombox.RTSP do
             optional(:video) => Membrane.RTSP.Source.track()
           },
           tracks_left_to_link: non_neg_integer(),
-          track_builders: Boombox.Bin.track_builders()
+          track_builders: Boombox.InternalBin.track_builders()
         }
 
   @spec create_input(URI.t()) :: Wait.t()
