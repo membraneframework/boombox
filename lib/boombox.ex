@@ -125,14 +125,72 @@ defmodule Boombox do
           input: input(),
           output: output()
         ) :: :ok | Enumerable.t()
-  @endpoint_opts [:input, :output]
   def run(stream \\ nil, opts) do
+    opts = validate_opts!(stream, opts)
+
+    case opts do
+      %{input: {:stream, _stream_opts}} ->
+        procs = start_pipeline(opts)
+        consume_stream(stream, procs)
+
+      %{output: {:stream, _stream_opts}} ->
+        produce_stream(opts)
+
+      opts ->
+        opts
+        |> start_pipeline()
+        |> await_pipeline()
+    end
+  end
+
+  @doc """
+  Asynchronous version of run/2
+  Doesn't block the calling process until the termination of the pipeline.
+  It returns a `Task` that can be awaited later.
+  If the output is a stream the behaviour is idential to run/2
+  """
+  @spec async(Enumerable.t() | nil,
+          input: input(),
+          output: output()
+        ) :: Task.t() | Enumerable.t()
+  def async(stream \\ nil, opts) do
+    opts = validate_opts!(stream, opts)
+
+    case opts do
+      %{input: {:stream, _stream_opts}} ->
+        procs = start_pipeline(opts)
+
+        Task.async(fn ->
+          Process.monitor(procs.supervisor)
+          consume_stream(stream, procs)
+        end)
+
+      %{output: {:stream, _stream_opts}} ->
+        produce_stream(opts)
+
+      opts ->
+        procs = start_pipeline(opts)
+
+        Task.async(fn ->
+          Process.monitor(procs.supervisor)
+          await_pipeline(procs)
+        end)
+    end
+  end
+
+  @endpoint_opts [:input, :output]
+  defp validate_opts!(stream, opts) do
+    if stream != nil and !Enumerable.impl_for(stream) do
+      raise ArgumentError,
+            "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
+    end
+
+    :ok = maybe_log_transcoding_related_warning(opts)
+
     opts =
       opts
       |> Keyword.validate!(@endpoint_opts)
       |> Map.new(fn {key, value} -> {key, parse_endpoint_opt!(key, value)} end)
-
-    :ok = maybe_log_transcoding_related_warning(opts)
 
     if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
       raise "#{key} is not provided"
@@ -142,21 +200,8 @@ defmodule Boombox do
       %{input: {:stream, _in_stream_opts}, output: {:stream, _out_stream_opts}} ->
         raise ArgumentError, ":stream on both input and output is not supported"
 
-      %{input: {:stream, _stream_opts}} ->
-        unless Enumerable.impl_for(stream) do
-          raise ArgumentError,
-                "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
-        end
-
-        consume_stream(stream, opts)
-
-      %{output: {:stream, _stream_opts}} ->
-        produce_stream(opts)
-
-      opts ->
+      _ ->
         opts
-        |> start_pipeline()
-        |> await_pipeline()
     end
   end
 
@@ -297,10 +342,8 @@ defmodule Boombox do
   defp webrtc_output_force_transcoding(%{output: {:webrtc, _singaling, opts}}),
     do: Keyword.get(opts, :force_transcoding)
 
-  @spec consume_stream(Enumerable.t(), opts_map()) :: term()
-  defp consume_stream(stream, opts) do
-    procs = start_pipeline(opts)
-
+  @spec consume_stream(Enumerable.t(), procs()) :: term()
+  defp consume_stream(stream, procs) do
     source =
       receive do
         {:boombox_ex_stream_source, source} -> source
