@@ -23,9 +23,8 @@ defmodule Boombox.StorageEndpoints.AAC do
     spec =
       track_builders[:audio]
       |> child(:aac_audio_transcoder, %Membrane.Transcoder{
-        output_stream_format: %AAC{}
+        output_stream_format: AAC
       })
-      |> child(:aac_output_parser, Membrane.AAC.Parser)
       |> child(:file_sink, %Membrane.File.Sink{location: location})
 
     %Ready{actions: [spec: spec]}

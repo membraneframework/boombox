@@ -402,30 +402,37 @@ defmodule Boombox.Pipeline do
   end
 
   defp link_output({:h264, location}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :h264)
     Boombox.StorageEndpoints.H264.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:h265, location}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :h265)
     Boombox.StorageEndpoints.H265.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:aac, location}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :aac)
     Boombox.StorageEndpoints.AAC.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:wav, location}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :wav)
     Boombox.StorageEndpoints.WAV.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:mp3, location}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :mp3)
     Boombox.StorageEndpoints.MP3.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:ivf, location}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :ivf)
     Boombox.StorageEndpoints.IVF.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:ogg, location}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :ogg)
     Boombox.StorageEndpoints.Ogg.link_output(location, track_builders, spec_builder)
   end
 
@@ -447,5 +454,13 @@ defmodule Boombox.Pipeline do
   # receives the last packet.
   defp wait_before_closing() do
     Process.sleep(500)
+  end
+
+  defp maybe_warn_about_dropped_tracks(track_builders, dropped_track, output_type) do
+    if track_builders[dropped_track] do
+      Membrane.Logger.info(
+        "Dropping #{dropped_track} track from input, as output #{output_type} does not support #{dropped_track}"
+      )
+    end
   end
 end
