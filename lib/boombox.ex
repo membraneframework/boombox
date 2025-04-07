@@ -200,7 +200,7 @@ defmodule Boombox do
       %{input: {:stream, _in_stream_opts}, output: {:stream, _out_stream_opts}} ->
         raise ArgumentError, ":stream on both input and output is not supported"
 
-      _ ->
+      _opts ->
         opts
     end
   end
