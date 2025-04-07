@@ -5,7 +5,7 @@ defmodule Boombox.Pipeline do
   @impl true
   def handle_init(_ctx, opts) do
     spec =
-      child(:boombox, %Boombox.Bin{
+      child(:boombox, %Boombox.InternalBin{
         input: opts.input,
         output: opts.output
       })

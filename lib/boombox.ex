@@ -298,5 +298,5 @@ defmodule Boombox do
   defp resolve_stream_endpoint({:stream, stream_options}, parent),
     do: {:stream, parent, stream_options}
 
-  defp resolve_stream_endpoint(endpont, _parent), do: endpont
+  defp resolve_stream_endpoint(endpoint, _parent), do: endpoint
 end

@@ -14,8 +14,8 @@ defmodule Boombox.Pad do
     raise """
     Boombox.Bin pad #{inspect(pad_ref)} was added while the Boombox.Bin playback \
     is already :playing. All Boombox.Bin pads have to be linked before it enters \
-    :playing playback. To achieve so, link all pads of Boombox.Bin in the same spec \
-    where you spawn it.
+    :playing playback. To achieve it, link all the pads of Boombox.Bin in the same \
+    spec where you spawn it.
     """
   end
 
@@ -30,7 +30,7 @@ defmodule Boombox.Pad do
   @spec create_input(CallbackContext.t()) :: Ready.t() | Wait.t() | no_return()
   def create_input(ctx) when ctx.playback == :playing and ctx.pads == %{} do
     raise """
-    Cannot create input of type #{inspect(__MODULE__)}, while there are no pads. \
+    Cannot create input of type #{inspect(__MODULE__)}, as there are no pads available. \
     Link pads to Boombox.Bin or set the `:input` option to fix this error.
     """
   end

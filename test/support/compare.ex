@@ -69,13 +69,13 @@ defmodule Support.Compare do
 
     assert_pipeline_notified(p, :sub_demuxer, {:new_tracks, sub_tracks})
 
-    subject_tracks_number = options[:subject_tracks_number] || length(kinds)
-    assert length(sub_tracks) == subject_tracks_number
+    endpoint expected_subject_tracks_number = options[:endpoint expected_subject_tracks_number] || length(kinds)
+    assert length(sub_tracks) == endpoint expected_subject_tracks_number
 
     sub_spec =
       Enum.map(sub_tracks, fn
         {id, %Membrane.AAC{}} ->
-          if options[:subject_tracks_number] == nil do
+          if options[:endpoint expected_subject_tracks_number] == nil do
             assert :audio in kinds
           end
 
@@ -86,7 +86,7 @@ defmodule Support.Compare do
           |> child(:sub_audio_bufs, GetBuffers)
 
         {id, %h26x{}} when h26x in [Membrane.H264, Membrane.H265] ->
-          if options[:subject_tracks_number] == nil do
+          if options[:endpoint expected_subject_tracks_number] == nil do
             assert :video in kinds
           end
 
