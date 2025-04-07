@@ -154,7 +154,6 @@ defmodule BoomboxTest do
     url = "rtmp://localhost:#{port}/app/stream_key"
     t = Task.async(fn -> Boombox.run(input: url, output: output) end)
 
-    # Wait for boombox to be ready
     p = send_rtmp(url)
     Task.await(t, 30_000)
     Testing.Pipeline.terminate(p)
@@ -211,8 +210,6 @@ defmodule BoomboxTest do
 
     t2 =
       Boombox.async(input: {:webrtc, signaling}, output: output)
-
-    # Wait for boombox to be ready
 
     p = send_rtmp(url)
     Task.await(t1, 30_000)
