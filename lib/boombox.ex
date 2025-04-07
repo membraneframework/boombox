@@ -185,12 +185,12 @@ defmodule Boombox do
             "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
     end
 
-    :ok = maybe_log_transcoding_related_warning(opts)
-
     opts =
       opts
       |> Keyword.validate!(@endpoint_opts)
       |> Map.new(fn {key, value} -> {key, parse_endpoint_opt!(key, value)} end)
+
+    :ok = maybe_log_transcoding_related_warning(opts)
 
     if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
       raise "#{key} is not provided"
