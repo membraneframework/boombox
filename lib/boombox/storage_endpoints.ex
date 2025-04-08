@@ -9,8 +9,8 @@ defmodule Boombox.StorageEndpoints do
            when extension in [".mp4", ".h264", ".h265", ".aac", ".wav", ".mp3", ".ivf", ".ogg"]
 
   @spec get_storage_endpoint_type!(String.t()) :: atom() | no_return()
-  def get_storage_endpoint_type!(extension) do
-    extension |> String.slice(1..-1//1) |> String.to_existing_atom()
+  def get_storage_endpoint_type!("." <> type) do
+    String.to_existing_atom(type)
   end
 
   @spec get_source(String.t(), :file | :http, boolean()) :: Membrane.ChildrenSpec.builder()
