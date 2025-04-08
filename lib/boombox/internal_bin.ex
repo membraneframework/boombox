@@ -1,7 +1,5 @@
 defmodule Boombox.InternalBin do
-  @moduledoc """
-  TODO: write docs
-  """
+  @moduledoc false
   use Membrane.Bin
 
   require Membrane.Logger
@@ -117,7 +115,7 @@ defmodule Boombox.InternalBin do
     availability: :on_request,
     max_instances: 1
 
-  def_options input: [spec: input() | :membrane_pad],
+  def_options input: [spec: input()],
               output: [spec: output()]
 
   @impl true

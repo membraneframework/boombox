@@ -56,7 +56,7 @@ defmodule Boombox.InternalBinTest do
     out_file = Path.join(tmp_dir, "out.mp4")
 
     spec = [
-      child(:boombox, %Boombox{output: out_file}),
+      child(:boombox, %Boombox.Bin{output: out_file}),
       spec_branch(:video, video_format),
       spec_branch(:audio, audio_format)
     ]
@@ -108,17 +108,18 @@ defmodule Boombox.InternalBinTest do
     ]
   end
 
-  test "Boombox bin raises when it has input pad linked and `:input` option set at the same time" do
-    spec =
-      child(Testing.Source)
-      |> via_in(:audio_input)
-      |> child(%Boombox{
-        input: {:webrtc, "ws://localhost:5432"},
-        output: {:webrtc, "ws://localhost:5433"}
-      })
+  # the test below will be uncommented after adding input pads
+  # test "Boombox bin raises when it has input pad linked and `:input` option set at the same time" do
+  #   spec =
+  #     child(Testing.Source)
+  #     |> via_in(:audio_input)
+  #     |> child(%Boombox.Bin{
+  #       input: {:webrtc, "ws://localhost:5432"},
+  #       output: {:webrtc, "ws://localhost:5433"}
+  #     })
 
-    {:ok, supervisor, _pipeline} = Testing.Pipeline.start(spec: spec)
-    ref = Process.monitor(supervisor)
-    assert_receive {:DOWN, ^ref, :process, _supervisor, _reason}
-  end
+  #   {:ok, supervisor, _pipeline} = Testing.Pipeline.start(spec: spec)
+  #   ref = Process.monitor(supervisor)
+  #   assert_receive {:DOWN, ^ref, :process, _supervisor, _reason}
+  # end
 end
