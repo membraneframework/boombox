@@ -1,4 +1,4 @@
-defmodule Boombox.InternalBinTest do
+defmodule Boombox.BinTest do
   use ExUnit.Case, async: true
 
   import Membrane.ChildrenSpec
