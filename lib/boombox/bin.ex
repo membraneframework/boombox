@@ -55,7 +55,7 @@ defmodule Boombox.Bin do
     if is_tuple(option) and elem(option, 0) == :stream do
       raise """
       #{inspect(direction)} option is set to #{inspect(option)}, but #{inspect(__MODULE__)} \
-      doesn't support Elixir Stream as endpoint.
+      doesn't support Elixir Stream as an endpoint.
       """
     end
 
