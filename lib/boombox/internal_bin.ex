@@ -30,6 +30,7 @@ defmodule Boombox.InternalBin do
           | {:hls, location :: String.t(), [Boombox.force_transcoding()]}
           | {:rtp, Boombox.out_rtp_opts()}
           | {:stream, pid(), Boombox.out_stream_opts()}
+          | :membrane_pad
 
   @type track_builders :: %{
           optional(:audio) => Membrane.ChildrenSpec.t(),
@@ -59,6 +60,7 @@ defmodule Boombox.InternalBin do
 
   defmodule State do
     @moduledoc false
+    use Bunch.Access
 
     @enforce_keys [:status, :input, :output]
 
@@ -119,13 +121,21 @@ defmodule Boombox.InternalBin do
       when Transcoder.Audio.is_audio_format(format) or Transcoder.Video.is_video_format(format),
     availability: :on_request,
     max_instances: 2,
-    options: [kind: [spec: :video | :audio]]
+    options: [
+      kind: [spec: :video | :audio]
+    ]
 
   def_options input: [spec: input()],
               output: [spec: output()]
 
   @impl true
   def handle_init(ctx, opts) do
+    if opts.input == :membrane_pad and opts.output == :membrane_pad do
+      raise """
+      Internal boombox error: both input and output of #{inspect(__MODULE__)} are set to :membrane_pad.
+      """
+    end
+
     state = %State{
       input: parse_endpoint_opt!(:input, opts.input),
       output: parse_endpoint_opt!(:output, opts.output),
@@ -137,17 +147,18 @@ defmodule Boombox.InternalBin do
   end
 
   @impl true
-  def handle_playing(ctx, state) when state.input == :membrane_pad do
-    cond do
-      state.status in [:init, :awaiting_output] ->
-        {[], state}
-
-      state.status == :awaiting_input ->
+  def handle_playing(ctx, state) when :membrane_pad in [state.input, state.output] do
+    case state.status do
+      :awaiting_input when state.input == :membrane_pad ->
         Boombox.Pad.create_input(ctx)
         |> proceed_result(ctx, state)
 
-      true ->
-        raise "internal boombox error (state.status is #{inspect(state.status)})"
+      :awaiting_output_link when state.output == :membrane_pad ->
+        Boombox.Pad.link_output(ctx, state.track_builders, state.spec_builder)
+        |> proceed_result(ctx, state)
+
+      _status ->
+        {[], state}
     end
   end
 
@@ -163,7 +174,7 @@ defmodule Boombox.InternalBin do
       """
     end
 
-    actions = Boombox.Pad.handle_pad_added(pad_ref, ctx)
+    actions = Boombox.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx)
     {actions, state}
   end
 
@@ -440,6 +451,10 @@ defmodule Boombox.InternalBin do
     )
   end
 
+  defp link_output(:membrane_pad, track_builder, spec_builder, ctx, _state) do
+    Boombox.Pad.link_output(ctx, track_builder, spec_builder)
+  end
+
   # Wait between sending the last packet
   # and terminating boombox, to avoid closing
   # any connection before the other peer
@@ -448,10 +463,8 @@ defmodule Boombox.InternalBin do
     Process.sleep(500)
   end
 
-  @spec parse_endpoint_opt!(:input, input() | :membrane_pad) ::
-          input() | :membrane_pad
-  @spec parse_endpoint_opt!(:output, output() | :membrane_pad) ::
-          output() | :membrane_pad
+  @spec parse_endpoint_opt!(:input, input()) :: input()
+  @spec parse_endpoint_opt!(:output, output()) :: output()
   defp parse_endpoint_opt!(direction, value) when is_binary(value) do
     parse_endpoint_opt!(direction, {value, []})
   end
@@ -575,7 +588,7 @@ defmodule Boombox.InternalBin do
 
   @spec maybe_log_transcoding_related_warning(input(), output()) :: :ok
   defp maybe_log_transcoding_related_warning(input, output) do
-    if elem(output, 0) == :webrtc and elem(input, 0) not in [:webrtc, :stream] and
+    if webrtc?(output) and not handles_keyframe_requests?(input) and
          webrtc_output_force_transcoding(output) not in [true, :video] do
       Membrane.Logger.warning("""
       Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
@@ -587,6 +600,13 @@ defmodule Boombox.InternalBin do
 
     :ok
   end
+
+  defp webrtc?({type, _signaling}), do: type in [:webrtc, :whip]
+  defp webrtc?({type, _signaling, _opts}), do: type in [:webrtc, :whip]
+  defp webrtc?(_endpoint), do: false
+
+  defp handles_keyframe_requests?({:stream, _pid, _opts}), do: true
+  defp handles_keyframe_requests?(endpoint), do: webrtc?(endpoint)
 
   defp webrtc_output_force_transcoding({:webrtc, _singaling, opts}),
     do: Keyword.get(opts, :force_transcoding)

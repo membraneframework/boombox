@@ -52,6 +52,26 @@ defmodule Boombox.BinTest do
     end
   end
 
+  @tag :xd
+  test "source bin" do
+    spec = [
+      child(:boombox_source, %Boombox.Bin{input: "test/fixtures/bun10s.mp4"})
+      |> via_out(:output, options: [kind: :video])
+      |> via_in(:input, options: [kind: :video])
+      |> child(:boombox_sink, %Boombox.Bin{
+        output: "xd.mp4"
+      }),
+      get_child(:boombox_source)
+      |> via_out(:output, options: [kind: :audio])
+      |> via_in(:input, options: [kind: :audio])
+      |> get_child(:boombox_sink)
+    ]
+
+    pipeline = Testing.Pipeline.start_link_supervised!(spec: spec)
+    assert_pipeline_notified(pipeline, :boombox_sink, :processing_finished)
+    Testing.Pipeline.terminate(pipeline)
+  end
+
   defp do_test(video_format, audio_format, tmp_dir) do
     out_file = Path.join(tmp_dir, "out.mp4")
 

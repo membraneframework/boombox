@@ -47,7 +47,9 @@ defmodule Boombox.Bin do
       when Transcoder.Audio.is_audio_format(format) or Transcoder.Video.is_video_format(format),
     availability: :on_request,
     max_instances: 2,
-    options: [kind: [spec: :video | :audio]]
+    options: [
+      kind: [spec: :video | :audio]
+    ]
 
   def_options input: [
                 spec: input() | nil,
@@ -110,7 +112,7 @@ defmodule Boombox.Bin do
 
     [:input, :output]
     |> Enum.each(fn direction ->
-      option = opts[direction]
+      option = opts |> Map.get(direction)
 
       if is_tuple(option) and elem(option, 0) == :stream do
         raise """
@@ -123,7 +125,7 @@ defmodule Boombox.Bin do
 
   defp validate_pads!(pads) do
     pads
-    |> Enum.group_by(&{&1.name, &1.options.kind})
+    |> Enum.group_by(fn {Pad.ref(name, _id), %{options: %{kind: kind}}} -> {name, kind} end)
     |> Enum.find(fn {_key, pads} -> length(pads) > 1 end)
     |> case do
       nil ->
@@ -132,7 +134,7 @@ defmodule Boombox.Bin do
       {_key, pads} ->
         raise """
         #{inspect(__MODULE__)} supports only one input and one output pad of each kind. \
-        Found multiple pads of the same kind: #{inspect(pads)}
+        Found multiple pads of the same kind: #{Map.keys(pads) |> inspect()}
         """
     end
   end

@@ -47,7 +47,7 @@ defmodule Boombox.Pad do
     track_builders =
       ctx.pads
       |> Enum.flat_map(fn
-        {Pad.ref(:input, _id) = pad_ref, %{options: %{kind: kind}}} ->
+        {Pad.ref(:input, _id), %{options: %{kind: kind}}} ->
           [{kind, get_child({:pad_connector, :input, kind})}]
 
         {Pad.ref(:output, _id), _pad_data} ->
@@ -62,26 +62,22 @@ defmodule Boombox.Pad do
     %Wait{}
   end
 
-  def create_output(ctx) when ctx.playback == :playing do
-    %Ready{}
-  end
-
-  def create_output(ctx) when ctx.playback == :stopped do
-    %Wait{}
-  end
-
-  def link_output(ctx, track_builders, spec_builder) do
+  def link_output(ctx, track_builders, spec_builder) when ctx.playback == :playing do
     validate_pads_and_tracks!(ctx, track_builders)
 
     linked_tracks =
       track_builders
       |> Enum.map(fn {kind, builder} ->
         builder
-        |> get_child({:pad_connector, :output, kind}, Connector)
+        |> get_child({:pad_connector, :output, kind})
       end)
 
     spec = [spec_builder, linked_tracks]
     %Ready{actions: [spec: spec]}
+  end
+
+  def link_output(ctx, _track_builder, _spec_builder) when ctx.playback == :stopped do
+    %Wait{}
   end
 
   defp validate_pads_and_tracks!(ctx, track_builders) do
@@ -111,12 +107,12 @@ defmodule Boombox.Pad do
     end)
   end
 
-  defp raise_if_key_not_present(map_a, map_b, raise_log) do
-    map_a
-    |> Enum.find(fn {kind, _value} -> not is_map_key(map_b, key) end)
+  defp raise_if_key_not_present(map_from, map_in, raise_log_generator) do
+    map_from
+    |> Enum.find(fn {kind, _value} -> not is_map_key(map_in, kind) end)
     |> case do
       nil -> :ok
-      {kind, _value} -> raise_log.(kind)
+      {kind, _value} -> raise raise_log_generator.(kind)
     end
   end
 end
