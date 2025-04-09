@@ -105,15 +105,21 @@ defmodule Boombox.InternalBin do
           }
   end
 
-  def_input_pad :audio_input,
-    accepted_format: format when Transcoder.Audio.is_audio_format(format),
+  def_input_pad :input,
+    accepted_format:
+      format
+      when Transcoder.Audio.is_audio_format(format) or Transcoder.Video.is_video_format(format),
     availability: :on_request,
-    max_instances: 1
+    max_instances: 2,
+    options: [kind: [spec: :video | :audio]]
 
-  def_input_pad :video_input,
-    accepted_format: format when Transcoder.Video.is_video_format(format),
+  def_output_pad :output,
+    accepted_format:
+      format
+      when Transcoder.Audio.is_audio_format(format) or Transcoder.Video.is_video_format(format),
     availability: :on_request,
-    max_instances: 1
+    max_instances: 2,
+    options: [kind: [spec: :video | :audio]]
 
   def_options input: [spec: input()],
               output: [spec: output()]
@@ -149,18 +155,16 @@ defmodule Boombox.InternalBin do
   def handle_playing(_ctx, state), do: {[], state}
 
   @impl true
-  def handle_pad_added(pad_ref, ctx, state) when state.input == :membrane_pad do
+  def handle_pad_added(Pad.ref(direction, _id) = pad_ref, ctx, state) do
+    if state[direction] != :membrane_pad do
+      raise """
+      internal boombox error (state.#{direction} is #{inspect(state[direction])}) but it \
+      should be :membrane_pad
+      """
+    end
+
     actions = Boombox.Pad.handle_pad_added(pad_ref, ctx)
     {actions, state}
-  end
-
-  @impl true
-  def handle_pad_added(pad_ref, _ctx, state) do
-    raise """
-    Tried to link pad #{inspect(pad_ref)}, while input was set to #{inspect(state.input)}. \
-    It is not possible to set `:input` option and link input pads of #{inspect(__MODULE__)} \
-    at the same time.
-    """
   end
 
   @impl true

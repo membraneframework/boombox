@@ -34,24 +34,20 @@ defmodule Boombox.Bin do
           | {:rtp, Boombox.out_rtp_opts()}
 
   def_input_pad :input,
-    accepted_format: format when Transcoder.Audio.is_audio_format(format),
+    accepted_format:
+      format
+      when Transcoder.Audio.is_audio_format(format) or Transcoder.Video.is_video_format(format),
     availability: :on_request,
-    max_instances: 1
+    max_instances: 2,
+    options: [kind: [spec: :video | :audio]]
 
-  def_input_pad :video_input,
-    accepted_format: format when Transcoder.Video.is_video_format(format),
+  def_output_pad :output,
+    accepted_format:
+      format
+      when Transcoder.Audio.is_audio_format(format) or Transcoder.Video.is_video_format(format),
     availability: :on_request,
-    max_instances: 1
-
-  def_output_pad :audio_output,
-    accepted_format: format when Transcoder.Audio.is_audio_format(format),
-    availability: :on_request,
-    max_instances: 1
-
-  def_output_pad :video_output,
-    accepted_format: format when Transcoder.Video.is_video_format(format),
-    availability: :on_request,
-    max_instances: 1
+    max_instances: 2,
+    options: [kind: [spec: :video | :audio]]
 
   def_options input: [
                 spec: input() | nil,
@@ -76,17 +72,19 @@ defmodule Boombox.Bin do
   end
 
   @impl true
-  def handle_pad_added(Pad.ref(pad_name, _id) = pad_ref, _ctx, state) do
+  def handle_pad_added(Pad.ref(direction, _id) = pad_ref, ctx, state) do
+    :ok = validate_pads!(ctx.pads)
+
     spec =
-      cond do
-        pad_name in [:audio_input, :video_input] and state.input == nil ->
+      case direction do
+        :input ->
           bin_input(pad_ref)
-          |> via_in(pad_ref)
+          |> via_in(:input, options: [kind: ctx.pad_options.kind])
           |> get_child(:boombox)
 
-        pad_name in [:audio_output, :video_output] and state.output == nil ->
+        :output ->
           get_child(:boombox)
-          |> via_out(pad_ref)
+          |> via_out(:output, options: [kind: ctx.pad_options.kind])
           |> bin_output(pad_ref)
       end
 
@@ -101,7 +99,7 @@ defmodule Boombox.Bin do
   defp validate_opts!(opts) do
     nil_opts_number =
       [opts.input, opts.output]
-      |> Enum.count(& &1 == nil)
+      |> Enum.count(&(&1 == nil))
 
     if nil_opts_number != 1 do
       raise """
@@ -121,5 +119,21 @@ defmodule Boombox.Bin do
         """
       end
     end)
+  end
+
+  defp validate_pads!(pads) do
+    pads
+    |> Enum.group_by(&{&1.name, &1.options.kind})
+    |> Enum.find(fn {_key, pads} -> length(pads) > 1 end)
+    |> case do
+      nil ->
+        :ok
+
+      {_key, pads} ->
+        raise """
+        #{inspect(__MODULE__)} supports only one input and one output pad of each kind. \
+        Found multiple pads of the same kind: #{inspect(pads)}
+        """
+    end
   end
 end
