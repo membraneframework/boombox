@@ -6,6 +6,7 @@ defmodule Boombox do
   """
   require Logger
   require Membrane.Time
+  require Boombox.StorageEndpoints, as: StorageEndpoints
 
   alias Membrane.RTP
 
@@ -74,6 +75,15 @@ defmodule Boombox do
   @type input ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
+          | {:h264, location :: String.t(),
+             transport: :file | :http, framerate: Membrane.H264.framerate()}
+          | {:h265, location :: String.t(),
+             transport: :file | :http, framerate: Membrane.H265.framerate_t()}
+          | {:aac, location :: String.t(), transport: :file | :http}
+          | {:wav, location :: String.t(), transport: :file | :http}
+          | {:mp3, location :: String.t(), transport: :file | :http}
+          | {:ivf, location :: String.t(), transport: :file | :http}
+          | {:ogg, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
@@ -85,6 +95,13 @@ defmodule Boombox do
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(), [force_transcoding()]}
           | {:mp4, location :: String.t()}
+          | {:h264, location :: String.t()}
+          | {:h265, location :: String.t()}
+          | {:aac, location :: String.t()}
+          | {:wav, location :: String.t()}
+          | {:mp3, location :: String.t()}
+          | {:ivf, location :: String.t()}
+          | {:ogg, location :: String.t()}
           | {:mp4, location :: String.t(), [force_transcoding()]}
           | {:webrtc, webrtc_signaling()}
           | {:webrtc, webrtc_signaling(), [force_transcoding()]}
@@ -188,18 +205,32 @@ defmodule Boombox do
     parse_endpoint_opt!(direction, {value, []})
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
     uri = URI.parse(value)
     scheme = uri.scheme
     extension = if uri.path, do: Path.extname(uri.path)
 
     case {scheme, extension, direction} do
-      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value, opts}
-      {nil, ".mp4", :output} -> {:mp4, value, opts}
-      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
-      {"rtsp", _ext, :input} -> {:rtsp, value}
-      {nil, ".m3u8", :output} -> {:hls, value, opts}
-      _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
+      {scheme, extension, :input}
+      when scheme in [nil, "http", "https"] and
+             StorageEndpoints.is_storage_endpoint_extension(extension) ->
+        {StorageEndpoints.get_storage_endpoint_type!(extension), value, opts}
+
+      {nil, extension, :output} when StorageEndpoints.is_storage_endpoint_extension(extension) ->
+        {StorageEndpoints.get_storage_endpoint_type!(extension), value, opts}
+
+      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] ->
+        {:rtmp, value}
+
+      {"rtsp", _ext, :input} ->
+        {:rtsp, value}
+
+      {nil, ".m3u8", :output} ->
+        {:hls, value, opts}
+
+      _other ->
+        raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
     |> then(&parse_endpoint_opt!(direction, &1))
   end
@@ -207,17 +238,29 @@ defmodule Boombox do
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp parse_endpoint_opt!(direction, value) when is_tuple(value) do
     case value do
-      {:mp4, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:mp4, location, []})
+      {endpoint_type, location}
+      when is_binary(location) and direction == :input and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        parse_endpoint_opt!(:input, {endpoint_type, location, []})
 
-      {:mp4, location, opts} when is_binary(location) and direction == :input ->
-        opts = opts |> Keyword.put(:transport, resolve_transport(location, opts))
-        {:mp4, location, opts}
+      {endpoint_type, location, opts}
+      when endpoint_type in [:h264, :h265] and is_binary(location) and direction == :input ->
+        {endpoint_type, location,
+         transport: resolve_transport(location, opts), framerate: opts[:framerate] || {30, 1}}
 
-      {:mp4, location} when is_binary(location) and direction == :output ->
-        {:mp4, location, []}
+      {endpoint_type, location, opts}
+      when is_binary(location) and direction == :input and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        {endpoint_type, location, transport: resolve_transport(location, opts)}
 
-      {:mp4, location, _opts} when is_binary(location) and direction == :output ->
+      {endpoint_type, location}
+      when is_binary(location) and direction == :output and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        {endpoint_type, location, []}
+
+      {endpoint_type, location, _opts}
+      when is_binary(location) and direction == :output and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
         value
 
       {:webrtc, %Membrane.WebRTC.Signaling{}} when direction == :input ->
@@ -412,7 +455,7 @@ defmodule Boombox do
 
   @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
   defp resolve_transport(location, opts) do
-    case Keyword.validate!(opts, transport: nil, force_transcoding: false)[:transport] do
+    case Keyword.merge([transport: nil, force_transcoding: false], opts)[:transport] do
       nil ->
         uri = URI.parse(location)
 

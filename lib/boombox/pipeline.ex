@@ -70,7 +70,9 @@ defmodule Boombox.Pipeline do
                   eos_info: nil,
                   rtsp_state: nil,
                   pending_new_tracks: %{input: [], output: []},
-                  output_webrtc_state: nil
+                  output_webrtc_state: nil,
+                  audio_terminated: false,
+                  video_terminated: false
                 ]
 
     @typedoc """
@@ -101,7 +103,9 @@ defmodule Boombox.Pipeline do
             eos_info: term(),
             rtsp_state: Boombox.RTSP.state() | nil,
             parent: pid(),
-            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
+            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil,
+            audio_terminated: boolean(),
+            video_terminated: boolean()
           }
   end
 
@@ -119,7 +123,7 @@ defmodule Boombox.Pipeline do
 
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do
-    Boombox.MP4.handle_input_tracks(tracks)
+    Boombox.StorageEndpoints.MP4.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
   end
 
@@ -203,7 +207,7 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_element_end_of_stream(:mp4_file_sink, :input, _ctx, state) do
+  def handle_element_end_of_stream(:file_sink, :input, _ctx, state) do
     {[terminate: :normal], state}
   end
 
@@ -319,7 +323,35 @@ defmodule Boombox.Pipeline do
   end
 
   defp create_input({:mp4, location, opts}, _ctx, _state) do
-    Boombox.MP4.create_input(location, opts)
+    Boombox.StorageEndpoints.MP4.create_input(location, opts)
+  end
+
+  defp create_input({:h264, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.H264.create_input(location, opts)
+  end
+
+  defp create_input({:h265, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.H265.create_input(location, opts)
+  end
+
+  defp create_input({:aac, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.AAC.create_input(location, opts)
+  end
+
+  defp create_input({:wav, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.WAV.create_input(location, opts)
+  end
+
+  defp create_input({:mp3, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.MP3.create_input(location, opts)
+  end
+
+  defp create_input({:ivf, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.IVF.create_input(location, opts)
+  end
+
+  defp create_input({:ogg, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.Ogg.create_input(location, opts)
   end
 
   defp create_input({:rtmp, src}, ctx, _state) do
@@ -366,7 +398,42 @@ defmodule Boombox.Pipeline do
   end
 
   defp link_output({:mp4, location, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.MP4.link_output(location, opts, track_builders, spec_builder)
+    Boombox.StorageEndpoints.MP4.link_output(location, opts, track_builders, spec_builder)
+  end
+
+  defp link_output({:h264, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :h264)
+    Boombox.StorageEndpoints.H264.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:h265, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :h265)
+    Boombox.StorageEndpoints.H265.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:aac, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :aac)
+    Boombox.StorageEndpoints.AAC.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:wav, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :wav)
+    Boombox.StorageEndpoints.WAV.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:mp3, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :mp3)
+    Boombox.StorageEndpoints.MP3.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:ivf, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :ivf)
+    Boombox.StorageEndpoints.IVF.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:ogg, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :ogg)
+    Boombox.StorageEndpoints.Ogg.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, _state) do
@@ -387,5 +454,13 @@ defmodule Boombox.Pipeline do
   # receives the last packet.
   defp wait_before_closing() do
     Process.sleep(500)
+  end
+
+  defp maybe_warn_about_dropped_tracks(track_builders, dropped_track, output_type) do
+    if track_builders[dropped_track] do
+      Membrane.Logger.info(
+        "Dropping #{dropped_track} track from input, as output #{output_type} does not support #{dropped_track}"
+      )
+    end
   end
 end
