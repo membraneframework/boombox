@@ -61,8 +61,8 @@ unless File.exists?("#{input_dir}/ffmpeg-testsrc.h264") do
 end
 
 unless File.exists?("#{input_dir}/test-audio.aac") do
-  %{status: 200, body: bbb_mkv} = Req.get!("#{samples_url}/test-audio.aac")
-  File.write!("#{input_dir}/test-audio.aac", bbb_mkv)
+  %{status: 200, body: test_audio} = Req.get!("#{samples_url}/test-audio.aac")
+  File.write!("#{input_dir}/test-audio.aac", test_audio)
 end
 
 assets_url =
