@@ -253,13 +253,12 @@ defmodule Boombox do
              StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
         {endpoint_type, location, transport: resolve_transport(location, opts)}
 
-      {:mp4, location} when is_binary(location) and direction == :output ->
-        {:mp4, location, []}
-
-      {:mp4, location, _opts} when is_binary(location) and direction == :output ->
-        value
-
       {endpoint_type, location}
+      when is_binary(location) and direction == :output and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        {endpoint_type, location, []}
+
+      {endpoint_type, location, _opts}
       when is_binary(location) and direction == :output and
              StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
         value
@@ -456,7 +455,7 @@ defmodule Boombox do
 
   @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
   defp resolve_transport(location, opts) do
-    case Keyword.validate!(opts, transport: nil, force_transcoding: false)[:transport] do
+    case Keyword.merge([transport: nil, force_transcoding: false], opts)[:transport] do
       nil ->
         uri = URI.parse(location)
 

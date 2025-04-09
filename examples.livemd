@@ -17,7 +17,15 @@ boombox = {:boombox, github: "membraneframework/boombox"}
 # can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
 # MIX_INSTALL_CONFIG_END
 
-Mix.install([boombox, :kino, :nx, :exla, :bumblebee, :websockex, :membrane_simple_rtsp_server])
+Mix.install([
+  boombox,
+  :kino,
+  :nx,
+  :exla,
+  :bumblebee,
+  :websockex,
+  :membrane_simple_rtsp_server
+])
 
 Nx.global_default_backend(EXLA.Backend)
 ```
@@ -45,6 +53,16 @@ end
 unless File.exists?("#{input_dir}/bun.mkv") do
   %{status: 200, body: bbb_mkv} = Req.get!("#{samples_url}/big-buck-bunny/bun33s.mkv")
   File.write!("#{input_dir}/bun.mkv", bbb_mkv)
+end
+
+unless File.exists?("#{input_dir}/ffmpeg-testsrc.h264") do
+  %{status: 200, body: testsrc_h264} = Req.get!("#{samples_url}/ffmpeg-testsrc.h264")
+  File.write!("#{input_dir}/ffmpeg-testsrc.h264", testsrc_h264)
+end
+
+unless File.exists?("#{input_dir}/test-audio.aac") do
+  %{status: 200, body: bbb_mkv} = Req.get!("#{samples_url}/test-audio.aac")
+  File.write!("#{input_dir}/test-audio.aac", bbb_mkv)
 end
 
 assets_url =
@@ -99,6 +117,36 @@ Boombox.run(
 
 ```elixir
 System.shell("ffplay #{out_dir}/webrtc_to_mp4.mp4")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Transcoding H264 to VP9 within an IVF Container
+
+```elixir
+Boombox.run(
+  input: {:h264, "#{input_dir}/ffmpeg-testsrc.h264", framerate: {30, 1}},
+  output: "#{out_dir}/ffmpeg-testsrc.ivf"
+)
+```
+
+```elixir
+System.shell("ffplay #{out_dir}/ffmpeg-testsrc.ivf")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Transcode AAC to Opus within an OGG container
+
+```elixir
+Boombox.run(
+  input: "#{input_dir}/test-audio.aac",
+  output: "#{out_dir}/test-audio.ogg"
+)
+```
+
+```elixir
+System.shell("ffplay #{out_dir}/test-audio.ogg")
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
