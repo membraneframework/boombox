@@ -13,6 +13,7 @@ defmodule Boombox.InternalBin do
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:webrtc, Boombox.webrtc_signaling()}
+          | {:webrtc, Boombox.webrtc_signaling(), Boombox.Bin.webrtc_video_track_options()}
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
@@ -383,7 +384,8 @@ defmodule Boombox.InternalBin do
 
   @spec create_input(input(), Membrane.Bin.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
-  defp create_input({:webrtc, signaling}, ctx, state) do
+  defp create_input({:webrtc, signaling, _opts}, ctx, state) do
+    # todo: handle transcoding policy etc. from opts
     Boombox.WebRTC.create_input(signaling, state.output, ctx, state)
   end
 
@@ -593,31 +595,22 @@ defmodule Boombox.InternalBin do
              StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
         value
 
-      {:webrtc, %Membrane.WebRTC.Signaling{}} when direction == :input ->
-        value
-
       {:webrtc, %Membrane.WebRTC.Signaling{} = signaling} ->
         {:webrtc, signaling, []}
 
-      {:webrtc, %Membrane.WebRTC.Signaling{}, _opts} when direction == :output ->
+      {:webrtc, %Membrane.WebRTC.Signaling{}, _opts} ->
         value
 
-      {:webrtc, uri} when is_binary(uri) and direction == :input ->
-        value
-
-      {:webrtc, uri} when is_binary(uri) and direction == :output ->
+      {:webrtc, uri} when is_binary(uri) ->
         {:webrtc, uri, []}
 
-      {:webrtc, uri, _opts} when is_binary(uri) and direction == :output ->
+      {:webrtc, uri, _opts} when is_binary(uri) ->
         value
 
       {:whip, uri} when is_binary(uri) ->
         parse_endpoint_opt!(direction, {:whip, uri, []})
 
-      {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :input ->
-        if Keyword.keyword?(opts), do: {:webrtc, value}
-
-      {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :output ->
+      {:whip, uri, opts} when is_binary(uri) and is_list(opts) ->
         {webrtc_opts, whip_opts} = split_webrtc_and_whip_opts(opts)
         if Keyword.keyword?(opts), do: {:webrtc, {:whip, uri, whip_opts}, webrtc_opts}
 
@@ -675,7 +668,9 @@ defmodule Boombox.InternalBin do
 
   defp split_webrtc_and_whip_opts(opts) do
     opts
-    |> Enum.split_with(fn {key, _value} -> key == :force_transcoding end)
+    |> Enum.split_with(fn {key, _value} ->
+      key in [:force_transcoding, :video_transcoding_policy, :video_codec]
+    end)
   end
 
   @spec maybe_log_transcoding_related_warning(input(), output()) :: :ok
@@ -693,7 +688,6 @@ defmodule Boombox.InternalBin do
     :ok
   end
 
-  defp webrtc?({:webrtc, _signaling}), do: true
   defp webrtc?({:webrtc, _signaling, _opts}), do: true
   defp webrtc?(_endpoint), do: false
 

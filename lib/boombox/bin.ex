@@ -10,11 +10,16 @@ defmodule Boombox.Bin do
 
   alias Membrane.Transcoder
 
+  @type webrtc_video_track_option() ::
+          {:video_codec, :h264 | :vp8 | [:h264 | :vp8]}
+          | {:video_transcoding_policy, :always | :if_needed | :never}
+
   @type input() ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
           | {:webrtc, Boombox.webrtc_signaling()}
-          | {:whip, uri :: String.t(), token: String.t()}
+          | {:webrtc, Boombox.webrtc_signaling(), webrtc_video_track_options()}
+          | {:whip, uri :: String.t(), [webrtc_video_track_option(), token: String.t()]}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
           | {:rtp, Boombox.in_rtp_opts()}
@@ -46,7 +51,15 @@ defmodule Boombox.Bin do
     availability: :on_request,
     max_instances: 2,
     options: [
-      kind: [spec: :video | :audio]
+      kind: [spec: :video | :audio],
+      webrtc_video_codec: [
+        spec: :vp8 | :h264 | [:vp8 | :h264],
+        default: :vp8
+      ],
+      transcoding_policy: [
+        spec: :always | :never | :if_needed | (stream_format() -> :always | :if_needed | :never),
+        default: :if_needed
+      ]
     ]
 
   def_options input: [
