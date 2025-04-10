@@ -47,7 +47,9 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.2"},
-      {:membrane_transcoder_plugin, "~> 0.2.1"},
+      {:membrane_transcoder_plugin,
+       github: "membraneframework/membrane_transcoder_plugin",
+       ref: "991718d00709b0f5de47f056f7110b19fe63a7e9"},
       {:membrane_webrtc_plugin, "~> 0.25.0"},
       {:membrane_mp4_plugin, "~> 0.35.2"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
@@ -63,6 +65,10 @@ defmodule Boombox.Mixfile do
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
+      {:membrane_wav_plugin, "~> 0.10.1"},
+      {:membrane_ivf_plugin, "~> 0.8.0"},
+      {:membrane_ogg_plugin, "~> 0.5.0"},
+      {:membrane_stream_plugin, "~> 0.4.0"},
       {:membrane_simple_rtsp_server, "~> 0.1.4", only: :test},
       {:image, "~> 0.54.0"},
       # {:playwright, "~> 1.49.1-alpha.1", only: :test},

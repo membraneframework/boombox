@@ -52,26 +52,6 @@ defmodule Boombox.BinTest do
     end
   end
 
-  @tag :xd
-  test "source bin" do
-    spec = [
-      child(:boombox_source, %Boombox.Bin{input: "test/fixtures/bun10s.mp4"})
-      |> via_out(:output, options: [kind: :video])
-      |> via_in(:input, options: [kind: :video])
-      |> child(:boombox_sink, %Boombox.Bin{
-        output: "xd.mp4"
-      }),
-      get_child(:boombox_source)
-      |> via_out(:output, options: [kind: :audio])
-      |> via_in(:input, options: [kind: :audio])
-      |> get_child(:boombox_sink)
-    ]
-
-    pipeline = Testing.Pipeline.start_link_supervised!(spec: spec)
-    assert_pipeline_notified(pipeline, :boombox_sink, :processing_finished)
-    Testing.Pipeline.terminate(pipeline)
-  end
-
   defp do_test(video_format, audio_format, tmp_dir) do
     out_file = Path.join(tmp_dir, "out.mp4")
 
@@ -109,23 +89,39 @@ defmodule Boombox.BinTest do
   defp spec_branch(_kind, nil), do: []
 
   defp spec_branch(kind, transcoding_format) do
-    {opposite_kind, boombox_pad} =
-      case kind do
-        :audio -> {:video, :audio_input}
-        :video -> {:audio, :video_input}
-      end
+    opposite_kind = if kind == :audio, do: :video, else: :audio
 
     [
       child(%Membrane.File.Source{location: @bbb_mp4})
       |> child({:mp4_demuxer, kind}, Membrane.MP4.Demuxer.ISOM)
       |> via_out(:output, options: [kind: kind])
       |> child(%Transcoder{output_stream_format: transcoding_format})
-      |> via_in(boombox_pad)
+      |> via_in(:input, options: [kind: kind])
       |> get_child(:boombox),
       get_child({:mp4_demuxer, kind})
       |> via_out(:output, options: [kind: opposite_kind])
       |> child(Membrane.Debug.Sink)
     ]
+  end
+
+  @tag :xd
+  test "source bin" do
+    spec = [
+      child(:boombox_source, %Boombox.Bin{input: "test/fixtures/bun10s.mp4"})
+      |> via_out(:output, options: [kind: :video])
+      |> via_in(:input, options: [kind: :video])
+      |> child(:boombox_sink, %Boombox.Bin{
+        output: "xd.mp4"
+      }),
+      get_child(:boombox_source)
+      |> via_out(:output, options: [kind: :audio])
+      |> via_in(:input, options: [kind: :audio])
+      |> get_child(:boombox_sink)
+    ]
+
+    pipeline = Testing.Pipeline.start_link_supervised!(spec: spec)
+    assert_pipeline_notified(pipeline, :boombox_sink, :processing_finished)
+    Testing.Pipeline.terminate(pipeline)
   end
 
   # the test below will be uncommented after adding input pads

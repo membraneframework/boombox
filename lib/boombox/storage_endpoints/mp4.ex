@@ -1,30 +1,25 @@
-defmodule Boombox.MP4 do
+defmodule Boombox.StorageEndpoints.MP4 do
   @moduledoc false
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.InternalBin.{Ready, Wait}
+  alias Boombox.StorageEndpoints
   alias Membrane.H264
   alias Membrane.H265
 
   defguardp is_h26x(format) when is_struct(format) and format.__struct__ in [H264, H265]
 
-  @spec create_input(String.t(), [Boombox.force_transcoding() | {:transport, :file | :http}]) ::
+  @spec create_input(String.t(), [{:transport, :file | :http}]) ::
           Wait.t()
   def create_input(location, opts) do
-    spec =
-      case opts[:transport] do
-        :file ->
-          child(:mp4_in_file_source, %Membrane.File.Source{location: location, seekable?: true})
-          |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
+    optimize_for_non_fast_start = opts[:transport] == :file
 
-        :http ->
-          child(:mp4_in_http_source, %Membrane.Hackney.Source{
-            location: location,
-            hackney_opts: [follow_redirect: true]
-          })
-          |> child(:mp4_demuxer, Membrane.MP4.Demuxer.ISOM)
-      end
+    spec =
+      StorageEndpoints.get_source(location, opts[:transport], optimize_for_non_fast_start)
+      |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{
+        optimize_for_non_fast_start?: optimize_for_non_fast_start
+      })
 
     %Wait{actions: [spec: spec]}
   end
@@ -61,14 +56,14 @@ defmodule Boombox.MP4 do
   def link_output(location, opts, track_builders, spec_builder) do
     force_transcoding = opts |> Keyword.get(:force_transcoding, false)
 
-    spec =
-      [
-        spec_builder,
-        child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
-        |> child(:mp4_file_sink, %Membrane.File.Sink{location: location}),
-        Enum.map(track_builders, fn
-          {:audio, builder} ->
-            builder
+    audio_branch =
+      case track_builders[:audio] do
+        nil ->
+          []
+
+        audio_builder ->
+          [
+            audio_builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.AAC,
               force_transcoding?: force_transcoding in [true, :audio]
@@ -79,9 +74,17 @@ defmodule Boombox.MP4 do
             })
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:mp4_muxer)
+          ]
+      end
 
-          {:video, builder} ->
-            builder
+    video_branch =
+      case track_builders[:video] do
+        nil ->
+          []
+
+        video_builder ->
+          [
+            video_builder
             |> child(:mp4_video_transcoder, %Membrane.Transcoder{
               output_stream_format: fn
                 %H264{stream_structure: :annexb} = h264 ->
@@ -100,8 +103,15 @@ defmodule Boombox.MP4 do
             })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)
-        end)
-      ]
+          ]
+      end
+
+    spec =
+      [
+        spec_builder,
+        child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
+        |> child(:file_sink, %Membrane.File.Sink{location: location})
+      ] ++ audio_branch ++ video_branch
 
     %Ready{actions: [spec: spec]}
   end

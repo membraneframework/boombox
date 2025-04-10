@@ -3,8 +3,10 @@ defmodule Boombox.InternalBin do
   use Membrane.Bin
 
   require Membrane.Logger
+  require Boombox.StorageEndpoints, as: StorageEndpoints
   require Membrane.Transcoder.Audio
   require Membrane.Transcoder.Video
+
   alias Membrane.Transcoder
 
   @type input() ::
@@ -180,7 +182,7 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do
-    Boombox.MP4.handle_input_tracks(tracks)
+    Boombox.StorageEndpoints.MP4.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
   end
 
@@ -263,13 +265,19 @@ defmodule Boombox.InternalBin do
     |> proceed_result(ctx, state)
   end
 
-  @impl true
-  def handle_element_end_of_stream(:mp4_file_sink, :input, _ctx, state) do
-    {[notify_parent: :processing_finished], state}
-  end
+  # @impl true
+  # def handle_element_end_of_stream(:file_sink, :input, _ctx, state) do
+  #   {[notify_parent: :processing_finished], state}
+  # end
+
+  # @impl true
+  # def handle_element_end_of_stream(:udp_rtp_sink, :input, _ctx, state) do
+  #   {[notify_parent: :processing_finished], state}
+  # end
 
   @impl true
-  def handle_element_end_of_stream(:udp_rtp_sink, :input, _ctx, state) do
+  def handle_element_end_of_stream(element, :input, _ctx, state)
+      when element in [:hls_sink_bin, :file_sink, :udp_rtp_sink] do
     {[notify_parent: :processing_finished], state}
   end
 
@@ -380,23 +388,51 @@ defmodule Boombox.InternalBin do
   end
 
   defp create_input({:mp4, location, opts}, _ctx, _state) do
-    Boombox.MP4.create_input(location, opts)
-  end
-
-  defp create_input({:rtmp, src}, ctx, _state) do
-    Boombox.RTMP.create_input(src, ctx.utility_supervisor)
+    Boombox.StorageEndpoints.MP4.create_input(location, opts)
   end
 
   defp create_input({:rtsp, uri}, _ctx, _state) do
     Boombox.RTSP.create_input(uri)
   end
 
-  defp create_input({:rtp, opts}, _ctx, _state) do
-    Boombox.RTP.create_input(opts)
-  end
-
   defp create_input({:stream, stream_process, params}, _ctx, _state) do
     Boombox.ElixirStream.create_input(stream_process, params)
+  end
+
+  defp create_input({:h264, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.H264.create_input(location, opts)
+  end
+
+  defp create_input({:h265, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.H265.create_input(location, opts)
+  end
+
+  defp create_input({:aac, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.AAC.create_input(location, opts)
+  end
+
+  defp create_input({:wav, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.WAV.create_input(location, opts)
+  end
+
+  defp create_input({:mp3, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.MP3.create_input(location, opts)
+  end
+
+  defp create_input({:ivf, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.IVF.create_input(location, opts)
+  end
+
+  defp create_input({:ogg, location, opts}, _ctx, _state) do
+    Boombox.StorageEndpoints.Ogg.create_input(location, opts)
+  end
+
+  defp create_input({:rtmp, src}, ctx, _state) do
+    Boombox.RTMP.create_input(src, ctx.utility_supervisor)
+  end
+
+  defp create_input({:rtp, opts}, _ctx, _state) do
+    Boombox.RTP.create_input(opts)
   end
 
   defp create_input(:membrane_pad, ctx, _state) do
@@ -431,7 +467,42 @@ defmodule Boombox.InternalBin do
   end
 
   defp link_output({:mp4, location, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.MP4.link_output(location, opts, track_builders, spec_builder)
+    Boombox.StorageEndpoints.MP4.link_output(location, opts, track_builders, spec_builder)
+  end
+
+  defp link_output({:h264, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :h264)
+    Boombox.StorageEndpoints.H264.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:h265, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :h265)
+    Boombox.StorageEndpoints.H265.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:aac, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :aac)
+    Boombox.StorageEndpoints.AAC.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:wav, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :wav)
+    Boombox.StorageEndpoints.WAV.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:mp3, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :mp3)
+    Boombox.StorageEndpoints.MP3.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:ivf, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :audio, :ivf)
+    Boombox.StorageEndpoints.IVF.link_output(location, track_builders, spec_builder)
+  end
+
+  defp link_output({:ogg, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+    maybe_warn_about_dropped_tracks(track_builders, :video, :ogg)
+    Boombox.StorageEndpoints.Ogg.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, _state) do
@@ -442,13 +513,8 @@ defmodule Boombox.InternalBin do
     Boombox.RTP.link_output(opts, track_builders, spec_builder)
   end
 
-  defp link_output({:stream, stream_process, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.ElixirStream.link_output(
-      stream_process,
-      opts,
-      track_builders,
-      spec_builder
-    )
+  defp link_output({:stream, stream_process, params}, track_builders, spec_builder, _ctx, _state) do
+    Boombox.ElixirStream.link_output(stream_process, params, track_builders, spec_builder)
   end
 
   defp link_output(:membrane_pad, track_builder, spec_builder, ctx, _state) do
@@ -469,36 +535,62 @@ defmodule Boombox.InternalBin do
     parse_endpoint_opt!(direction, {value, []})
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
     uri = URI.parse(value)
     scheme = uri.scheme
     extension = if uri.path, do: Path.extname(uri.path)
 
     case {scheme, extension, direction} do
-      {scheme, ".mp4", :input} when scheme in [nil, "http", "https"] -> {:mp4, value, opts}
-      {nil, ".mp4", :output} -> {:mp4, value, opts}
-      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] -> {:rtmp, value}
-      {"rtsp", _ext, :input} -> {:rtsp, value}
-      {nil, ".m3u8", :output} -> {:hls, value, opts}
-      _other -> raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
+      {scheme, extension, :input}
+      when scheme in [nil, "http", "https"] and
+             StorageEndpoints.is_storage_endpoint_extension(extension) ->
+        {StorageEndpoints.get_storage_endpoint_type!(extension), value, opts}
+
+      {nil, extension, :output} when StorageEndpoints.is_storage_endpoint_extension(extension) ->
+        {StorageEndpoints.get_storage_endpoint_type!(extension), value, opts}
+
+      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] ->
+        {:rtmp, value}
+
+      {"rtsp", _ext, :input} ->
+        {:rtsp, value}
+
+      {nil, ".m3u8", :output} ->
+        {:hls, value, opts}
+
+      _other ->
+        raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
     |> then(&parse_endpoint_opt!(direction, &1))
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_endpoint_opt!(direction, value) when is_tuple(value) or is_atom(value) do
+  defp parse_endpoint_opt!(direction, value) when is_tuple(value) or is_atom(:value) do
     case value do
-      {:mp4, location} when is_binary(location) and direction == :input ->
-        parse_endpoint_opt!(:input, {:mp4, location, []})
+      {endpoint_type, location}
+      when is_binary(location) and direction == :input and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        parse_endpoint_opt!(:input, {endpoint_type, location, []})
 
-      {:mp4, location, opts} when is_binary(location) and direction == :input ->
-        opts = opts |> Keyword.put(:transport, resolve_transport(location, opts))
-        {:mp4, location, opts}
+      {endpoint_type, location, opts}
+      when endpoint_type in [:h264, :h265] and is_binary(location) and direction == :input ->
+        {endpoint_type, location,
+         transport: resolve_transport(location, opts), framerate: opts[:framerate] || {30, 1}}
 
-      {:mp4, location} when is_binary(location) and direction == :output ->
-        {:mp4, location, []}
+      {endpoint_type, location, opts}
+      when is_binary(location) and direction == :input and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        {endpoint_type, location, transport: resolve_transport(location, opts)}
 
-      {:mp4, location, _opts} when is_binary(location) and direction == :output ->
+      {endpoint_type, location}
+      when is_binary(location) and direction == :output and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
+        {endpoint_type, location, []}
+
+      {endpoint_type, location, _opts}
+      when is_binary(location) and direction == :output and
+             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
         value
 
       {:webrtc, %Membrane.WebRTC.Signaling{}} when direction == :input ->
@@ -545,7 +637,7 @@ defmodule Boombox.InternalBin do
       {:rtp, opts} ->
         if Keyword.keyword?(opts), do: value
 
-      {:stream, _stream_process, opts} ->
+      {:stream, stream_process, opts} when is_pid(stream_process) ->
         if Keyword.keyword?(opts), do: value
 
       :membrane_pad ->
@@ -601,8 +693,8 @@ defmodule Boombox.InternalBin do
     :ok
   end
 
-  defp webrtc?({type, _signaling}), do: type in [:webrtc, :whip]
-  defp webrtc?({type, _signaling, _opts}), do: type in [:webrtc, :whip]
+  defp webrtc?({:webrtc, _signaling}), do: true
+  defp webrtc?({:webrtc, _signaling, _opts}), do: true
   defp webrtc?(_endpoint), do: false
 
   defp handles_keyframe_requests?({:stream, _pid, _opts}), do: true
@@ -610,4 +702,12 @@ defmodule Boombox.InternalBin do
 
   defp webrtc_output_force_transcoding({:webrtc, _singaling, opts}),
     do: Keyword.get(opts, :force_transcoding)
+
+  defp maybe_warn_about_dropped_tracks(track_builders, dropped_track, output_type) do
+    if track_builders[dropped_track] do
+      Membrane.Logger.info(
+        "Dropping #{dropped_track} track from input, as output #{output_type} does not support #{dropped_track}"
+      )
+    end
+  end
 end
