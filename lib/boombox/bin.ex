@@ -1,8 +1,6 @@
 defmodule Boombox.Bin do
   @moduledoc """
-  Boombox is a tool for audio and video streaming.
-
-  See `run/1` for details and [examples.livemd](examples.livemd) for examples.
+  todo:)
   """
 
   use Membrane.Bin
