@@ -124,7 +124,24 @@ defmodule Boombox.InternalBin do
     availability: :on_request,
     max_instances: 2,
     options: [
-      kind: [spec: :video | :audio]
+      kind: [spec: :video | :audio],
+      codec: [
+        spec:
+          H264
+          | VP8
+          | VP9
+          | AAC
+          | Opus
+          | RawVideo
+          | RawAudio
+          | [H264 | VP8 | VP9 | AAC | Opus | RawVideo | RawAudio]
+          | nil,
+        default: nil
+      ],
+      transcoding_policy: [
+        spec: :always | :if_needed | :never,
+        default: :if_needed
+      ]
     ]
 
   def_options input: [spec: input()],
@@ -264,16 +281,6 @@ defmodule Boombox.InternalBin do
     Boombox.RTMP.handle_connection(client_ref)
     |> proceed_result(ctx, state)
   end
-
-  # @impl true
-  # def handle_element_end_of_stream(:file_sink, :input, _ctx, state) do
-  #   {[notify_parent: :processing_finished], state}
-  # end
-
-  # @impl true
-  # def handle_element_end_of_stream(:udp_rtp_sink, :input, _ctx, state) do
-  #   {[notify_parent: :processing_finished], state}
-  # end
 
   @impl true
   def handle_element_end_of_stream(element, :input, _ctx, state)

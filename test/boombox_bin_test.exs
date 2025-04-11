@@ -124,6 +124,8 @@ defmodule Boombox.BinTest do
     Testing.Pipeline.terminate(pipeline)
   end
 
+  # Boombox bin with input pad when video is Membrane.VP8 and audio is Membrane.Opus
+
   # the test below will be uncommented after adding input pads
   # test "Boombox bin raises when it has input pad linked and `:input` option set at the same time" do
   #   spec =

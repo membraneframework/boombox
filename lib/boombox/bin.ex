@@ -8,7 +8,16 @@ defmodule Boombox.Bin do
   require Membrane.Pad, as: Pad
   require Membrane.Transcoder.{Audio, Video}
 
-  alias Membrane.Transcoder
+  alias Membrane.RawVideo
+  alias Membrane.{Transcoder, RawVideo, RawAudio, H264, VP8, VP9, AAC, Opus}
+
+  @video_codecs [H264, VP8, VP9, RawVideo]
+  @audio_codecs [AAC, Opus, RawAudio]
+
+  @codecs %{
+    audio: @audio_codecs,
+    video: @video_codecs
+  }
 
   @type input() ::
           (path_or_uri :: String.t())
@@ -46,7 +55,24 @@ defmodule Boombox.Bin do
     availability: :on_request,
     max_instances: 2,
     options: [
-      kind: [spec: :video | :audio]
+      kind: [spec: :video | :audio],
+      codec: [
+        spec:
+          H264
+          | VP8
+          | VP9
+          | AAC
+          | Opus
+          | RawVideo
+          | RawAudio
+          | [H264 | VP8 | VP9 | AAC | Opus | RawVideo | RawAudio]
+          | nil,
+        default: nil
+      ],
+      transcoding_policy: [
+        spec: :always | :if_needed | :never,
+        default: :if_needed
+      ]
     ]
 
   def_options input: [
@@ -72,11 +98,11 @@ defmodule Boombox.Bin do
   end
 
   @impl true
-  def handle_pad_added(Pad.ref(direction, _id) = pad_ref, ctx, state) do
+  def handle_pad_added(Pad.ref(name, _id) = pad_ref, ctx, state) do
     :ok = validate_pads!(ctx.pads)
 
     spec =
-      case direction do
+      case name do
         :input ->
           bin_input(pad_ref)
           |> via_in(:input, options: [kind: ctx.pad_options.kind])
@@ -84,7 +110,7 @@ defmodule Boombox.Bin do
 
         :output ->
           get_child(:boombox)
-          |> via_out(:output, options: [kind: ctx.pad_options.kind])
+          |> via_out(:output, options: Map.to_list(ctx.pad_options))
           |> bin_output(pad_ref)
       end
 
@@ -123,7 +149,26 @@ defmodule Boombox.Bin do
 
   defp validate_pads!(pads) do
     pads
-    |> Enum.group_by(fn {Pad.ref(name, _id), %{options: %{kind: kind}}} -> {name, kind} end)
+    |> Enum.find(fn {Pad.ref(name, _id), %{options: options}} ->
+      name == :output and
+        (Bunch.listify(options.codec) -- @codecs[options.kind]) -- [nil] != []
+    end)
+    |> case do
+      nil ->
+        :ok
+
+      {pad_ref, %{options: options}} ->
+        raise """
+        Pad #{inspect(pad_ref)} is of kind #{inspect(options.kind)} and it has :codec option set \
+        to  #{inspect(options.codec)}. \
+        Supported codecs for #{inspect(options.kind)} kind are: #{inspect(@codecs[options.kind])}.
+        """
+    end
+
+    pads
+    |> Enum.group_by(fn {Pad.ref(name, _id), %{options: %{kind: kind}}} ->
+      {name, kind}
+    end)
     |> Enum.find(fn {_key, pads} -> length(pads) > 1 end)
     |> case do
       nil ->
@@ -132,7 +177,7 @@ defmodule Boombox.Bin do
       {_key, pads} ->
         raise """
         #{inspect(__MODULE__)} supports only one input and one output pad of each kind. \
-        Found multiple pads of the same kind: #{Map.keys(pads) |> inspect()}
+        Found multiple pads of the same direction and kind: #{Map.keys(pads) |> inspect()}
         """
     end
   end

@@ -152,7 +152,8 @@ defmodule Boombox.WebRTC do
           builder
           |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
             output_stream_format: Membrane.Opus,
-            force_transcoding?: force_transcoding in [true, :audio]
+            transcoding_policy:
+              if(force_transcoding in [true, :audio], do: :always, else: :if_needed)
           })
           |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
@@ -173,7 +174,7 @@ defmodule Boombox.WebRTC do
                 force_video_transcoding?
               )
             end,
-            force_transcoding?: force_video_transcoding?
+            transcoding_policy: if(force_video_transcoding?, do: :always, else: :if_needed)
           })
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)

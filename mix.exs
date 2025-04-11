@@ -47,9 +47,7 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.2"},
-      {:membrane_transcoder_plugin,
-       github: "membraneframework/membrane_transcoder_plugin",
-       ref: "991718d00709b0f5de47f056f7110b19fe63a7e9"},
+      {:membrane_transcoder_plugin, "~> 0.3.0"},
       {:membrane_webrtc_plugin, "~> 0.25.0"},
       {:membrane_mp4_plugin, "~> 0.35.2"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},

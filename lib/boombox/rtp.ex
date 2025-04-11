@@ -166,7 +166,7 @@ defmodule Boombox.RTP do
         builder
         |> child({:rtp_transcoder, media_type}, %Membrane.Transcoder{
           output_stream_format: output_stream_format,
-          force_transcoding?: force_transcoding?
+          transcoding_policy: if(force_transcoding?, do: :always, else: :if_needed)
         })
         |> child({:rtp_out_parser, media_type}, parser)
         |> child({:rtp_payloader, media_type}, payloader)

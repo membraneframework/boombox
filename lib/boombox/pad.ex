@@ -68,7 +68,22 @@ defmodule Boombox.Pad do
     linked_tracks =
       track_builders
       |> Enum.map(fn {kind, builder} ->
+        pad_options =
+          ctx.pads
+          |> Enum.find_value(fn
+            {Pad.ref(:output, _id), %{options: %{kind: ^kind} = options}} -> options
+            _pad_entry -> nil
+          end)
+
+        pad_codecs = Bunch.listify(pad_options.codec || Membrane.H264)
+
         builder
+        |> child(%Membrane.Transcoder{
+          output_stream_format: fn %input_codec{} ->
+            if input_codec in pad_codecs, do: input_codec, else: List.first(pad_codecs)
+          end,
+          transcoding_policy: pad_options.transcoding_policy
+        })
         |> get_child({:pad_connector, :output, kind})
       end)
 
@@ -83,27 +98,21 @@ defmodule Boombox.Pad do
   defp validate_pads_and_tracks!(ctx, track_builders) do
     output_pads =
       ctx.pads
-      |> Enum.flat_map(fn
-        {Pad.ref(:output, _id) = pad_ref, %{options: %{kind: kind}}} ->
-          [{kind, pad_ref}]
-
-        {Pad.ref(:input, _id), _pad_data} ->
-          []
+      |> Enum.filter(fn {Pad.ref(name, _id), _data} ->
+        name == :output
       end)
-      |> Map.new()
+      |> Map.new(fn {pad_ref, %{options: %{kind: kind}}} ->
+        {kind, pad_ref}
+      end)
 
     raise_if_key_not_present(track_builders, output_pads, fn kind ->
-      """
-      Boombox.Bin has no output pad of kind #{inspect(kind)}, but it has a track \
-      of this kind. Please add an output pad of this kind to the Boombox.Bin.
-      """
+      "Boombox.Bin has no output pad of kind #{inspect(kind)}, but it has a track \
+      of this kind. Please add an output pad of this kind to the Boombox.Bin."
     end)
 
     raise_if_key_not_present(output_pads, track_builders, fn kind ->
-      """
-      Boombox.Bin has no track of kind #{inspect(kind)}, but it has an output pad \
-      of this kind. Please add a track of this kind to the Boombox.Bin.
-      """
+      "Boombox.Bin has no track of kind #{inspect(kind)}, but it has an output pad \
+      of this kind. Please add a track of this kind to the Boombox.Bin."
     end)
   end
 

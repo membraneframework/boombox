@@ -66,7 +66,8 @@ defmodule Boombox.StorageEndpoints.MP4 do
             audio_builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.AAC,
-              force_transcoding?: force_transcoding in [true, :audio]
+              transcoding_policy:
+                if(force_transcoding in [true, :audio], do: :always, else: :if_needed)
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
@@ -99,7 +100,8 @@ defmodule Boombox.StorageEndpoints.MP4 do
                 _not_h26x ->
                   %H264{stream_structure: :avc3, alignment: :au}
               end,
-              force_transcoding?: force_transcoding in [true, :video]
+              transcoding_policy:
+                if(force_transcoding in [true, :video], do: :always, else: :if_needed)
             })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)
