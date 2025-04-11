@@ -41,7 +41,7 @@ defmodule Boombox.BinTest do
     if video_format != nil or audio_format != nil do
       @tag :tmp_dir
 
-      if video_format == VP8 and audio_format == Opus do
+      if video_format == VP8 and audio_format == AAC do
         @tag :xd
       end
 
@@ -127,6 +127,7 @@ defmodule Boombox.BinTest do
     pipeline = Testing.Pipeline.start_link_supervised!(spec: spec)
     assert_pipeline_notified(pipeline, :boombox_sink, :processing_finished)
     Testing.Pipeline.terminate(pipeline)
+    System.cmd("rm", ["xd.mp4"])
   end
 
   # Boombox bin with input pad when video is Membrane.VP8 and audio is Membrane.Opus

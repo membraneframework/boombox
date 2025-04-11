@@ -10,6 +10,10 @@ defmodule Boombox.WebRTC do
   @type output_webrtc_state :: %{negotiated_video_codecs: [:vp8 | :h264] | nil}
   @type webrtc_sink_new_tracks :: [%{id: term, kind: :audio | :video}]
 
+  defguardp is_webrtc(endpoint) when is_tuple(endpoint) and elem(endpoint, 0) == :webrtc
+  defguardp has_webrtc_input(state) when is_webrtc(state.input)
+  defguardp has_webrtc_output(state) when is_webrtc(state.output)
+
   @spec create_input(Boombox.webrtc_signaling(), Boombox.output(), CallbackContext.t(), State.t()) ::
           Wait.t()
   def create_input(signaling, output, ctx, state) do
@@ -22,20 +26,7 @@ defmodule Boombox.WebRTC do
       end
 
     {preferred_video_codec, allowed_video_codecs} =
-      case state.output_webrtc_state do
-        nil ->
-          {:h264, [:h264, :vp8]}
-
-        %{negotiated_video_codecs: []} ->
-          # preferred_video_codec will be ignored
-          {:vp8, []}
-
-        %{negotiated_video_codecs: [codec]} ->
-          {codec, [:h264, :vp8]}
-
-        %{negotiated_video_codecs: [_codec_1, _codec_2] = codecs} ->
-          {:vp8, codecs}
-      end
+      resolve_input_webrtc_codec_options(ctx, state)
 
     spec =
       child(:webrtc_input, %WebRTC.Source{
@@ -74,7 +65,7 @@ defmodule Boombox.WebRTC do
           {Ready.t() | Wait.t(), State.t()}
   def create_output(signaling, ctx, state) do
     signaling = resolve_signaling(signaling, :output, ctx.utility_supervisor)
-    startup_tracks = if webrtc_input?(state), do: [:audio, :video], else: []
+    startup_tracks = if has_webrtc_input(state), do: [:audio, :video], else: []
 
     spec =
       child(:webrtc_output, %WebRTC.Sink{
@@ -86,7 +77,7 @@ defmodule Boombox.WebRTC do
     state = %{state | output_webrtc_state: %{negotiated_video_codecs: nil}}
 
     {status, state} =
-      if webrtc_input?(state) do
+      if has_webrtc_input(state) do
         # let's spawn websocket server for webrtc source before the source starts
         {:webrtc, input_signaling} = state.input
         signaling = resolve_signaling(input_signaling, :input, ctx.utility_supervisor)
@@ -104,7 +95,7 @@ defmodule Boombox.WebRTC do
           {Ready.t() | Wait.t(), State.t()}
   def handle_output_video_codecs_negotiated(codecs, state) do
     state = put_in(state.output_webrtc_state.negotiated_video_codecs, codecs)
-    status = if webrtc_input?(state), do: %Ready{}, else: %Wait{}
+    status = if has_webrtc_input(state), do: %Ready{}, else: %Wait{}
     {status, state}
   end
 
@@ -116,7 +107,7 @@ defmodule Boombox.WebRTC do
           State.t()
         ) :: Ready.t() | Wait.t()
   def link_output(opts, track_builders, spec_builder, tracks, state) do
-    if webrtc_input?(state) do
+    if has_webrtc_input(state) do
       do_link_output(opts, track_builders, spec_builder, tracks, state)
     else
       tracks = Bunch.KVEnum.keys(track_builders)
@@ -132,7 +123,7 @@ defmodule Boombox.WebRTC do
           State.t()
         ) :: Ready.t() | no_return()
   def handle_output_tracks_negotiated(opts, track_builders, spec_builder, tracks, state) do
-    if webrtc_input?(state) do
+    if has_webrtc_input(state) do
       raise """
       Currently ICE restart is not supported in Boombox instances having WebRTC input and output.
       """
@@ -277,6 +268,50 @@ defmodule Boombox.WebRTC do
     signaling
   end
 
-  defp webrtc_input?(%{input: {:webrtc, _signalling}}), do: true
-  defp webrtc_input?(_state), do: false
+  defp resolve_input_webrtc_codec_options(_ctx, state) when has_webrtc_output(state) do
+    case state.output_webrtc_state do
+      %{negotiated_video_codecs: []} ->
+        # preferred_video_codec will be ignored
+        {:vp8, []}
+
+      %{negotiated_video_codecs: [codec]} ->
+        {codec, [:h264, :vp8]}
+
+      %{negotiated_video_codecs: [_codec_1, _codec_2] = codecs} ->
+        {:vp8, codecs}
+    end
+  end
+
+  defp resolve_input_webrtc_codec_options(ctx, state) when state.output == :membrane_pad do
+    output_video_pad_options =
+      ctx.pads
+      |> Enum.find(fn
+        {Pad.ref(:output, _id), %{options: %{kind: :video} = options}} -> options
+        _pad_entry -> false
+      end)
+
+    with %{codec: codec} <- output_video_pad_options do
+      preferred_codec =
+        case codec do
+          [first_codec | _rest] -> first_codec
+          atom when is_atom(atom) -> atom
+        end
+        |> case do
+          H264 -> :h264
+          VP8 -> :vp8
+          _other -> :h264
+        end
+
+      {preferred_codec, [:h264, :vp8]}
+    else
+      nil ->
+        # there is no output video pad so video codec shouldn't be negotiated so
+        # value returned from this function will be ignored
+        {:h264, []}
+    end
+  end
+
+  defp resolve_input_webrtc_codec_options(_ctx, _state) do
+    {:h264, [:h264, :vp8]}
+  end
 end
