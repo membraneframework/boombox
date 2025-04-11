@@ -135,12 +135,10 @@ defmodule Boombox.InternalBin do
           | RawVideo
           | RawAudio
           | [H264 | VP8 | VP9 | AAC | Opus | RawVideo | RawAudio]
-          | nil,
-        default: nil
+          | nil
       ],
       transcoding_policy: [
-        spec: :always | :if_needed | :never,
-        default: :if_needed
+        spec: :always | :if_needed | :never
       ]
     ]
 
@@ -173,7 +171,7 @@ defmodule Boombox.InternalBin do
         |> proceed_result(ctx, state)
 
       :awaiting_output_link when state.output == :membrane_pad ->
-        Boombox.Pad.link_output(ctx, state.track_builders, state.spec_builder)
+        Boombox.Pad.link_output(ctx, state.track_builders, state.spec_builder, state)
         |> proceed_result(ctx, state)
 
       _status ->
@@ -524,8 +522,8 @@ defmodule Boombox.InternalBin do
     Boombox.ElixirStream.link_output(stream_process, params, track_builders, spec_builder)
   end
 
-  defp link_output(:membrane_pad, track_builder, spec_builder, ctx, _state) do
-    Boombox.Pad.link_output(ctx, track_builder, spec_builder)
+  defp link_output(:membrane_pad, track_builder, spec_builder, ctx, state) do
+    Boombox.Pad.link_output(ctx, track_builder, spec_builder, state)
   end
 
   # Wait between sending the last packet

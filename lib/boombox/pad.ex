@@ -62,7 +62,7 @@ defmodule Boombox.Pad do
     %Wait{}
   end
 
-  def link_output(ctx, track_builders, spec_builder) when ctx.playback == :playing do
+  def link_output(ctx, track_builders, spec_builder, state) when ctx.playback == :playing do
     validate_pads_and_tracks!(ctx, track_builders)
 
     linked_tracks =
@@ -75,7 +75,13 @@ defmodule Boombox.Pad do
             _pad_entry -> nil
           end)
 
-        pad_codecs = Bunch.listify(pad_options.codec || Membrane.H264)
+        default_codec =
+          case pad_options.kind do
+            :audio -> if webrtc_input?(state), do: Membrane.Opus, else: Membrane.AAC
+            :video -> Membrane.H264
+          end
+
+        pad_codecs = Bunch.listify(pad_options.codec || default_codec)
 
         builder
         |> child(%Membrane.Transcoder{
@@ -91,7 +97,7 @@ defmodule Boombox.Pad do
     %Ready{actions: [spec: spec]}
   end
 
-  def link_output(ctx, _track_builder, _spec_builder) when ctx.playback == :stopped do
+  def link_output(ctx, _track_builder, _spec_builder, _state) when ctx.playback == :stopped do
     %Wait{}
   end
 
@@ -122,6 +128,14 @@ defmodule Boombox.Pad do
     |> case do
       nil -> :ok
       {kind, _value} -> raise raise_log_generator.(kind)
+    end
+  end
+
+  defp webrtc_input?(state) do
+    case state.input do
+      {:webrtc, _signaling} -> true
+      {:webrtc, _signaling, _opts} -> true
+      _other -> false
     end
   end
 end
