@@ -93,13 +93,17 @@ defmodule Boombox.Pad do
       |> Map.new()
 
     raise_if_key_not_present(track_builders, output_pads, fn kind ->
-      "Boombox.Bin has no output pad of kind #{inspect(kind)}, but it has a track \
-      of this kind. Please add an output pad of this kind to the Boombox.Bin."
+      """
+      Boombox.Bin has no output pad of kind #{inspect(kind)}, but it has a track \
+      of this kind. Please add an output pad of this kind to the Boombox.Bin.
+      """
     end)
 
     raise_if_key_not_present(output_pads, track_builders, fn kind ->
-      "Boombox.Bin has no track of kind #{inspect(kind)}, but it has an output pad \
-      of this kind. Please add a track of this kind to the Boombox.Bin."
+      """
+      Boombox.Bin has no track of kind #{inspect(kind)}, but it has an output pad \
+      of this kind. Please add a track of this kind to the Boombox.Bin.
+      """
     end)
   end
 
