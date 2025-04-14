@@ -75,7 +75,8 @@ defmodule Boombox.InternalBin do
                   eos_info: nil,
                   rtsp_state: nil,
                   pending_new_tracks: %{input: [], output: []},
-                  output_webrtc_state: nil
+                  output_webrtc_state: nil,
+                  send_new_tracks?: true
                 ]
 
     @typedoc """
@@ -156,7 +157,8 @@ defmodule Boombox.InternalBin do
     state = %State{
       input: parse_endpoint_opt!(:input, opts.input),
       output: parse_endpoint_opt!(:output, opts.output),
-      status: :init
+      status: :init,
+      send_new_tracks?: opts.output == :membrane_pad
     }
 
     :ok = maybe_log_transcoding_related_warning(state.input, state.output)

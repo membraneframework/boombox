@@ -13,8 +13,7 @@ defmodule Boombox.Bin do
   require Membrane.Pad, as: Pad
   require Membrane.Transcoder.{Audio, Video}
 
-  alias Membrane.RawVideo
-  alias Membrane.{Transcoder, RawVideo, RawAudio, H264, VP8, VP9, AAC, Opus}
+  alias Membrane.{AAC, H264, Opus, RawAudio, RawVideo, Transcoder, VP8, VP9}
 
   @video_codecs [H264, VP8, VP9, RawVideo]
   @audio_codecs [AAC, Opus, RawAudio]
@@ -192,6 +191,11 @@ defmodule Boombox.Bin do
   @impl true
   def handle_child_notification(:processing_finished, :boombox, _ctx, state) do
     {[notify_parent: :processing_finished], state}
+  end
+
+  @impl true
+  def handle_child_notification({:new_tracks, _tracks} = notification, _child, _ctx, state) do
+    {[notify_parent: notification], state}
   end
 
   defp validate_opts!(opts) do
