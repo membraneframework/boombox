@@ -193,11 +193,6 @@ defmodule Boombox.Bin do
     {[notify_parent: :processing_finished], state}
   end
 
-  @impl true
-  def handle_child_notification({:new_tracks, _tracks} = notification, _child, _ctx, state) do
-    {[notify_parent: notification], state}
-  end
-
   defp validate_opts!(opts) do
     nil_opts_number =
       [opts.input, opts.output]
