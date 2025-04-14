@@ -124,20 +124,58 @@ defmodule Boombox.BinTest do
     System.cmd("rm", ["xd.mp4"])
   end
 
-  # Boombox bin with input pad when video is Membrane.VP8 and audio is Membrane.Opus
+  describe "Boombox.Bin raises when" do
+    test "it has input pad linked and `:input` option set at the same time" do
+      spec =
+        child(Testing.Source)
+        |> via_in(:input, options: [kind: :audio])
+        |> child(%Boombox.Bin{
+          input: {:webrtc, "ws://localhost:5432"},
+          output: {:webrtc, "ws://localhost:5433"}
+        })
 
-  # the test below will be uncommented after adding input pads
-  # test "Boombox bin raises when it has input pad linked and `:input` option set at the same time" do
-  #   spec =
-  #     child(Testing.Source)
-  #     |> via_in(:audio_input)
-  #     |> child(%Boombox.Bin{
-  #       input: {:webrtc, "ws://localhost:5432"},
-  #       output: {:webrtc, "ws://localhost:5433"}
-  #     })
+      do_test_raise(spec)
+    end
 
-  #   {:ok, supervisor, _pipeline} = Testing.Pipeline.start(spec: spec)
-  #   ref = Process.monitor(supervisor)
-  #   assert_receive {:DOWN, ^ref, :process, _supervisor, _reason}
-  # end
+    test "its input and output pads are linked at the same time" do
+      spec =
+        child(Testing.Source)
+        |> via_in(:input, options: [kind: :audio])
+        |> child(Boombox.Bin)
+        |> via_out(:output, options: [kind: :audio])
+        |> child(Testing.Sink)
+
+      do_test_raise(spec)
+    end
+
+    @tag :tmp_dir
+    test "pad is linked after `handle_playing/2`", %{tmp_dir: tmp_dir} do
+      spec =
+        child(Testing.Source)
+        |> via_in(:input, options: [kind: :audio])
+        |> child(:boombox, %Boombox.Bin{
+          output: Path.join(tmp_dir, "file.mp4")
+        })
+
+      {:ok, supervisor, pipeline} = Testing.Pipeline.start(spec: spec)
+      ref = Process.monitor(supervisor)
+
+      Process.sleep(500)
+      assert Process.alive?(supervisor)
+
+      new_spec =
+        child(Testing.Source)
+        |> via_in(:input, options: [kind: :video])
+        |> get_child(:boombox)
+
+      Testing.Pipeline.execute_actions(pipeline, spec: new_spec)
+      assert_receive {:DOWN, ^ref, :process, _supervisor, _reason}
+    end
+  end
+
+  defp do_test_raise(spec) do
+    {:ok, supervisor, _pipeline} = Testing.Pipeline.start(spec: spec)
+    ref = Process.monitor(supervisor)
+    assert_receive {:DOWN, ^ref, :process, _supervisor, _reason}
+  end
 end

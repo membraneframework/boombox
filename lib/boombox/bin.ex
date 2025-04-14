@@ -1,6 +1,11 @@
 defmodule Boombox.Bin do
   @moduledoc """
-  todo:)
+  Boombox.Bin is a Membrane Bin for audio and video streaming.
+  It can be used as a Sink or Source in your Membrane Pipeline.
+
+  If you use it as a Membrane Source, you have to specify `:input` option.
+  If you use it as a Membrane Sink, you have to specify `:output` option.
+  Boombox.Bin cannot be used as both Source and Sink at the same time.
   """
 
   use Membrane.Bin
@@ -19,6 +24,11 @@ defmodule Boombox.Bin do
     video: @video_codecs
   }
 
+  @typedoc """
+  Value passed via `:input` option.
+  Specifies the input endpoint of `#{inspect(__MODULE__)}`.
+  Similar to `Boombox.input()`, but without `:stream` option.
+  """
   @type input() ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
@@ -28,6 +38,11 @@ defmodule Boombox.Bin do
           | {:rtsp, url :: String.t()}
           | {:rtp, Boombox.in_rtp_opts()}
 
+  @typedoc """
+  Value passed via `:output` option.
+  Specifies the output endpoint of `#{inspect(__MODULE__)}`.
+  Similar to `Boombox.output()`, but without `:stream` option.
+  """
   @type output ::
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(), [Boombox.transcoding_policy()]}
@@ -46,7 +61,16 @@ defmodule Boombox.Bin do
       when Transcoder.Audio.is_audio_format(format) or Transcoder.Video.is_video_format(format),
     availability: :on_request,
     max_instances: 2,
-    options: [kind: [spec: :video | :audio]]
+    options: [
+      kind: [
+        spec: :video | :audio,
+        description: """
+        Specifies, if the input pad is for audio or video.
+
+        There might be up to one pad of each kind at the time.
+        """
+      ]
+    ]
 
   def_output_pad :output,
     accepted_format:
@@ -55,7 +79,14 @@ defmodule Boombox.Bin do
     availability: :on_request,
     max_instances: 2,
     options: [
-      kind: [spec: :video | :audio],
+      kind: [
+        spec: :video | :audio,
+        description: """
+        Specifies, if the output pad is for audio or video.
+
+        There might be up to one pad of each kind at the time.
+        """
+      ],
       codec: [
         spec:
           H264
@@ -67,11 +98,48 @@ defmodule Boombox.Bin do
           | RawAudio
           | [H264 | VP8 | VP9 | AAC | Opus | RawVideo | RawAudio]
           | nil,
-        default: nil
+        default: nil,
+        description: """
+        Specifies the codec of the stream flowing through the pad.
+
+        Can be either a single codec or a list of codecs.
+
+        If a list is provided
+          * and the stream matches one of the codecs, the matching codec will be used,
+          * and the stream doesn't match any of the codecs, it will be transcoded to
+            the first codec in the list.
+
+        If the codec is not specified, it will be resolved to:
+          * `Membrane.H264` for video,
+          * `Membrane.AAC` for audio, if the input is not WebRTC,
+          * `Membrane.Opus` for audio, if the input is WebRTC.
+        """
       ],
       transcoding_policy: [
         spec: :always | :if_needed | :never,
-        default: :if_needed
+        default: :if_needed,
+        description: """
+        Specifies the transcoding policy for the stream flowing through the pad.
+
+        Can be either `:always`, `:if_needed`, or `:never`.
+
+        If set to `:always`, the media stream will be decoded and/or encoded, even if the
+        format of the stream arriving at the #{inspect(__MODULE__)} endpoint matches the \
+        output pad codec.
+
+        If set to `:if_needed`, the media stream will be transcoded only if the format of
+        the stream arriving at the #{inspect(__MODULE__)} endpoint doesn't match the output
+        pad codec.
+        This is the default behavior.
+
+        If set to `:never`, the input media stream won't be decoded or encoded.
+        Changing alignment, encapsulation, or stream structure is still possible. This option
+        is helpful when you want to ensure that #{inspect(__MODULE__)} will not use too many
+        resources, e.g., CPU or memory.
+
+        If the stream arriving at the #{inspect(__MODULE__)} endpoint doesn't match the output
+        pad codec, an error will be raised.
+        """
       ]
     ]
 
