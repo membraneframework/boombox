@@ -10,12 +10,12 @@ defmodule Boombox.HLS do
 
   @spec link_output(
           Path.t(),
-          [Boombox.force_transcoding()],
+          [Boombox.transcoding_policy()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, opts, track_builders, spec_builder) do
-    force_transcoding = opts |> Keyword.get(:force_transcoding, false)
+    transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
 
     {directory, manifest_name} =
       if Path.extname(location) == ".m3u8" do
@@ -48,8 +48,7 @@ defmodule Boombox.HLS do
             builder
             |> child(:hls_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.AAC,
-              transcoding_policy:
-                if(force_transcoding in [true, :audio], do: :always, else: :if_needed)
+              transcoding_policy: transcoding_policy
             })
             |> via_in(Pad.ref(:input, :audio),
               options: [encoding: :AAC, segment_duration: Time.milliseconds(2000)]
@@ -60,8 +59,7 @@ defmodule Boombox.HLS do
             builder
             |> child(:hls_video_transcoder, %Membrane.Transcoder{
               output_stream_format: %H264{alignment: :au, stream_structure: :avc3},
-              transcoding_policy:
-                if(force_transcoding in [true, :video], do: :always, else: :if_needed)
+              transcoding_policy: transcoding_policy
             })
             |> via_in(Pad.ref(:input, :video),
               options: [encoding: :H264, segment_duration: Time.milliseconds(2000)]

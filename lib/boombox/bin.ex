@@ -30,14 +30,14 @@ defmodule Boombox.Bin do
 
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [Boombox.force_transcoding()]}
+          | {path_or_uri :: String.t(), [Boombox.transcoding_policy()]}
           | {:mp4, location :: String.t()}
-          | {:mp4, location :: String.t(), [Boombox.force_transcoding()]}
+          | {:mp4, location :: String.t(), [Boombox.transcoding_policy()]}
           | {:webrtc, Boombox.webrtc_signaling()}
-          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.force_transcoding()]}
+          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy()]}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [Boombox.force_transcoding()]}
+          | {:hls, location :: String.t(), [Boombox.transcoding_policy()]}
           | {:rtp, Boombox.out_rtp_opts()}
 
   def_input_pad :input,

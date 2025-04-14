@@ -11,7 +11,7 @@ defmodule Boombox do
 
   alias Membrane.RTP
 
-  @type force_transcoding() :: {:force_transcoding, boolean() | :audio | :video}
+  @type transcoding_policy() :: {:transcoding_policy, :always | :if_needed | :never}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
   @type in_stream_opts :: [
@@ -70,7 +70,7 @@ defmodule Boombox do
           | {:address, :inet.ip_address() | String.t()}
           | {:port, :inet.port_number()}
           | {:target, String.t()}
-          | force_transcoding()
+          | transcoding_policy()
         ]
 
   @type input ::
@@ -94,7 +94,7 @@ defmodule Boombox do
 
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [force_transcoding()]}
+          | {path_or_uri :: String.t(), [transcoding_policy()]}
           | {:mp4, location :: String.t()}
           | {:h264, location :: String.t()}
           | {:h265, location :: String.t()}
@@ -103,12 +103,12 @@ defmodule Boombox do
           | {:mp3, location :: String.t()}
           | {:ivf, location :: String.t()}
           | {:ogg, location :: String.t()}
-          | {:mp4, location :: String.t(), [force_transcoding()]}
+          | {:mp4, location :: String.t(), [transcoding_policy()]}
           | {:webrtc, webrtc_signaling()}
-          | {:webrtc, webrtc_signaling(), [force_transcoding()]}
+          | {:webrtc, webrtc_signaling(), [transcoding_policy()]}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [force_transcoding()]}
+          | {:hls, location :: String.t(), [transcoding_policy()]}
           | {:rtp, out_rtp_opts()}
           | {:stream, out_stream_opts()}
 

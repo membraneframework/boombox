@@ -22,14 +22,14 @@ defmodule Boombox.InternalBin do
 
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [Boombox.force_transcoding()]}
+          | {path_or_uri :: String.t(), [Boombox.transcoding_policy()]}
           | {:mp4, location :: String.t()}
-          | {:mp4, location :: String.t(), [Boombox.force_transcoding()]}
+          | {:mp4, location :: String.t(), [Boombox.transcoding_policy()]}
           | {:webrtc, Boombox.webrtc_signaling()}
-          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.force_transcoding()]}
+          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy()]}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [Boombox.force_transcoding()]}
+          | {:hls, location :: String.t(), [Boombox.transcoding_policy()]}
           | {:rtp, Boombox.out_rtp_opts()}
           | {:stream, pid(), Boombox.out_stream_opts()}
           | :membrane_pad
@@ -659,7 +659,9 @@ defmodule Boombox.InternalBin do
 
   @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
   defp resolve_transport(location, opts) do
-    case Keyword.validate!(opts, transport: nil, force_transcoding: false)[:transport] do
+    opts = opts |> Keyword.validate!(transport: nil, transcoding_policy: :if_needed)
+
+    case opts[:transport] do
       nil ->
         uri = URI.parse(location)
 
@@ -680,18 +682,18 @@ defmodule Boombox.InternalBin do
 
   defp split_webrtc_and_whip_opts(opts) do
     opts
-    |> Enum.split_with(fn {key, _value} -> key == :force_transcoding end)
+    |> Enum.split_with(fn {key, _value} -> key == :transcoding_policy end)
   end
 
   @spec maybe_log_transcoding_related_warning(input(), output()) :: :ok
   defp maybe_log_transcoding_related_warning(input, output) do
     if webrtc?(output) and not handles_keyframe_requests?(input) and
-         webrtc_output_force_transcoding(output) not in [true, :video] do
+         webrtc_output_transcoding_policy(output) != :always do
       Membrane.Logger.warning("""
       Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
       might lead to issues with the output video if the output stream isn't sent only by localhost. You \
-      can solve this by setting `:force_transcoding` output option to `true` or `:video`, but be aware \
-      that it will increase Boombox CPU usage.
+      can solve this by setting `:transcoding_policy` output option to `:always`, but be aware that it \
+      will increase Boombox CPU usage.
       """)
     end
 
@@ -705,8 +707,8 @@ defmodule Boombox.InternalBin do
   defp handles_keyframe_requests?({:stream, _pid, _opts}), do: true
   defp handles_keyframe_requests?(endpoint), do: webrtc?(endpoint)
 
-  defp webrtc_output_force_transcoding({:webrtc, _singaling, opts}),
-    do: Keyword.get(opts, :force_transcoding)
+  defp webrtc_output_transcoding_policy({:webrtc, _singaling, opts}),
+    do: Keyword.get(opts, :transcoding_policy, :if_needed)
 
   defp maybe_warn_about_dropped_tracks(track_builders, dropped_track, output_type) do
     if track_builders[dropped_track] do
