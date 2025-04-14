@@ -1,7 +1,7 @@
 defmodule Boombox.StorageEndpoints.AAC do
   @moduledoc false
   import Membrane.ChildrenSpec
-  alias Boombox.Pipeline.Ready
+  alias Boombox.InternalBin.Ready
   alias Boombox.StorageEndpoints
   alias Membrane.AAC
 
@@ -16,7 +16,7 @@ defmodule Boombox.StorageEndpoints.AAC do
 
   @spec link_output(
           String.t(),
-          Boombox.Pipeline.track_builders(),
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do

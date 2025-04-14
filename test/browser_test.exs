@@ -107,18 +107,17 @@ defmodule Boombox.BrowserTest do
     assert size > 400_000
   end
 
-  for first <- [:ingress, :egress], transcoding? <- [true, false] do
-    test "browser -> boombox -> browser, but #{first} browser page connects first and :enforce_audio/video_transcoding? is set to #{transcoding?}",
+  for first <- [:ingress, :egress], transcoding_policy <- [:always, :if_needed] do
+    test "browser -> boombox -> browser, but #{first} browser page connects first and :transcoding_policy option is set to #{transcoding_policy}",
          %{
            browser: browser
          } do
-      transcoding? = unquote(transcoding?)
-
       boombox_task =
         Task.async(fn ->
           Boombox.run(
             input: {:webrtc, "ws://localhost:8829"},
-            output: {:webrtc, "ws://localhost:8830", force_transcoding: transcoding?}
+            output:
+              {:webrtc, "ws://localhost:8830", transcoding_policy: unquote(transcoding_policy)}
           )
         end)
 
@@ -147,7 +146,15 @@ defmodule Boombox.BrowserTest do
       assert_frames_decoded(egress_page, seconds)
 
       assert_page_codecs(ingress_page, [:vp8, :opus])
-      egress_video_codec = if unquote(transcoding?), do: :h264, else: :vp8
+
+      egress_video_codec =
+        unquote(
+          case transcoding_policy do
+            :always -> :h264
+            :if_needed -> :vp8
+          end
+        )
+
       assert_page_codecs(egress_page, [egress_video_codec, :opus])
 
       [ingress_page, egress_page]
