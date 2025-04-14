@@ -83,7 +83,7 @@ defmodule Boombox.Pad do
 
         builder
         |> child(%Membrane.Transcoder{
-          output_stream_format: &resolve_stream_format(&1, options, state),
+          output_stream_format: &resolve_stream_format(&1, pad_options, state),
           transcoding_policy: pad_options.transcoding_policy
         })
         |> get_child({:pad_connector, :output, kind})
