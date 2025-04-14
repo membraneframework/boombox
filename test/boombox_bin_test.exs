@@ -40,11 +40,6 @@ defmodule Boombox.BinTest do
   for video_format <- @video_formats, audio_format <- @audio_formats do
     if video_format != nil or audio_format != nil do
       @tag :tmp_dir
-
-      if video_format == VP8 and audio_format == AAC do
-        @tag :xd
-      end
-
       test "Boombox bin with input pad when video is #{Format.to_string(video_format)} and audio is #{Format.to_string(audio_format)}",
            %{tmp_dir: tmp_dir} do
         video_format =
@@ -67,7 +62,7 @@ defmodule Boombox.BinTest do
     ]
 
     pipeline = Testing.Pipeline.start_link_supervised!(spec: spec)
-    assert_pipeline_notified(pipeline, :boombox, :processing_finished)
+    assert_pipeline_notified(pipeline, :boombox, :processing_finished, 5_000)
     Testing.Pipeline.terminate(pipeline)
 
     tracks_number = [video_format, audio_format] |> Enum.count(&(&1 != nil))
@@ -109,7 +104,6 @@ defmodule Boombox.BinTest do
     ]
   end
 
-  @tag :xd
   test "source bin" do
     spec = [
       child(:boombox_source, %Boombox.Bin{input: "test/fixtures/bun10s.mp4"})
