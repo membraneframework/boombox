@@ -26,8 +26,10 @@ defmodule Boombox.Bin do
 
   @typedoc """
   Value passed via `:input` option.
+
   Specifies the input endpoint of `#{inspect(__MODULE__)}`.
-  Similar to `Boombox.input()`, but without `:stream` option.
+
+  Similar to `t:Boombox.input/0`, but without `:stream` option.
   """
   @type input() ::
           (path_or_uri :: String.t())
@@ -40,8 +42,10 @@ defmodule Boombox.Bin do
 
   @typedoc """
   Value passed via `:output` option.
+
   Specifies the output endpoint of `#{inspect(__MODULE__)}`.
-  Similar to `Boombox.output()`, but without `:stream` option.
+
+  Similar to `t:Boombox.output/0`, but without `:stream` option.
   """
   @type output ::
           (path_or_uri :: String.t())
