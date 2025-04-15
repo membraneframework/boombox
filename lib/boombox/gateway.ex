@@ -15,12 +15,19 @@ defmodule Boombox.Gateway do
   end
 
   @impl true
-  def init(_arg) do
-    {:ok, %{boombox_pid: nil, finished: false}}
+  def init(arg) do
+    Process.register(self(), arg)
+    {:ok, %{boombox_pid: nil, boombox_monitor: nil, last_produced_packet: nil}}
   end
 
   @impl true
   def handle_call({:run_boombox, run_opts}, _from, state) do
+    run_opts =
+      [
+        input: {:stream, video: :image, audio: false},
+        output: "output/index.m3u8"
+      ]
+
     boombox_mode = get_boombox_mode(run_opts)
     gateway_pid = self()
 
@@ -31,41 +38,77 @@ defmodule Boombox.Gateway do
       end
 
     boombox_pid = spawn(boombox_process_fun)
+    Process.monitor(boombox_pid)
 
-    if boombox_mode == :consuming do
-      receive do
-        :packet_consumed -> :ok
+    last_produced_packet =
+      case boombox_mode do
+        :consuming ->
+          receive do
+            :packet_consumed -> nil
+          end
+
+        :producing ->
+          receive do
+            {:packet_produced, packet} -> packet
+          end
       end
-    end
 
-    {:reply, :ok, %{state | boombox_pid: boombox_pid}}
+    {:reply, :ok, %{state | boombox_pid: boombox_pid, last_produced_packet: last_produced_packet}}
   end
 
   @impl true
-  def handle_call({:consume_packet, packet}, _from, %{finished: false} = state) do
+  def handle_call({:consume_packet, packet, width, height, timestamp}, _from, state) do
+    packet =
+      if is_binary(packet) do
+        {:ok, img} = Vix.Vips.Image.new_from_binary(packet, width, height, 3, :VIPS_FORMAT_UCHAR)
+        %Boombox.Packet{kind: :video, payload: img, pts: Membrane.Time.milliseconds(timestamp)}
+      else
+        packet
+      end
+
     send(state.boombox_pid, {:consume_packet, packet})
 
     receive do
-      :packet_consumed -> :ok
-    end
+      :packet_consumed ->
+        {:reply, :ok, state}
 
-    {:reply, :ok, state}
+      :finished ->
+        {:reply, :finished, state}
+    end
   end
 
   @impl true
-  def handle_call(:produce_packet, _from, %{finished: false} = state) do
+  def handle_call(:finish_consuming, _from, state) do
+    send(state.boombox_pid, :finish_consuming)
+
+    receive do
+      :finished ->
+        {:reply, :finished, state}
+    end
+  end
+
+  @impl true
+  def handle_call(:produce_packet, _from, state) do
     send(state.boombox_pid, :produce_packet)
 
-    packet =
-      receive do
-        {:packet_produced, packet} -> packet
-      end
+    receive do
+      {:packet_produced, packet} ->
+        {:reply, {:ok, state.last_produced_packet}, %{state | last_produced_packet: packet}}
 
-    {:reply, {:ok, packet}, state}
+      :finished ->
+        {:reply, {:finished, state.last_produced_packet}, state}
+    end
   end
 
   @impl true
-  def handle_info(:finished, state) do
+  def handle_info({:call, sender, message}, state) do
+    {:reply, reply, state} = handle_call(message, sender, state)
+    send(sender, reply)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:DOWN, _ref, :process, pid, :normal}, %{boombox_pid: pid} = state) do
     {:stop, :finished, state}
   end
 
@@ -77,27 +120,33 @@ defmodule Boombox.Gateway do
 
   @spec consuming_boombox_function(boombox_opts(), pid()) :: :ok
   defp consuming_boombox_function(run_opts, gateway_pid) do
-    Stream.repeatedly(fn ->
-      send(gateway_pid, :packet_consumed)
+    Stream.resource(
+      fn -> nil end,
+      fn nil ->
+        send(gateway_pid, :packet_consumed)
 
-      receive do
-        {:consume_packet, packet} -> packet
-      end
-    end)
+        receive do
+          {:consume_packet, packet} ->
+            {[packet], nil}
+
+          :finish_consuming ->
+            {:halt, nil}
+        end
+      end,
+      fn nil -> send(gateway_pid, :finished) end
+    )
     |> Boombox.run(run_opts)
-
-    send(gateway_pid, :finished)
   end
 
   @spec producing_boombox_function(boombox_opts(), pid()) :: :ok
   defp producing_boombox_function(run_opts, gateway_pid) do
     Boombox.run(run_opts)
     |> Enum.each(fn packet ->
+      send(gateway_pid, {:packet_produced, packet})
+
       receive do
         :produce_packet -> :ok
       end
-
-      send(gateway_pid, {:packet_produced, packet})
     end)
 
     send(gateway_pid, :finished)
