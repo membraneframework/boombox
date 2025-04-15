@@ -131,10 +131,13 @@ defmodule Boombox do
     case opts do
       %{input: {:stream, _stream_opts}} ->
         procs = start_pipeline(opts)
-        consume_stream(stream, procs)
+        source = await_source_ready()
+        consume_stream(stream, source, procs)
 
       %{output: {:stream, _stream_opts}} ->
-        produce_stream(opts)
+        procs = start_pipeline(opts)
+        sink = await_sink_ready()
+        produce_stream(sink, procs)
 
       opts ->
         opts
@@ -159,14 +162,17 @@ defmodule Boombox do
     case opts do
       %{input: {:stream, _stream_opts}} ->
         procs = start_pipeline(opts)
+        source = await_source_ready()
 
         Task.async(fn ->
           Process.monitor(procs.supervisor)
-          consume_stream(stream, procs)
+          consume_stream(stream, source, procs)
         end)
 
       %{output: {:stream, _stream_opts}} ->
-        produce_stream(opts)
+        procs = start_pipeline(opts)
+        sink = await_sink_ready()
+        produce_stream(sink, procs)
 
       opts ->
         procs = start_pipeline(opts)
@@ -342,13 +348,8 @@ defmodule Boombox do
   defp webrtc_output_force_transcoding(%{output: {:webrtc, _singaling, opts}}),
     do: Keyword.get(opts, :force_transcoding)
 
-  @spec consume_stream(Enumerable.t(), procs()) :: term()
-  defp consume_stream(stream, procs) do
-    source =
-      receive do
-        {:boombox_ex_stream_source, source} -> source
-      end
-
+  @spec consume_stream(Enumerable.t(), pid(), procs()) :: term()
+  defp consume_stream(stream, source, procs) do
     Enum.reduce_while(
       stream,
       %{demand: 0},
@@ -382,15 +383,11 @@ defmodule Boombox do
     end
   end
 
-  @spec produce_stream(opts_map()) :: Enumerable.t()
-  defp produce_stream(opts) do
+  @spec produce_stream(pid(), procs()) :: Enumerable.t()
+  defp produce_stream(sink, procs) do
     Stream.resource(
       fn ->
-        procs = start_pipeline(opts)
-
-        receive do
-          {:boombox_ex_stream_sink, sink} -> %{sink: sink, procs: procs}
-        end
+        %{sink: sink, procs: procs}
       end,
       fn %{sink: sink, procs: procs} = state ->
         send(sink, :boombox_demand)
@@ -431,6 +428,20 @@ defmodule Boombox do
   defp await_pipeline(%{supervisor: supervisor}) do
     receive do
       {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
+    end
+  end
+
+  @spec await_source_ready() :: pid()
+  defp await_source_ready() do
+    receive do
+      {:boombox_ex_stream_source, source} -> source
+    end
+  end
+
+  @spec await_sink_ready() :: pid()
+  defp await_sink_ready() do
+    receive do
+      {:boombox_ex_stream_sink, sink} -> sink
     end
   end
 
