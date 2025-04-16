@@ -2,7 +2,15 @@ defmodule Boombox.Gateway do
   use GenServer
 
   @typep boombox_opts :: [input: Boombox.input(), output: Boombox.output()]
-  @typep boombox_mode :: :consuming | :producing
+  @typep boombox_mode :: :consuming | :producing | :standalone
+
+  @type packet :: %{
+          data: binary(),
+          width: pos_integer(),
+          height: pos_integer(),
+          channels: pos_integer(),
+          timestamp: integer()
+        }
 
   @spec start_link(term()) :: GenServer.on_start()
   def start_link(arg) do
@@ -23,10 +31,20 @@ defmodule Boombox.Gateway do
   @impl true
   def handle_call({:run_boombox, run_opts}, _from, state) do
     run_opts =
-      [
-        input: {:stream, video: :image, audio: false},
-        output: "output/index.m3u8"
-      ]
+      case run_opts do
+        1 ->
+          [
+            input:
+              "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s.mp4",
+            output: {:stream, video: :image, audio: false}
+          ]
+
+        2 ->
+          [
+            input: {:stream, video: :image, audio: false},
+            output: "output/index.m3u8"
+          ]
+      end
 
     boombox_mode = get_boombox_mode(run_opts)
     gateway_pid = self()
@@ -35,6 +53,7 @@ defmodule Boombox.Gateway do
       case boombox_mode do
         :consuming -> fn -> consuming_boombox_function(run_opts, gateway_pid) end
         :producing -> fn -> producing_boombox_function(run_opts, gateway_pid) end
+        :standalone -> fn -> standalone_boombox_function(run_opts) end
       end
 
     boombox_pid = spawn(boombox_process_fun)
@@ -51,20 +70,36 @@ defmodule Boombox.Gateway do
           receive do
             {:packet_produced, packet} -> packet
           end
+
+        :standalone ->
+          nil
       end
 
     {:reply, :ok, %{state | boombox_pid: boombox_pid, last_produced_packet: last_produced_packet}}
   end
 
   @impl true
-  def handle_call({:consume_packet, packet, width, height, timestamp}, _from, state) do
+  def handle_call(:get_pid, _from, state) do
+    {:reply, self(), state}
+  end
+
+  @impl true
+  def handle_call({:consume_packet, packet}, _from, state) do
+    {:ok, img} =
+      Vix.Vips.Image.new_from_binary(
+        packet.data,
+        packet.width,
+        packet.height,
+        packet.channels,
+        :VIPS_FORMAT_UCHAR
+      )
+
     packet =
-      if is_binary(packet) do
-        {:ok, img} = Vix.Vips.Image.new_from_binary(packet, width, height, 3, :VIPS_FORMAT_UCHAR)
-        %Boombox.Packet{kind: :video, payload: img, pts: Membrane.Time.milliseconds(timestamp)}
-      else
-        packet
-      end
+      %Boombox.Packet{
+        kind: :video,
+        payload: img,
+        pts: Membrane.Time.milliseconds(packet.timestamp)
+      }
 
     send(state.boombox_pid, {:consume_packet, packet})
 
@@ -91,13 +126,33 @@ defmodule Boombox.Gateway do
   def handle_call(:produce_packet, _from, state) do
     send(state.boombox_pid, :produce_packet)
 
-    receive do
-      {:packet_produced, packet} ->
-        {:reply, {:ok, state.last_produced_packet}, %{state | last_produced_packet: packet}}
+    last_produced_packet = state.last_produced_packet
 
-      :finished ->
-        {:reply, {:finished, state.last_produced_packet}, state}
-    end
+    {production_phase, state} =
+      receive do
+        {:packet_produced, packet} -> {:continue, %{state | last_produced_packet: packet}}
+        :finished -> {:finished, state}
+      end
+
+    output_packet =
+      case last_produced_packet.kind do
+        :video ->
+          {:ok, tensor} = Vix.Vips.Image.write_to_tensor(last_produced_packet.payload)
+          {height, width, channels} = tensor.shape
+
+          %{
+            data: tensor.data,
+            width: width,
+            height: height,
+            channels: channels,
+            timestamp: Membrane.Time.as_milliseconds(last_produced_packet.pts)
+          }
+
+        :audio ->
+          raise "Not implemented"
+      end
+
+    {:reply, {production_phase, output_packet}, state}
   end
 
   @impl true
@@ -109,7 +164,7 @@ defmodule Boombox.Gateway do
 
   @impl true
   def handle_info({:DOWN, _ref, :process, pid, :normal}, %{boombox_pid: pid} = state) do
-    {:stop, :finished, state}
+    {:stop, :normal, state}
   end
 
   @impl true
@@ -152,12 +207,18 @@ defmodule Boombox.Gateway do
     send(gateway_pid, :finished)
   end
 
+  @spec standalone_boombox_function(boombox_opts()) :: :ok
+  defp standalone_boombox_function(run_opts) do
+    Boombox.run(run_opts)
+  end
+
   @spec get_boombox_mode(input: Boombox.input(), output: Boombox.output()) :: boombox_mode()
   defp get_boombox_mode(run_opts) do
     case Map.new(run_opts) do
       %{input: {:stream, _input_opts}, output: {:stream, _output_opts}} -> raise "Cannot do both"
       %{input: {:stream, _input_opts}} -> :consuming
       %{output: {:stream, _output_opts}} -> :producing
+      _neither_input_or_output -> :standalone
     end
   end
 end
