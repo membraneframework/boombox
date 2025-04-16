@@ -186,11 +186,6 @@ defmodule Boombox do
 
   @endpoint_opts [:input, :output]
   defp validate_opts!(stream, opts) do
-    if stream != nil and !Enumerable.impl_for(stream) do
-      raise ArgumentError,
-            "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
-    end
-
     opts =
       opts
       |> Keyword.validate!(@endpoint_opts)
@@ -198,18 +193,28 @@ defmodule Boombox do
 
     :ok = maybe_log_transcoding_related_warning(opts)
 
-    if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
-      raise "#{key} is not provided"
-    end
+    cond do
+      Map.keys(opts) -- @endpoint_opts != [] ->
+        raise ArgumentError, "Both input and output are required"
 
-    case opts do
-      %{input: {:stream, _in_stream_opts}, output: {:stream, _out_stream_opts}} ->
-        raise ArgumentError, ":stream on both input and output is not supported"
+      is_stream?(opts[:input]) && stream == nil ->
+        raise ArgumentError, "Stream is required for input stream"
 
-      _opts ->
+      is_stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
+        raise ArgumentError,
+              "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
+
+      is_stream?(opts[:input]) && is_stream?(opts[:output]) ->
+        raise ArgumentError,
+              ":stream on both input and output is not supported"
+
+      true ->
         opts
     end
   end
+
+  defp is_stream?({:stream, _opts}), do: true
+  defp is_stream?(_), do: false
 
   @doc """
   Runs boombox with CLI arguments.
