@@ -150,8 +150,10 @@ defmodule Boombox.Mixfile do
       boombox:
         [
           steps: [:assemble, &restore_symlinks/1, burrito_wrap]
-        ] ++
-          burrito_config
+        ] ++ burrito_config,
+      boombox_python: [
+        steps: [:assemble, &restore_symlinks/1]
+      ]
     ]
   end
 

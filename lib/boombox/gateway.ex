@@ -1,4 +1,4 @@
-defmodule Boombox.Gateway do
+defmodule Boombox.Server do
   use GenServer
 
   @typep boombox_opts :: [input: Boombox.input(), output: Boombox.output()]
@@ -24,19 +24,19 @@ defmodule Boombox.Gateway do
 
   @impl true
   def init(_arg) do
-    Process.register(self(), :boombox_gateway)
+    Process.register(self(), :boombox_server)
     {:ok, %{boombox_pid: nil, boombox_monitor: nil, last_produced_packet: nil}}
   end
 
   @impl true
   def handle_call({:run_boombox, run_opts}, _from, state) do
     boombox_mode = get_boombox_mode(run_opts)
-    gateway_pid = self()
+    server_pid = self()
 
     boombox_process_fun =
       case boombox_mode do
-        :consuming -> fn -> consuming_boombox_function(run_opts, gateway_pid) end
-        :producing -> fn -> producing_boombox_function(run_opts, gateway_pid) end
+        :consuming -> fn -> consuming_boombox_function(run_opts, server_pid) end
+        :producing -> fn -> producing_boombox_function(run_opts, server_pid) end
         :standalone -> fn -> standalone_boombox_function(run_opts) end
       end
 
@@ -158,11 +158,11 @@ defmodule Boombox.Gateway do
   end
 
   @spec consuming_boombox_function(boombox_opts(), pid()) :: :ok
-  defp consuming_boombox_function(run_opts, gateway_pid) do
+  defp consuming_boombox_function(run_opts, server_pid) do
     Stream.resource(
       fn -> nil end,
       fn nil ->
-        send(gateway_pid, :packet_consumed)
+        send(server_pid, :packet_consumed)
 
         receive do
           {:consume_packet, packet} ->
@@ -172,23 +172,23 @@ defmodule Boombox.Gateway do
             {:halt, nil}
         end
       end,
-      fn nil -> send(gateway_pid, :finished) end
+      fn nil -> send(server_pid, :finished) end
     )
     |> Boombox.run(run_opts)
   end
 
   @spec producing_boombox_function(boombox_opts(), pid()) :: :ok
-  defp producing_boombox_function(run_opts, gateway_pid) do
+  defp producing_boombox_function(run_opts, server_pid) do
     Boombox.run(run_opts)
     |> Enum.each(fn packet ->
-      send(gateway_pid, {:packet_produced, packet})
+      send(server_pid, {:packet_produced, packet})
 
       receive do
         :produce_packet -> :ok
       end
     end)
 
-    send(gateway_pid, :finished)
+    send(server_pid, :finished)
   end
 
   @spec standalone_boombox_function(boombox_opts()) :: :ok

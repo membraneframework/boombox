@@ -336,7 +336,7 @@ defmodule Boombox do
 
     source =
       receive do
-        {:boombox_message_source, source} -> source
+        {:boombox_ex_stream_source, source} -> source
       end
 
     Enum.reduce_while(
@@ -380,7 +380,7 @@ defmodule Boombox do
         procs = start_pipeline(opts)
 
         receive do
-          {:boombox_message_sink, sink} -> %{sink: sink, procs: procs}
+          {:boombox_ex_stream_sink, sink} -> %{sink: sink, procs: procs}
         end
       end,
       fn %{sink: sink, procs: procs} = state ->

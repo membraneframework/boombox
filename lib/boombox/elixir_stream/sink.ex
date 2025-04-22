@@ -1,4 +1,4 @@
-defmodule Boombox.Message.Sink do
+defmodule Boombox.ElixirStream.Sink do
   @moduledoc false
   use Membrane.Sink
 
@@ -22,7 +22,7 @@ defmodule Boombox.Message.Sink do
 
   @impl true
   def handle_playing(_ctx, state) do
-    send(state.consumer, {:boombox_message_sink, self()})
+    send(state.consumer, {:boombox_ex_stream_sink, self()})
     {[], state}
   end
 

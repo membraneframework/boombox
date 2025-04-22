@@ -367,7 +367,7 @@ defmodule Boombox.Pipeline do
   end
 
   defp create_input({:stream, params}, _ctx, state) do
-    Boombox.Message.create_input(state.parent, params)
+    Boombox.ElixirStream.create_input(state.parent, params)
   end
 
   @spec create_output(Boombox.output(), Membrane.Pipeline.CallbackContext.t(), State.t()) ::
@@ -445,7 +445,7 @@ defmodule Boombox.Pipeline do
   end
 
   defp link_output({:stream, opts}, track_builders, spec_builder, _ctx, state) do
-    Boombox.Message.link_output(state.parent, opts, track_builders, spec_builder)
+    Boombox.ElixirStream.link_output(state.parent, opts, track_builders, spec_builder)
   end
 
   # Wait between sending the last packet

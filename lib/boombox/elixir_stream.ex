@@ -1,4 +1,4 @@
-defmodule Boombox.Message do
+defmodule Boombox.ElixirStream do
   @moduledoc false
 
   import Membrane.ChildrenSpec

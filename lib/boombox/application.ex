@@ -3,9 +3,21 @@ defmodule Boombox.Application do
 
   @impl true
   def start(_type, _args) do
-    pyrlang_node = System.fetch_env!("PYRLANG_NODE")
+    children =
+      case System.get_env("RELEASE_NAME") do
+        "server" ->
+          node_to_ping = System.get_env("NODE_TO_PING")
 
-    Node.ping(String.to_atom(pyrlang_node))
-    Supervisor.start_link([Boombox.Gateway], strategy: :one_for_one)
+          if node_to_ping != nil do
+            Node.ping(String.to_atom(node_to_ping))
+          end
+
+          [Boombox.Server]
+
+        _ ->
+          []
+      end
+
+    Supervisor.start_link(children, strategy: :one_for_one)
   end
 end
