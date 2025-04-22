@@ -34,7 +34,7 @@ defmodule Boombox.Mixfile do
         if burrito?() do
           {Boombox.Utils.BurritoApp, []}
         else
-          []
+          {Boombox.Application, []}
         end
     ]
   end
