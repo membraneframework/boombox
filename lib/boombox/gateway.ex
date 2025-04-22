@@ -23,29 +23,13 @@ defmodule Boombox.Gateway do
   end
 
   @impl true
-  def init(arg) do
-    Process.register(self(), arg)
+  def init(_arg) do
+    Process.register(self(), :boombox_gateway)
     {:ok, %{boombox_pid: nil, boombox_monitor: nil, last_produced_packet: nil}}
   end
 
   @impl true
   def handle_call({:run_boombox, run_opts}, _from, state) do
-    run_opts =
-      case run_opts do
-        1 ->
-          [
-            input:
-              "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s.mp4",
-            output: {:stream, video: :image, audio: false}
-          ]
-
-        2 ->
-          [
-            input: {:stream, video: :image, audio: false},
-            output: "output/index.m3u8"
-          ]
-      end
-
     boombox_mode = get_boombox_mode(run_opts)
     gateway_pid = self()
 
