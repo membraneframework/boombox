@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:lib/boombox/internal_bin/elixir_stream/sink.ex
 defmodule Boombox.InternalBin.ElixirStream.Sink do
+========
+defmodule Boombox.ElixirStream.Sink do
+>>>>>>>> 5914bea (Fix for release, go back to elixir_stream):lib/boombox/elixir_stream/sink.ex
   @moduledoc false
   use Membrane.Sink
 
