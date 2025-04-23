@@ -31,8 +31,14 @@ defmodule Boombox.ElixirStream do
            |> via_out(Pad.ref(:output, :audio))}
       end)
 
+    audio_options =
+      case Map.take(options, @options_audio_keys) do
+        audio_options when map_size(audio_options) == 3 -> audio_options
+        _no_audio_options -> nil
+      end
+
     spec_builder =
-      child(:elixir_stream_source, %Source{producer: producer})
+      child(:elixir_stream_source, %Source{producer: producer, audio_options: audio_options})
 
     %Ready{track_builders: builders, spec_builder: spec_builder}
   end

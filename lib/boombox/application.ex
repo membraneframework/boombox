@@ -14,7 +14,7 @@ defmodule Boombox.Application do
 
           [Boombox.Server]
 
-        _ ->
+        _not_server ->
           []
       end
 

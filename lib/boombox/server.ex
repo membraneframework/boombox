@@ -1,14 +1,27 @@
 defmodule Boombox.Server do
+  require Logger
   use GenServer
+
+  alias Membrane.RTCP.Packet
+  alias Boombox.Packet
 
   @typep boombox_opts :: [input: Boombox.input(), output: Boombox.output()]
   @typep boombox_mode :: :consuming | :producing | :standalone
 
-  @type packet :: %{
+  @type serialized_audio_data :: %{
+          data: binary(),
+          sample_format: Membrane.RawAudio.SampleFormat.t(),
+          sample_rate: pos_integer(),
+          channels: pos_integer()
+        }
+  @type serialized_video_data :: %{
           data: binary(),
           width: pos_integer(),
           height: pos_integer(),
-          channels: pos_integer(),
+          channels: pos_integer()
+        }
+  @type serialized_packet :: %{
+          payload: {:audio, serialized_audio_data()} | {:video, serialized_video_data()},
           timestamp: integer()
         }
 
@@ -69,22 +82,7 @@ defmodule Boombox.Server do
 
   @impl true
   def handle_call({:consume_packet, packet}, _from, state) do
-    {:ok, img} =
-      Vix.Vips.Image.new_from_binary(
-        packet.data,
-        packet.width,
-        packet.height,
-        packet.channels,
-        :VIPS_FORMAT_UCHAR
-      )
-
-    packet =
-      %Boombox.Packet{
-        kind: :video,
-        payload: img,
-        pts: Membrane.Time.milliseconds(packet.timestamp)
-      }
-
+    packet = deserialize_packet(packet)
     send(state.boombox_pid, {:consume_packet, packet})
 
     receive do
@@ -118,25 +116,8 @@ defmodule Boombox.Server do
         :finished -> {:finished, state}
       end
 
-    output_packet =
-      case last_produced_packet.kind do
-        :video ->
-          {:ok, tensor} = Vix.Vips.Image.write_to_tensor(last_produced_packet.payload)
-          {height, width, channels} = tensor.shape
-
-          %{
-            data: tensor.data,
-            width: width,
-            height: height,
-            channels: channels,
-            timestamp: Membrane.Time.as_milliseconds(last_produced_packet.pts)
-          }
-
-        :audio ->
-          raise "Not implemented"
-      end
-
-    {:reply, {production_phase, output_packet}, state}
+    serialized_packet = serialize_packet(last_produced_packet)
+    {:reply, {production_phase, serialized_packet}, state}
   end
 
   @impl true
@@ -153,8 +134,75 @@ defmodule Boombox.Server do
 
   @impl true
   def handle_info(info, state) do
-    IO.inspect(info)
+    Logger.warning("Ignoring message #{inspect(info)}")
     {:noreply, state}
+  end
+
+  @spec deserialize_packet(serialized_packet()) :: Packet.t()
+  defp deserialize_packet(%{payload: {:audio, payload}} = serialized_packet) do
+    %Boombox.Packet{
+      kind: :audio,
+      payload: payload.data,
+      pts: Membrane.Time.milliseconds(serialized_packet.timestamp),
+      format: %{
+        audio_format: payload.sample_format,
+        audio_rate: payload.sample_rate,
+        audio_channels: payload.channels
+      }
+    }
+  end
+
+  defp deserialize_packet(%{payload: {:video, payload}} = serialized_packet) do
+    {:ok, img} =
+      Vix.Vips.Image.new_from_binary(
+        payload.data,
+        payload.width,
+        payload.height,
+        payload.channels,
+        :VIPS_FORMAT_UCHAR
+      )
+
+    %Boombox.Packet{
+      kind: :video,
+      payload: img,
+      pts: Membrane.Time.milliseconds(serialized_packet.timestamp)
+    }
+  end
+
+  @spec serialize_packet(Packet.t()) :: serialized_packet()
+  defp serialize_packet(%Packet{kind: :audio} = packet) do
+    serialized_payload =
+      {:audio,
+       %{
+         data: packet.payload,
+         sample_format: packet.format.audio_format,
+         sample_rate: packet.format.audio_rate,
+         channels: packet.format.audio_channels
+       }}
+
+    %{
+      payload: serialized_payload,
+      timestamp: Membrane.Time.as_milliseconds(packet.pts, :round)
+    }
+  end
+
+  defp serialize_packet(%Packet{kind: :video} = packet) do
+    {:ok, tensor} = Vix.Vips.Image.write_to_tensor(packet.payload)
+    {height, width, channels} = tensor.shape
+
+    serialized_payload =
+      {:video,
+       %{
+         data: tensor.data,
+         width: width,
+         height: height,
+         channels: channels
+       }}
+
+    %{
+      payload: serialized_payload,
+      timestamp: Membrane.Time.as_milliseconds(packet.pts, :round)
+    }
   end
 
   @spec consuming_boombox_function(boombox_opts(), pid()) :: :ok

@@ -27,8 +27,12 @@ defmodule Boombox.ElixirStream.Sink do
   end
 
   @impl true
-  def handle_info(:boombox_demand, _ctx, state) do
-    {kind, _pts} = Enum.min_by(state.last_pts, fn {_kind, pts} -> pts end)
+  def handle_info(:boombox_demand, ctx, state) do
+    {kind, _pts} =
+      state.last_pts
+      |> Enum.reject(fn {kind, _pts} -> ctx.pads[Pad.ref(:input, kind)].end_of_stream? end)
+      |> Enum.min_by(fn {_kind, pts} -> pts end)
+
     {[demand: Pad.ref(:input, kind)], state}
   end
 
