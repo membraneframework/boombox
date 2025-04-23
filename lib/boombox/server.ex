@@ -1,12 +1,26 @@
 defmodule Boombox.Server do
-  require Logger
+  @moduledoc """
+  This module provides a GenServer interface for boombox. To run boombox the server needs to be
+  called with `{:run_boombox, boombox_opts}` - it can be done by calling `run_boombox/2`, sending a
+  `{:call, :run_boombox, boombox_opts}` message to the server or calling the server directly with `GenServer.call/3`.
+  The return value signals what mode boombox is in. Once boombox is running it can be interacted
+  with through appropriate calls.
+  """
   use GenServer
 
-  alias Membrane.RTCP.Packet
+  require Logger
+
   alias Boombox.Packet
 
-  @typep boombox_opts :: [input: Boombox.input(), output: Boombox.output()]
-  @typep boombox_mode :: :consuming | :producing | :standalone
+  @type boombox_opts :: [input: Boombox.input(), output: Boombox.output()]
+
+  @typedoc """
+  Mode in which Boombox is operating:
+    * `:consuming` - Boombox consumes packets provided with `{:consume_packet, packet}` calls.
+    * `:producing` - Boombox produces packets in response to being called with `:produce_packet`.
+    * `:standalone` - Boombox neither consumes nor produces packets.
+  """
+  @type boombox_mode :: :consuming | :producing | :standalone
 
   @type serialized_audio_data :: %{
           data: binary(),
@@ -25,6 +39,19 @@ defmodule Boombox.Server do
           timestamp: integer()
         }
 
+  defmodule State do
+    @moduledoc false
+    @type t :: %__MODULE__{
+            boombox_pid: pid(),
+            boombox_mode: Boombox.Server.boombox_mode(),
+            last_produced_packet: Boombox.Server.serialized_packet() | nil
+          }
+
+    @enforce_keys [:boombox_pid, :boombox_mode, :last_produced_packet]
+
+    defstruct @enforce_keys ++ []
+  end
+
   @spec start_link(term()) :: GenServer.on_start()
   def start_link(arg) do
     GenServer.start_link(__MODULE__, arg)
@@ -35,22 +62,49 @@ defmodule Boombox.Server do
     GenServer.start(__MODULE__, arg)
   end
 
-  @impl true
-  def init(_arg) do
-    Process.register(self(), :boombox_server)
-    {:ok, %{boombox_pid: nil, boombox_monitor: nil, last_produced_packet: nil}}
+  @spec run_boombox(GenServer.server(), boombox_opts()) :: boombox_mode()
+  def run_boombox(server, boombox_opts) do
+    GenServer.call(server, {:run_boombox, boombox_opts})
+  end
+
+  @spec get_pid(GenServer.server()) :: pid()
+  def get_pid(server) do
+    GenServer.call(server, :get_pid)
+  end
+
+  @spec consume_packet(GenServer.server(), serialized_packet()) ::
+          :ok | :finished | {:error, :boombox_not_running}
+  def consume_packet(server, packet) do
+    GenServer.call(server, {:consume_packet, packet})
+  end
+
+  @spec finish_consuming(GenServer.server()) :: :finished | {:error, :boombox_not_running}
+  def finish_consuming(server) do
+    GenServer.call(server, :finish_consuming)
+  end
+
+  @spec produce_packet(GenServer.server()) ::
+          {:ok | :finished, serialized_packet()} | {:error, :boombox_not_running}
+  def produce_packet(server) do
+    GenServer.call(server, :produce_packet)
   end
 
   @impl true
-  def handle_call({:run_boombox, run_opts}, _from, state) do
-    boombox_mode = get_boombox_mode(run_opts)
+  def init(_arg) do
+    Process.register(self(), :boombox_server)
+    {:ok, nil}
+  end
+
+  @impl true
+  def handle_call({:run_boombox, boombox_opts}, _from, _state) do
+    boombox_mode = get_boombox_mode(boombox_opts)
     server_pid = self()
 
     boombox_process_fun =
       case boombox_mode do
-        :consuming -> fn -> consuming_boombox_function(run_opts, server_pid) end
-        :producing -> fn -> producing_boombox_function(run_opts, server_pid) end
-        :standalone -> fn -> standalone_boombox_function(run_opts) end
+        :consuming -> fn -> consuming_boombox_function(boombox_opts, server_pid) end
+        :producing -> fn -> producing_boombox_function(boombox_opts, server_pid) end
+        :standalone -> fn -> standalone_boombox_function(boombox_opts) end
       end
 
     boombox_pid = spawn(boombox_process_fun)
@@ -72,7 +126,12 @@ defmodule Boombox.Server do
           nil
       end
 
-    {:reply, :ok, %{state | boombox_pid: boombox_pid, last_produced_packet: last_produced_packet}}
+    {:reply, boombox_mode,
+     %State{
+       boombox_pid: boombox_pid,
+       boombox_mode: boombox_mode,
+       last_produced_packet: last_produced_packet
+     }}
   end
 
   @impl true
@@ -81,7 +140,7 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call({:consume_packet, packet}, _from, state) do
+  def handle_call({:consume_packet, packet}, _from, %State{} = state) do
     packet = deserialize_packet(packet)
     send(state.boombox_pid, {:consume_packet, packet})
 
@@ -95,7 +154,7 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call(:finish_consuming, _from, state) do
+  def handle_call(:finish_consuming, _from, %State{} = state) do
     send(state.boombox_pid, :finish_consuming)
 
     receive do
@@ -105,19 +164,24 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call(:produce_packet, _from, state) do
+  def handle_call(:produce_packet, _from, %State{} = state) do
     send(state.boombox_pid, :produce_packet)
 
     last_produced_packet = state.last_produced_packet
 
     {production_phase, state} =
       receive do
-        {:packet_produced, packet} -> {:continue, %{state | last_produced_packet: packet}}
+        {:packet_produced, packet} -> {:ok, %{state | last_produced_packet: packet}}
         :finished -> {:finished, state}
       end
 
     serialized_packet = serialize_packet(last_produced_packet)
     {:reply, {production_phase, serialized_packet}, state}
+  end
+
+  @impl true
+  def handle_call(_request, _from, nil) do
+    {:reply, {:error, :boombox_not_running}, nil}
   end
 
   @impl true
@@ -128,7 +192,7 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_info({:DOWN, _ref, :process, pid, :normal}, %{boombox_pid: pid} = state) do
+  def handle_info({:DOWN, _ref, :process, pid, :normal}, %State{boombox_pid: pid} = state) do
     {:stop, :normal, state}
   end
 
@@ -206,7 +270,7 @@ defmodule Boombox.Server do
   end
 
   @spec consuming_boombox_function(boombox_opts(), pid()) :: :ok
-  defp consuming_boombox_function(run_opts, server_pid) do
+  defp consuming_boombox_function(boombox_opts, server_pid) do
     Stream.resource(
       fn -> nil end,
       fn nil ->
@@ -222,12 +286,12 @@ defmodule Boombox.Server do
       end,
       fn nil -> send(server_pid, :finished) end
     )
-    |> Boombox.run(run_opts)
+    |> Boombox.run(boombox_opts)
   end
 
   @spec producing_boombox_function(boombox_opts(), pid()) :: :ok
-  defp producing_boombox_function(run_opts, server_pid) do
-    Boombox.run(run_opts)
+  defp producing_boombox_function(boombox_opts, server_pid) do
+    Boombox.run(boombox_opts)
     |> Enum.each(fn packet ->
       send(server_pid, {:packet_produced, packet})
 
@@ -240,17 +304,24 @@ defmodule Boombox.Server do
   end
 
   @spec standalone_boombox_function(boombox_opts()) :: :ok
-  defp standalone_boombox_function(run_opts) do
-    Boombox.run(run_opts)
+  defp standalone_boombox_function(boombox_opts) do
+    Boombox.run(boombox_opts)
   end
 
-  @spec get_boombox_mode(input: Boombox.input(), output: Boombox.output()) :: boombox_mode()
-  defp get_boombox_mode(run_opts) do
-    case Map.new(run_opts) do
-      %{input: {:stream, _input_opts}, output: {:stream, _output_opts}} -> raise "Cannot do both"
-      %{input: {:stream, _input_opts}} -> :consuming
-      %{output: {:stream, _output_opts}} -> :producing
-      _neither_input_or_output -> :standalone
+  @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
+  defp get_boombox_mode(boombox_opts) do
+    case Map.new(boombox_opts) do
+      %{input: {:stream, _input_opts}, output: {:stream, _output_opts}} ->
+        raise ArgumentError, ":stream on both input and output is not supported"
+
+      %{input: {:stream, _input_opts}} ->
+        :consuming
+
+      %{output: {:stream, _output_opts}} ->
+        :producing
+
+      _neither_input_or_output ->
+        :standalone
     end
   end
 end
