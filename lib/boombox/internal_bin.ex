@@ -10,27 +10,12 @@ defmodule Boombox.InternalBin do
   alias Membrane.Transcoder
 
   @type input() ::
-          (path_or_uri :: String.t())
-          | {:mp4, location :: String.t(), transport: :file | :http}
-          | {:webrtc, Boombox.webrtc_signaling()}
-          | {:whip, uri :: String.t(), token: String.t()}
-          | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
-          | {:rtsp, url :: String.t()}
-          | {:rtp, Boombox.in_rtp_opts()}
+          Boombox.Bin.input()
           | {:stream, pid(), Boombox.in_stream_opts()}
           | :membrane_pad
 
   @type output ::
-          (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [Boombox.transcoding_policy()]}
-          | {:mp4, location :: String.t()}
-          | {:mp4, location :: String.t(), [Boombox.transcoding_policy()]}
-          | {:webrtc, Boombox.webrtc_signaling()}
-          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy()]}
-          | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
-          | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [Boombox.transcoding_policy()]}
-          | {:rtp, Boombox.out_rtp_opts()}
+          Boombox.Bin.output()
           | {:stream, pid(), Boombox.out_stream_opts()}
           | :membrane_pad
 

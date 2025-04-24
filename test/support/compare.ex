@@ -144,21 +144,7 @@ defmodule Support.Compare do
       # The threshold here is obtained empirically and may need
       # to be adjusted, or a better metric should be used.
 
-      # <<<<<<< HEAD
-      #       assert abs(length(ref_audio_bufs) - length(sub_audio_bufs)) <= 1
-
-      #       Enum.zip(sub_audio_bufs, ref_audio_bufs)
-      #       |> Enum.each(fn {sub, ref} ->
-      #         # The results differ between operating systems
-      #         # and subsequent runs due to transcoding.
-      #         # The threshold here is obtained empirically and may need
-      #         # to be adjusted, or a better metric should be used.
-      #         boundary = options[:audio_error_bounadry] || 30_000
-      #         assert samples_min_squared_error(sub.payload, ref.payload, 16) < boundary
-      #       end)
-      # =======
-      #       assert samples_min_squared_error(sub_audio, ref_audio, 16) < 30_000
-      # >>>>>>> origin/master
+      assert samples_min_squared_error(sub_audio, ref_audio, 16) < 30_000
     end
 
     Testing.Pipeline.terminate(p)

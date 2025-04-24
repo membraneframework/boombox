@@ -1,11 +1,33 @@
 defmodule Boombox.Bin do
   @moduledoc """
-  Boombox.Bin is a Membrane Bin for audio and video streaming.
+  `Boombox.Bin` is a Membrane Bin for audio and video streaming.
   It can be used as a Sink or Source in your Membrane Pipeline.
 
-  If you use it as a Membrane Source, you have to specify `:input` option.
-  If you use it as a Membrane Sink, you have to specify `:output` option.
-  Boombox.Bin cannot be used as both Source and Sink at the same time.
+  If you use it as a Membrane Source and link `:output` pad, you
+  have to specify `:input` option, e.g.
+  ```elixir
+  child(:boombox, %Boombox.Bin{
+    input: "path/to/input/file.mp4"
+  })
+  |> via_out(:output, options: [kind: :audio])
+  |> child(:my_audio_sink, My.Audio.Sink)
+  ```
+
+  If you use it as a Membrane Sink and link `:input` pad, you have
+  to specify `:output` option, e.g.
+  ```elixir
+  child(:my_video_source, My.Video.Source)
+  |> via_in(:input, options: [kind: :video])
+  |> child(:boombox, %Boombox.Bin{
+    output: "path/to/output/file.mp4"
+  })
+  ```
+
+  `Boombox.Bin` cannot have `:input` and `:output` pads linked at
+  the same time.
+
+  `Boombox.Bin` cannot have `:input` and `:output` options set
+  at the same time.
   """
 
   use Membrane.Bin
@@ -15,12 +37,9 @@ defmodule Boombox.Bin do
 
   alias Membrane.{AAC, H264, Opus, RawAudio, RawVideo, Transcoder, VP8, VP9}
 
-  @video_codecs [H264, VP8, VP9, RawVideo]
-  @audio_codecs [AAC, Opus, RawAudio]
-
-  @codecs %{
-    audio: @audio_codecs,
-    video: @video_codecs
+  @allowed_codecs %{
+    audio: [AAC, Opus, RawAudio],
+    video: [H264, VP8, VP9, RawVideo]
   }
 
   @typedoc """
@@ -169,19 +188,21 @@ defmodule Boombox.Bin do
   end
 
   @impl true
-  def handle_pad_added(Pad.ref(name, _id) = pad_ref, ctx, state) do
+  def handle_pad_added(Pad.ref(pad_name, _id) = pad_ref, ctx, state) do
     :ok = validate_pads!(ctx.pads)
 
+    pad_options = Map.to_list(ctx.pad_options)
+
     spec =
-      case name do
+      case pad_name do
         :input ->
           bin_input(pad_ref)
-          |> via_in(:input, options: [kind: ctx.pad_options.kind])
+          |> via_in(:input, options: pad_options)
           |> get_child(:boombox)
 
         :output ->
           get_child(:boombox)
-          |> via_out(:output, options: Map.to_list(ctx.pad_options))
+          |> via_out(:output, options: pad_options)
           |> bin_output(pad_ref)
       end
 
@@ -220,21 +241,11 @@ defmodule Boombox.Bin do
 
   defp validate_pads!(pads) do
     pads
-    |> Enum.find(fn {Pad.ref(name, _id), %{options: options}} ->
-      name == :output and
-        (Bunch.listify(options.codec) -- @codecs[options.kind]) -- [nil] != []
+    |> Enum.each(fn {pad_ref, %{options: options}} ->
+      if Pad.name_by_ref(pad_ref) == :output do
+        :ok = validate_codec_pad_option!(pad_ref, options.codec, options.kind)
+      end
     end)
-    |> case do
-      nil ->
-        :ok
-
-      {pad_ref, %{options: options}} ->
-        raise """
-        Pad #{inspect(pad_ref)} is of kind #{inspect(options.kind)} and it has :codec option set \
-        to  #{inspect(options.codec)}. \
-        Supported codecs for #{inspect(options.kind)} kind are: #{inspect(@codecs[options.kind])}.
-        """
-    end
 
     pads
     |> Enum.group_by(fn {Pad.ref(name, _id), %{options: %{kind: kind}}} ->
@@ -250,6 +261,20 @@ defmodule Boombox.Bin do
         #{inspect(__MODULE__)} supports only one input and one output pad of each kind. \
         Found multiple pads of the same direction and kind: #{Map.keys(pads) |> inspect()}
         """
+    end
+  end
+
+  defp validate_codec_pad_option!(pad_ref, codec, kind) do
+    codecs = Bunch.listify(codec)
+
+    if codecs == [nil] or codecs -- @allowed_codecs[kind] == [] do
+      :ok
+    else
+      raise """
+      Pad #{inspect(pad_ref)} is of kind #{inspect(kind)} and it has :codec option set \
+      to  #{inspect(codec)}. \
+      Supported codecs for #{inspect(kind)} kind are: #{inspect(@allowed_codecs[kind])}.
+      """
     end
   end
 end
