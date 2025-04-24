@@ -200,8 +200,8 @@ defmodule Boombox.Bin do
 
     if nil_opts_number != 1 do
       raise """
-      Always excatly one of options of #{inspect(__MODULE__)} has to be nil, but :input field is \
-      set to #{inspect(opts.input)} and :output is set to #{inspect(opts.output)} at the same time.
+      #{inspect(__MODULE__)} cannot accept input and output options at the same time, but both were provided.\
+      Input: #{inspect(opts.input)}, output: #{inspect(opts.output)}.
       """
     end
 
