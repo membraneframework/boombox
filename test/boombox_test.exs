@@ -20,34 +20,37 @@ defmodule BoomboxTest do
   @moduletag :tmp_dir
 
   [
-    file_file_mp4: {@bbb_mp4, "ref_bun10s_aac.mp4"},
-    file_h265_file_mp4: {@bbb_mp4_h265, "ref_bun10s_h265.mp4"},
-    file_file_mp4_audio: {@bbb_mp4_a, "ref_bun10s_aac.mp4", kinds: [:audio]},
-    file_file_mp4_video: {@bbb_mp4_v, "ref_bun10s_aac.mp4", kinds: [:video]},
-    http_file_mp4: {@bbb_mp4_url, "ref_bun10s_aac.mp4"}
+    file_file_mp4: {[@bbb_mp4, "output.mp4"], "ref_bun10s_aac.mp4"},
+    file_h265_file_mp4: {[@bbb_mp4_h265, "output.mp4"], "ref_bun10s_h265.mp4"},
+    file_file_mp4_audio: {[@bbb_mp4_a, "output.mp4"], "ref_bun10s_aac.mp4", kinds: [:audio]},
+    file_file_mp4_video: {[@bbb_mp4_v, "output.mp4"], "ref_bun10s_aac.mp4", kinds: [:video]},
+    http_file_mp4: {[@bbb_mp4_url, "output.mp4"], "ref_bun10s_aac.mp4"},
+    file_file_file_mp4: {[@bbb_mp4, "mid_output.mp4", "output.mp4"], "ref_bun10s_aac.mp4"}
   ]
   |> Enum.each(fn {tag, scenario} ->
-    {input, fixture, opts} =
+    {[source | io], output, opts} =
       case scenario do
-        {input, fixture} -> {input, fixture, []}
-        {input, fixture, opts} -> {input, fixture, opts}
+        {io, output} ->
+          {io, output, []}
+
+        with_opts ->
+          with_opts
       end
 
     @tag tag
     async_test "#{tag}", %{tmp_dir: tmp} do
-      output = Path.join(tmp, "output.mp4")
-      Boombox.run(input: unquote(input), output: output)
-      Compare.compare(output, "test/fixtures/#{unquote(fixture)}", unquote(opts))
+      reduce_test(unquote(io), unquote(source), unquote(output), [{:tmp_dir, tmp} | unquote(opts)])
     end
   end)
 
-  @tag :file_file_file_mp4
-  async_test "mp4 file -> mp4 file -> mp4 file", %{tmp_dir: tmp} do
-    mid_output = Path.join(tmp, "mid_output.mp4")
-    Boombox.run(input: @bbb_mp4, output: mid_output)
-    output = Path.join(tmp, "output.mp4")
-    Boombox.run(input: mid_output, output: output)
-    Compare.compare(output, "test/fixtures/ref_bun10s_aac2.mp4")
+  defp reduce_test([output | next], input, fixture, opts) do
+    output_path = Path.join(opts[:tmp_dir], output)
+    Boombox.run(input: input, output: output_path)
+    reduce_test(next, output_path, fixture, opts)
+  end
+
+  defp reduce_test([], input, fixture, opts) do
+    Compare.compare(input, "test/fixtures/#{fixture}", opts)
   end
 
   @tag :file_webrtc
