@@ -20,26 +20,17 @@ defmodule BoomboxTest do
   @moduletag :tmp_dir
 
   [
-    file_file_mp4: {[@bbb_mp4, "output.mp4"], "ref_bun10s_aac.mp4"},
-    file_h265_file_mp4: {[@bbb_mp4_h265, "output.mp4"], "ref_bun10s_h265.mp4"},
+    file_file_mp4: {[@bbb_mp4, "output.mp4"], "ref_bun10s_aac.mp4", []},
+    file_h265_file_mp4: {[@bbb_mp4_h265, "output.mp4"], "ref_bun10s_h265.mp4", []},
     file_file_mp4_audio: {[@bbb_mp4_a, "output.mp4"], "ref_bun10s_aac.mp4", kinds: [:audio]},
     file_file_mp4_video: {[@bbb_mp4_v, "output.mp4"], "ref_bun10s_aac.mp4", kinds: [:video]},
-    http_file_mp4: {[@bbb_mp4_url, "output.mp4"], "ref_bun10s_aac.mp4"},
-    file_file_file_mp4: {[@bbb_mp4, "mid_output.mp4", "output.mp4"], "ref_bun10s_aac.mp4"}
+    http_file_mp4: {[@bbb_mp4_url, "output.mp4"], "ref_bun10s_aac.mp4", []},
+    file_file_file_mp4: {[@bbb_mp4, "mid_output.mp4", "output.mp4"], "ref_bun10s_aac.mp4", []}
   ]
-  |> Enum.each(fn {tag, scenario} ->
-    {[source | io], output, opts} =
-      case scenario do
-        {io, output} ->
-          {io, output, []}
-
-        with_opts ->
-          with_opts
-      end
-
+  |> Enum.each(fn {tag, {[input | io], fixture, opts}} ->
     @tag tag
     async_test "#{tag}", %{tmp_dir: tmp} do
-      reduce_test(unquote(io), unquote(source), unquote(output), [{:tmp_dir, tmp} | unquote(opts)])
+      reduce_test(unquote(io), unquote(input), unquote(fixture), [{:tmp_dir, tmp} | unquote(opts)])
     end
   end)
 
