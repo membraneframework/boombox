@@ -11,8 +11,7 @@ defmodule Boombox do
 
   alias Membrane.RTP
 
-  @type transcoding_policy() :: {:transcoding_policy, :always | :if_needed | :never}
-  @type storage_format :: :mp4 | :aac | :wav | :mp3 | :ivf | :ogg
+  @type transcoding_policy :: {:transcoding_policy, :always | :if_needed | :never}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
   @type in_stream_opts :: [
@@ -76,8 +75,9 @@ defmodule Boombox do
 
   @type input ::
           (path_or_uri :: String.t())
-          | {storage_format(), location :: String.t()}
-          | {storage_format(), location :: String.t(), transport: :file | :http}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
+             transport: :file | :http}
           | {:h264, location :: String.t(),
              transport: :file | :http, framerate: Membrane.H264.framerate()}
           | {:h265, location :: String.t(),
@@ -92,7 +92,7 @@ defmodule Boombox do
   @type output ::
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(), [transcoding_policy()]}
-          | {storage_format() | :h264 | :h265, location :: String.t()}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4, location :: String.t(), [transcoding_policy()]}
           | {:webrtc, webrtc_signaling()}
           | {:webrtc, webrtc_signaling(), [transcoding_policy()]}
