@@ -132,13 +132,13 @@ defmodule Boombox.Pad do
     end)
   end
 
-  defp raise_if_key_not_present(map_from, map_in, raise_log_generator) do
+  defp raise_if_key_not_present(map_from, map_in, error_log_generator) do
     map_from
-    |> Enum.find(fn {kind, _value} -> not is_map_key(map_in, kind) end)
-    |> case do
-      nil -> :ok
-      {kind, _value} -> raise raise_log_generator.(kind)
-    end
+    |> Enum.each(fn {kind, _value} ->
+      if not is_map_key(map_in, kind) do
+        raise error_log_generator.(kind)
+      end
+    end)
   end
 
   defp webrtc_input?(state) do
