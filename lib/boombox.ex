@@ -197,9 +197,6 @@ defmodule Boombox do
       Map.keys(opts) -- @endpoint_opts != [] ->
         raise ArgumentError, "Both input and output are required"
 
-      is_stream?(opts[:input]) && stream == nil ->
-        raise ArgumentError, "Stream is required for input stream"
-
       is_stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
         raise ArgumentError,
               "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
