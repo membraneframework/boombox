@@ -89,7 +89,7 @@ defmodule Boombox.BinTest do
 
   for video_codec <- @video_formats_for_source_bin,
       audio_codec <- @audio_formats_for_source_bin do
-    test "Boombox.Bin with source pad when video is #{Format.to_string(video_codec)} and audio is #{Format.to_string(audio_codec)}" do
+    test "Boombox.Bin with output pad when video is #{Format.to_string(video_codec)} and audio is #{Format.to_string(audio_codec)}" do
       do_test_source_bin(
         unquote(video_codec),
         unquote(audio_codec)
