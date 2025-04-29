@@ -3,7 +3,7 @@ defmodule Boombox.InternalBin do
   use Membrane.Bin
 
   require Membrane.Logger
-  require Boombox.StorageEndpoints, as: StorageEndpoints
+  require Boombox.InternalBin.StorageEndpoints, as: StorageEndpoints
   require Membrane.Transcoder.Audio
   require Membrane.Transcoder.Video
 
@@ -182,7 +182,7 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do
-    Boombox.StorageEndpoints.MP4.handle_input_tracks(tracks)
+    Boombox.InternalBin.StorageEndpoints.MP4.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
   end
 
@@ -378,7 +378,7 @@ defmodule Boombox.InternalBin do
   end
 
   defp create_input({:mp4, location, opts}, _ctx, _state) do
-    Boombox.StorageEndpoints.MP4.create_input(location, opts)
+    Boombox.InternalBin.StorageEndpoints.MP4.create_input(location, opts)
   end
 
   defp create_input({:rtsp, uri}, _ctx, _state) do
@@ -390,31 +390,31 @@ defmodule Boombox.InternalBin do
   end
 
   defp create_input({:h264, location, opts}, _ctx, _state) do
-    Boombox.StorageEndpoints.H264.create_input(location, opts)
+    Boombox.InternalBin.StorageEndpoints.H264.create_input(location, opts)
   end
 
   defp create_input({:h265, location, opts}, _ctx, _state) do
-    Boombox.StorageEndpoints.H265.create_input(location, opts)
+    Boombox.InternalBin.StorageEndpoints.H265.create_input(location, opts)
   end
 
   defp create_input({:aac, location, opts}, _ctx, _state) do
-    Boombox.StorageEndpoints.AAC.create_input(location, opts)
+    Boombox.InternalBin.StorageEndpoints.AAC.create_input(location, opts)
   end
 
   defp create_input({:wav, location, opts}, _ctx, _state) do
-    Boombox.StorageEndpoints.WAV.create_input(location, opts)
+    Boombox.InternalBin.StorageEndpoints.WAV.create_input(location, opts)
   end
 
   defp create_input({:mp3, location, opts}, _ctx, _state) do
-    Boombox.StorageEndpoints.MP3.create_input(location, opts)
+    Boombox.InternalBin.StorageEndpoints.MP3.create_input(location, opts)
   end
 
   defp create_input({:ivf, location, opts}, _ctx, _state) do
-    Boombox.StorageEndpoints.IVF.create_input(location, opts)
+    Boombox.InternalBin.StorageEndpoints.IVF.create_input(location, opts)
   end
 
   defp create_input({:ogg, location, opts}, _ctx, _state) do
-    Boombox.StorageEndpoints.Ogg.create_input(location, opts)
+    Boombox.InternalBin.StorageEndpoints.Ogg.create_input(location, opts)
   end
 
   defp create_input({:rtmp, src}, ctx, _state) do
@@ -457,42 +457,47 @@ defmodule Boombox.InternalBin do
   end
 
   defp link_output({:mp4, location, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.StorageEndpoints.MP4.link_output(location, opts, track_builders, spec_builder)
+    Boombox.InternalBin.StorageEndpoints.MP4.link_output(
+      location,
+      opts,
+      track_builders,
+      spec_builder
+    )
   end
 
   defp link_output({:h264, location, _opts}, track_builders, spec_builder, _ctx, _state) do
     maybe_warn_about_dropped_tracks(track_builders, :audio, :h264)
-    Boombox.StorageEndpoints.H264.link_output(location, track_builders, spec_builder)
+    Boombox.InternalBin.StorageEndpoints.H264.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:h265, location, _opts}, track_builders, spec_builder, _ctx, _state) do
     maybe_warn_about_dropped_tracks(track_builders, :audio, :h265)
-    Boombox.StorageEndpoints.H265.link_output(location, track_builders, spec_builder)
+    Boombox.InternalBin.StorageEndpoints.H265.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:aac, location, _opts}, track_builders, spec_builder, _ctx, _state) do
     maybe_warn_about_dropped_tracks(track_builders, :video, :aac)
-    Boombox.StorageEndpoints.AAC.link_output(location, track_builders, spec_builder)
+    Boombox.InternalBin.StorageEndpoints.AAC.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:wav, location, _opts}, track_builders, spec_builder, _ctx, _state) do
     maybe_warn_about_dropped_tracks(track_builders, :video, :wav)
-    Boombox.StorageEndpoints.WAV.link_output(location, track_builders, spec_builder)
+    Boombox.InternalBin.StorageEndpoints.WAV.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:mp3, location, _opts}, track_builders, spec_builder, _ctx, _state) do
     maybe_warn_about_dropped_tracks(track_builders, :video, :mp3)
-    Boombox.StorageEndpoints.MP3.link_output(location, track_builders, spec_builder)
+    Boombox.InternalBin.StorageEndpoints.MP3.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:ivf, location, _opts}, track_builders, spec_builder, _ctx, _state) do
     maybe_warn_about_dropped_tracks(track_builders, :audio, :ivf)
-    Boombox.StorageEndpoints.IVF.link_output(location, track_builders, spec_builder)
+    Boombox.InternalBin.StorageEndpoints.IVF.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:ogg, location, _opts}, track_builders, spec_builder, _ctx, _state) do
     maybe_warn_about_dropped_tracks(track_builders, :video, :ogg)
-    Boombox.StorageEndpoints.Ogg.link_output(location, track_builders, spec_builder)
+    Boombox.InternalBin.StorageEndpoints.Ogg.link_output(location, track_builders, spec_builder)
   end
 
   defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, _state) do

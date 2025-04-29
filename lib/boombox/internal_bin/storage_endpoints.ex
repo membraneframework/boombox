@@ -1,4 +1,4 @@
-defmodule Boombox.StorageEndpoints do
+defmodule Boombox.InternalBin.StorageEndpoints do
   @moduledoc false
   import Membrane.ChildrenSpec
 

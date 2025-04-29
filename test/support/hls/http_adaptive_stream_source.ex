@@ -3,7 +3,7 @@ defmodule Membrane.HTTPAdaptiveStream.Source do
 
   use Membrane.Source
 
-  alias Boombox.StorageEndpoints.MP4
+  alias Boombox.InternalBin.StorageEndpoints.MP4
   alias Membrane.{Buffer, MP4}
   alias Membrane.MP4.MovieBox.TrackBox
 

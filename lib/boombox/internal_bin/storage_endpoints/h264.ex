@@ -1,8 +1,8 @@
-defmodule Boombox.StorageEndpoints.H264 do
+defmodule Boombox.InternalBin.StorageEndpoints.H264 do
   @moduledoc false
   import Membrane.ChildrenSpec
   alias Boombox.InternalBin.Ready
-  alias Boombox.StorageEndpoints
+  alias Boombox.InternalBin.StorageEndpoints
   alias Membrane.H264
 
   @spec create_input(String.t(), transport: :file | :http, framerate: Membrane.H264.framerate()) ::

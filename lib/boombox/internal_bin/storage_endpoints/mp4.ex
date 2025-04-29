@@ -1,10 +1,10 @@
-defmodule Boombox.StorageEndpoints.MP4 do
+defmodule Boombox.InternalBin.StorageEndpoints.MP4 do
   @moduledoc false
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
   alias Boombox.InternalBin.{Ready, Wait}
-  alias Boombox.StorageEndpoints
+  alias Boombox.InternalBin.StorageEndpoints
   alias Membrane.H264
   alias Membrane.H265
 
