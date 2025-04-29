@@ -146,8 +146,10 @@ defmodule Boombox.Bin do
         Can be either `:always`, `:if_needed`, or `:never`.
 
         If set to `:always`, the media stream will be decoded and/or encoded, even if the
-        format of the stream arriving at the #{inspect(__MODULE__)} endpoint matches the \
-        output pad codec.
+        format of the stream arriving at the #{inspect(__MODULE__)} endpoint matches the
+        output pad codec. This option is useful, when the there will be keyframe request
+        events going upstream the output pad while the Boombox input won't be able to
+        handle them (e.g. when the Boombox input is a MP4 file).
 
         If set to `:if_needed`, the media stream will be transcoded only if the format of
         the stream arriving at the #{inspect(__MODULE__)} endpoint doesn't match the output
@@ -219,11 +221,18 @@ defmodule Boombox.Bin do
       [opts.input, opts.output]
       |> Enum.count(&(&1 == nil))
 
-    if nil_opts_number != 1 do
-      raise """
-      #{inspect(__MODULE__)} cannot accept input and output options at the same time, but both were provided.\
-      Input: #{inspect(opts.input)}, output: #{inspect(opts.output)}.
-      """
+    case nil_opts_number do
+      0 ->
+        raise """
+        #{inspect(__MODULE__)} cannot accept input and output options at the same time, but both were provided.\
+        Input: #{inspect(opts.input)}, output: #{inspect(opts.output)}.
+        """
+
+      1 ->
+        :ok
+
+      2 ->
+        raise "#{inspect(__MODULE__)} requires either input or output option to be set, but none were provided."
     end
 
     [:input, :output]
