@@ -1,4 +1,4 @@
-defmodule Boombox.ElixirStream.Sink do
+defmodule Boombox.InternalBin.ElixirStream.Sink do
   @moduledoc false
   use Membrane.Sink
 

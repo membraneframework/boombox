@@ -37,6 +37,7 @@ defmodule Support.Compare do
   end
 
   @spec compare(Path.t(), Path.t(), [compare_option()]) :: :ok
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def compare(subject, reference, options \\ []) do
     kinds = options[:kinds] || [:audio, :video]
     format = options[:format] || :mp4
@@ -68,12 +69,15 @@ defmodule Support.Compare do
 
     assert_pipeline_notified(p, :sub_demuxer, {:new_tracks, sub_tracks})
 
-    assert length(sub_tracks) == length(kinds)
+    expected_subject_tracks_number = options[:expected_subject_tracks_number] || length(kinds)
+    assert length(sub_tracks) == expected_subject_tracks_number
 
     sub_spec =
       Enum.map(sub_tracks, fn
         {id, %Membrane.AAC{}} ->
-          assert :audio in kinds
+          if options[:expected_subject_tracks_number] == nil do
+            assert :audio in kinds
+          end
 
           get_child(:sub_demuxer)
           |> via_out(Pad.ref(:output, id))
@@ -89,7 +93,9 @@ defmodule Support.Compare do
           |> child(:sub_audio_bufs, GetBuffers)
 
         {id, %h26x{}} when h26x in [Membrane.H264, Membrane.H265] ->
-          assert :video in kinds
+          if options[:expected_subject_tracks_number] == nil do
+            assert :video in kinds
+          end
 
           {parser, decoder} = get_h26x_parser_and_decoder(h26x)
 
@@ -121,7 +127,8 @@ defmodule Support.Compare do
         # and subsequent runs due to transcoding.
         # The threshold here is obtained empirically and may need
         # to be adjusted, or a better metric should be used.
-        assert samples_min_squared_error(sub.payload, ref.payload, 8) < 10
+        boundary = options[:video_error_bounadry] || 10
+        assert samples_min_squared_error(sub.payload, ref.payload, 8) < boundary
       end)
     end
 

@@ -1,8 +1,8 @@
-defmodule Boombox.StorageEndpoints.MP3 do
+defmodule Boombox.InternalBin.StorageEndpoints.MP3 do
   @moduledoc false
   import Membrane.ChildrenSpec
-  alias Boombox.Pipeline.Ready
-  alias Boombox.StorageEndpoints
+  alias Boombox.InternalBin.Ready
+  alias Boombox.InternalBin.StorageEndpoints
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
   def create_input(location, opts) do
@@ -22,7 +22,7 @@ defmodule Boombox.StorageEndpoints.MP3 do
 
   @spec link_output(
           String.t(),
-          Boombox.Pipeline.track_builders(),
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, track_builders, _spec_builder) do

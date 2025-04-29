@@ -25,7 +25,7 @@ defmodule Boombox.Utils.CLI do
     vps: {:string, :binary},
     whip: {:string, :string},
     token: {:string, :string},
-    force_transcoding: {:boolean, :boolean}
+    transcoding_policy: {:string, :atom}
   ]
 
   @spec parse_argv([String.t()]) ::
