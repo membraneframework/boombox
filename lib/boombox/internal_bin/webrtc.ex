@@ -1,4 +1,4 @@
-defmodule Boombox.WebRTC do
+defmodule Boombox.InternalBin.WebRTC do
   @moduledoc false
 
   import Membrane.ChildrenSpec

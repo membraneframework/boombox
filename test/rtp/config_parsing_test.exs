@@ -1,4 +1,4 @@
-defmodule Boombox.RTP.ParsingTest do
+defmodule Boombox.InternalBin.RTP.ParsingTest do
   use ExUnit.Case
 
   alias Boombox.InternalBin.Ready
@@ -20,13 +20,13 @@ defmodule Boombox.RTP.ParsingTest do
           sps: "def"
         ]
 
-      assert %Ready{} = Boombox.RTP.create_input(rtp_opts)
+      assert %Ready{} = Boombox.InternalBin.RTP.create_input(rtp_opts)
     end
 
     test "for minimal H264 options" do
       rtp_opts = [port: 5001, video_encoding: :H264]
 
-      assert %Ready{} = Boombox.RTP.create_input(rtp_opts)
+      assert %Ready{} = Boombox.InternalBin.RTP.create_input(rtp_opts)
     end
   end
 
@@ -34,25 +34,25 @@ defmodule Boombox.RTP.ParsingTest do
     test "for options with missing required encoding specific params" do
       rtp_opts = [port: 5001, audio_encoding: :AAC]
 
-      assert_raise MatchError, fn -> Boombox.RTP.create_input(rtp_opts) end
+      assert_raise MatchError, fn -> Boombox.InternalBin.RTP.create_input(rtp_opts) end
     end
 
     test "for no tracks configured" do
       rtp_opts = [port: 5001]
 
-      assert_raise RuntimeError, fn -> Boombox.RTP.create_input(rtp_opts) end
+      assert_raise RuntimeError, fn -> Boombox.InternalBin.RTP.create_input(rtp_opts) end
     end
 
     test "for no options provided" do
       rtp_opts = []
 
-      assert_raise RuntimeError, fn -> Boombox.RTP.create_input(rtp_opts) end
+      assert_raise RuntimeError, fn -> Boombox.InternalBin.RTP.create_input(rtp_opts) end
     end
 
     test "for unsupported encoding" do
       rtp_opts = [port: 5001, video_encoding: :Glorp]
 
-      assert_raise RuntimeError, fn -> Boombox.RTP.create_input(rtp_opts) end
+      assert_raise RuntimeError, fn -> Boombox.InternalBin.RTP.create_input(rtp_opts) end
     end
   end
 end

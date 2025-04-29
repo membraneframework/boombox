@@ -1,4 +1,4 @@
-defmodule Boombox.RTP do
+defmodule Boombox.InternalBin.RTP do
   @moduledoc false
   import Membrane.ChildrenSpec
 

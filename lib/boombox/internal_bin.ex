@@ -89,8 +89,8 @@ defmodule Boombox.InternalBin do
             track_builders: Boombox.InternalBin.track_builders() | nil,
             last_result: Ready.t() | Wait.t() | nil,
             eos_info: term(),
-            rtsp_state: Boombox.RTSP.state() | nil,
-            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
+            rtsp_state: Boombox.InternalBin.RTSP.state() | nil,
+            output_webrtc_state: Boombox.InternalBin.WebRTC.output_webrtc_state() | nil
           }
   end
 
@@ -152,11 +152,11 @@ defmodule Boombox.InternalBin do
   def handle_playing(ctx, state) when :membrane_pad in [state.input, state.output] do
     case state.status do
       :awaiting_input when state.input == :membrane_pad ->
-        Boombox.Pad.create_input(ctx)
+        Boombox.InternalBin.Pad.create_input(ctx)
         |> proceed_result(ctx, state)
 
       :awaiting_output_link when state.output == :membrane_pad ->
-        Boombox.Pad.link_output(ctx, state.track_builders, state.spec_builder, state)
+        Boombox.InternalBin.Pad.link_output(ctx, state.track_builders, state.spec_builder, state)
         |> proceed_result(ctx, state)
 
       _status ->
@@ -176,7 +176,7 @@ defmodule Boombox.InternalBin do
       """
     end
 
-    actions = Boombox.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx)
+    actions = Boombox.InternalBin.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx)
     {actions, state}
   end
 
@@ -188,25 +188,27 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_child_notification({:set_up_tracks, tracks}, :rtsp_source, ctx, state) do
-    {result, state} = Boombox.RTSP.handle_set_up_tracks(tracks, state)
+    {result, state} = Boombox.InternalBin.RTSP.handle_set_up_tracks(tracks, state)
     proceed_result(result, ctx, state)
   end
 
   @impl true
   def handle_child_notification({:new_track, ssrc, track}, :rtsp_source, ctx, state) do
-    {result, state} = Boombox.RTSP.handle_input_track(ssrc, track, state)
+    {result, state} = Boombox.InternalBin.RTSP.handle_input_track(ssrc, track, state)
     proceed_result(result, ctx, state)
   end
 
   @impl true
   def handle_child_notification({:new_tracks, tracks}, :webrtc_input, ctx, state) do
-    Boombox.WebRTC.handle_input_tracks(tracks)
+    Boombox.InternalBin.WebRTC.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
   end
 
   @impl true
   def handle_child_notification({:negotiated_video_codecs, codecs}, :webrtc_output, ctx, state) do
-    {result, state} = Boombox.WebRTC.handle_output_video_codecs_negotiated(codecs, state)
+    {result, state} =
+      Boombox.InternalBin.WebRTC.handle_output_video_codecs_negotiated(codecs, state)
+
     proceed_result(result, ctx, state)
   end
 
@@ -221,7 +223,7 @@ defmodule Boombox.InternalBin do
 
     {:webrtc, _signaling, webrtc_opts} = state.output
 
-    Boombox.WebRTC.handle_output_tracks_negotiated(
+    Boombox.InternalBin.WebRTC.handle_output_tracks_negotiated(
       webrtc_opts,
       state.track_builders,
       state.spec_builder,
@@ -261,7 +263,7 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_info({:rtmp_client_ref, client_ref}, ctx, state) do
-    Boombox.RTMP.handle_connection(client_ref)
+    Boombox.InternalBin.RTMP.handle_connection(client_ref)
     |> proceed_result(ctx, state)
   end
 
@@ -374,7 +376,7 @@ defmodule Boombox.InternalBin do
   @spec create_input(input(), Membrane.Bin.CallbackContext.t(), State.t()) ::
           Ready.t() | Wait.t()
   defp create_input({:webrtc, signaling}, ctx, state) do
-    Boombox.WebRTC.create_input(signaling, state.output, ctx, state)
+    Boombox.InternalBin.WebRTC.create_input(signaling, state.output, ctx, state)
   end
 
   defp create_input({:mp4, location, opts}, _ctx, _state) do
@@ -382,11 +384,11 @@ defmodule Boombox.InternalBin do
   end
 
   defp create_input({:rtsp, uri}, _ctx, _state) do
-    Boombox.RTSP.create_input(uri)
+    Boombox.InternalBin.RTSP.create_input(uri)
   end
 
   defp create_input({:stream, stream_process, params}, _ctx, _state) do
-    Boombox.ElixirStream.create_input(stream_process, params)
+    Boombox.InternalBin.ElixirStream.create_input(stream_process, params)
   end
 
   defp create_input({:h264, location, opts}, _ctx, _state) do
@@ -418,21 +420,21 @@ defmodule Boombox.InternalBin do
   end
 
   defp create_input({:rtmp, src}, ctx, _state) do
-    Boombox.RTMP.create_input(src, ctx.utility_supervisor)
+    Boombox.InternalBin.RTMP.create_input(src, ctx.utility_supervisor)
   end
 
   defp create_input({:rtp, opts}, _ctx, _state) do
-    Boombox.RTP.create_input(opts)
+    Boombox.InternalBin.RTP.create_input(opts)
   end
 
   defp create_input(:membrane_pad, ctx, _state) do
-    Boombox.Pad.create_input(ctx)
+    Boombox.InternalBin.Pad.create_input(ctx)
   end
 
   @spec create_output(output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
           {Ready.t() | Wait.t(), State.t()}
   defp create_output({:webrtc, signaling, _opts}, ctx, state) do
-    Boombox.WebRTC.create_output(signaling, ctx, state)
+    Boombox.InternalBin.WebRTC.create_output(signaling, ctx, state)
   end
 
   defp create_output(_output, _ctx, state) do
@@ -453,7 +455,7 @@ defmodule Boombox.InternalBin do
       %{kind: :video, id: :video_tracks}
     ]
 
-    Boombox.WebRTC.link_output(opts, track_builders, spec_builder, tracks, state)
+    Boombox.InternalBin.WebRTC.link_output(opts, track_builders, spec_builder, tracks, state)
   end
 
   defp link_output({:mp4, location, opts}, track_builders, spec_builder, _ctx, _state) do
@@ -501,19 +503,24 @@ defmodule Boombox.InternalBin do
   end
 
   defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.HLS.link_output(location, opts, track_builders, spec_builder)
+    Boombox.InternalBin.HLS.link_output(location, opts, track_builders, spec_builder)
   end
 
   defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.RTP.link_output(opts, track_builders, spec_builder)
+    Boombox.InternalBin.RTP.link_output(opts, track_builders, spec_builder)
   end
 
   defp link_output({:stream, stream_process, params}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.ElixirStream.link_output(stream_process, params, track_builders, spec_builder)
+    Boombox.InternalBin.ElixirStream.link_output(
+      stream_process,
+      params,
+      track_builders,
+      spec_builder
+    )
   end
 
   defp link_output(:membrane_pad, track_builder, spec_builder, ctx, state) do
-    Boombox.Pad.link_output(ctx, track_builder, spec_builder, state)
+    Boombox.InternalBin.Pad.link_output(ctx, track_builder, spec_builder, state)
   end
 
   # Wait between sending the last packet

@@ -1,4 +1,4 @@
-defmodule Boombox.HLS do
+defmodule Boombox.InternalBin.HLS do
   @moduledoc false
 
   import Membrane.ChildrenSpec

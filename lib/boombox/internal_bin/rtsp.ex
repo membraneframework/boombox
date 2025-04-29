@@ -1,4 +1,4 @@
-defmodule Boombox.RTSP do
+defmodule Boombox.InternalBin.RTSP do
   @moduledoc false
   import Membrane.ChildrenSpec
 

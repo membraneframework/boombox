@@ -1,4 +1,4 @@
-defmodule Boombox.Pad do
+defmodule Boombox.InternalBin.Pad do
   @moduledoc false
 
   import Membrane.ChildrenSpec
