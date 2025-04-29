@@ -147,9 +147,9 @@ defmodule Boombox.Bin do
 
         If set to `:always`, the media stream will be decoded and/or encoded, even if the
         format of the stream arriving at the #{inspect(__MODULE__)} endpoint matches the
-        output pad codec. This option is useful, when the there will be keyframe request
-        events going upstream the output pad while the Boombox input won't be able to
-        handle them (e.g. when the Boombox input is a MP4 file).
+        output pad codec. This option is useful when you want to make sure keyframe request
+        events going upstream the output pad are handled in Boombox when the Boombox input
+        itself cannot handle them (i.e. when the input is not WebRTC).
 
         If set to `:if_needed`, the media stream will be transcoded only if the format of
         the stream arriving at the #{inspect(__MODULE__)} endpoint doesn't match the output
