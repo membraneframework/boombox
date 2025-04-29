@@ -60,8 +60,7 @@ defmodule Boombox.InternalBin do
                   eos_info: nil,
                   rtsp_state: nil,
                   pending_new_tracks: %{input: [], output: []},
-                  output_webrtc_state: nil,
-                  new_tracks_notification_status: :not_resolved_yet
+                  output_webrtc_state: nil
                 ]
 
     @typedoc """
@@ -91,8 +90,7 @@ defmodule Boombox.InternalBin do
             last_result: Ready.t() | Wait.t() | nil,
             eos_info: term(),
             rtsp_state: Boombox.InternalBin.RTSP.state() | nil,
-            output_webrtc_state: Boombox.InternalBin.WebRTC.output_webrtc_state() | nil,
-            new_tracks_notification_status: :sent | :to_be_sent | :never_sent | :not_resolved_yet
+            output_webrtc_state: Boombox.InternalBin.WebRTC.output_webrtc_state() | nil
           }
   end
 
@@ -152,13 +150,6 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_playing(ctx, state) when :membrane_pad in [state.input, state.output] do
-    new_tracks_notification_status =
-      if state.output == :membrane_pad and map_size(ctx.pads) == 0,
-        do: :to_be_sent,
-        else: :never_sent
-
-    state = %{state | new_tracks_notification_status: new_tracks_notification_status}
-
     case state.status do
       :awaiting_input when state.input == :membrane_pad ->
         Boombox.InternalBin.Pad.create_input(ctx)
