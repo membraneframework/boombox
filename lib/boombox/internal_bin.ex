@@ -147,18 +147,15 @@ defmodule Boombox.InternalBin do
         output: parse_endpoint_opt!(:output, opts.output),
         status: :init
       }
-
-    {new_tracks_actions, state} =
-      Boombox.InternalBin.Pad.resolve_new_tracks_notification_status(state, ctx)
+      |> Boombox.InternalBin.Pad.resolve_new_tracks_notification_status(ctx)
 
     :ok = maybe_log_transcoding_related_warning(state.input, state.output)
-    {proceed_actions, state} = proceed(ctx, state)
-    {new_tracks_actions ++ proceed_actions, state}
+    proceed(ctx, state)
   end
 
   @impl true
   def handle_playing(ctx, state) do
-    {new_tracks_actions, state} =
+    state =
       Boombox.InternalBin.Pad.resolve_new_tracks_notification_status(state, ctx)
 
     {proceed_actions, state} =
@@ -463,7 +460,7 @@ defmodule Boombox.InternalBin do
           Membrane.Bin.CallbackContext.t(),
           State.t()
         ) ::
-          Ready.t() | Wait.t()
+          {Ready.t() | Wait.t(), State.t()}
   defp link_output({:webrtc, _signaling, opts}, track_builders, spec_builder, _ctx, state) do
     tracks = [
       %{kind: :audio, id: :audio_track},
