@@ -150,7 +150,7 @@ defmodule Boombox do
   Asynchronous version of run/2
   Doesn't block the calling process until the termination of the pipeline.
   It returns a `Task` that can be awaited later.
-  If the output is a stream the behaviour is idential to run/2
+  If the output is a stream the behaviour is identical to run/2
   """
   @spec async(Enumerable.t() | nil,
           input: input(),
@@ -220,9 +220,6 @@ defmodule Boombox do
     cond do
       Map.keys(opts) -- @endpoint_opts != [] ->
         raise ArgumentError, "Both input and output are required"
-
-      is_stream?(opts[:input]) && stream == nil ->
-        raise ArgumentError, "Stream is required for input stream"
 
       is_stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
         raise ArgumentError,
