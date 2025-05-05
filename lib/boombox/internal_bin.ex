@@ -61,7 +61,7 @@ defmodule Boombox.InternalBin do
                   rtsp_state: nil,
                   pending_new_tracks: %{input: [], output: []},
                   output_webrtc_state: nil,
-                  new_tracks_notification_status: :to_be_resolved
+                  new_tracks_notification_status: :not_resolved
                 ]
 
     @typedoc """
@@ -147,7 +147,6 @@ defmodule Boombox.InternalBin do
         output: parse_endpoint_opt!(:output, opts.output),
         status: :init
       }
-      |> Boombox.InternalBin.Pad.resolve_new_tracks_notification_status(ctx)
 
     :ok = maybe_log_transcoding_related_warning(state.input, state.output)
     proceed(ctx, state)
@@ -158,26 +157,25 @@ defmodule Boombox.InternalBin do
     state =
       Boombox.InternalBin.Pad.resolve_new_tracks_notification_status(state, ctx)
 
-    {proceed_actions, state} =
-      case state.status do
-        :awaiting_input when state.input == :membrane_pad ->
-          Boombox.InternalBin.Pad.create_input(ctx)
-          |> proceed_result(ctx, state)
+    case state.status do
+      :awaiting_input when state.input == :membrane_pad ->
+        Boombox.InternalBin.Pad.create_input(ctx)
+        |> proceed_result(ctx, state)
 
-        :awaiting_output_link when state.output == :membrane_pad ->
+      :awaiting_output_link when state.output == :membrane_pad ->
+        {result, state} =
           Boombox.InternalBin.Pad.link_output(
             ctx,
             state.track_builders,
             state.spec_builder,
             state
           )
-          |> proceed_result(ctx, state)
 
-        _status ->
-          {[], state}
-      end
+        proceed_result(result, ctx, state)
 
-    {new_tracks_actions ++ proceed_actions, state}
+      _status ->
+        {[], state}
+    end
   end
 
   @impl true
@@ -189,7 +187,8 @@ defmodule Boombox.InternalBin do
       """
     end
 
-    Boombox.InternalBin.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx, state)
+    actions = Boombox.InternalBin.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx, state)
+    {actions, state}
   end
 
   @impl true
@@ -347,8 +346,8 @@ defmodule Boombox.InternalBin do
        when track_builders != nil do
     state = %{state | track_builders: track_builders, spec_builder: spec_builder}
 
-    link_output(state.output, track_builders, spec_builder, ctx, state)
-    |> do_proceed(:output_linked, :awaiting_output_link, ctx, state)
+    {result, state} = link_output(state.output, track_builders, spec_builder, ctx, state)
+    do_proceed(result, :output_linked, :awaiting_output_link, ctx, state)
   end
 
   defp proceed(ctx, %{status: :output_linked} = state) do
@@ -467,68 +466,119 @@ defmodule Boombox.InternalBin do
       %{kind: :video, id: :video_tracks}
     ]
 
-    Boombox.InternalBin.WebRTC.link_output(opts, track_builders, spec_builder, tracks, state)
+    result =
+      Boombox.InternalBin.WebRTC.link_output(opts, track_builders, spec_builder, tracks, state)
+
+    {result, state}
   end
 
-  defp link_output({:mp4, location, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.InternalBin.StorageEndpoints.MP4.link_output(
-      location,
-      opts,
-      track_builders,
-      spec_builder
-    )
+  defp link_output({:mp4, location, opts}, track_builders, spec_builder, _ctx, state) do
+    result =
+      Boombox.InternalBin.StorageEndpoints.MP4.link_output(
+        location,
+        opts,
+        track_builders,
+        spec_builder
+      )
+
+    {result, state}
   end
 
-  defp link_output({:h264, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:h264, location, _opts}, track_builders, spec_builder, _ctx, state) do
     maybe_warn_about_dropped_tracks(track_builders, :audio, :h264)
-    Boombox.InternalBin.StorageEndpoints.H264.link_output(location, track_builders, spec_builder)
+
+    result =
+      Boombox.InternalBin.StorageEndpoints.H264.link_output(
+        location,
+        track_builders,
+        spec_builder
+      )
+
+    {result, state}
   end
 
-  defp link_output({:h265, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:h265, location, _opts}, track_builders, spec_builder, _ctx, state) do
     maybe_warn_about_dropped_tracks(track_builders, :audio, :h265)
-    Boombox.InternalBin.StorageEndpoints.H265.link_output(location, track_builders, spec_builder)
+
+    result =
+      Boombox.InternalBin.StorageEndpoints.H265.link_output(
+        location,
+        track_builders,
+        spec_builder
+      )
+
+    {result, state}
   end
 
-  defp link_output({:aac, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:aac, location, _opts}, track_builders, spec_builder, _ctx, state) do
     maybe_warn_about_dropped_tracks(track_builders, :video, :aac)
-    Boombox.InternalBin.StorageEndpoints.AAC.link_output(location, track_builders, spec_builder)
+
+    result =
+      Boombox.InternalBin.StorageEndpoints.AAC.link_output(location, track_builders, spec_builder)
+
+    {result, state}
   end
 
-  defp link_output({:wav, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:wav, location, _opts}, track_builders, spec_builder, _ctx, state) do
     maybe_warn_about_dropped_tracks(track_builders, :video, :wav)
-    Boombox.InternalBin.StorageEndpoints.WAV.link_output(location, track_builders, spec_builder)
+
+    result =
+      Boombox.InternalBin.StorageEndpoints.WAV.link_output(location, track_builders, spec_builder)
+
+    {result, state}
   end
 
-  defp link_output({:mp3, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:mp3, location, _opts}, track_builders, spec_builder, _ctx, state) do
     maybe_warn_about_dropped_tracks(track_builders, :video, :mp3)
-    Boombox.InternalBin.StorageEndpoints.MP3.link_output(location, track_builders, spec_builder)
+
+    result =
+      Boombox.InternalBin.StorageEndpoints.MP3.link_output(location, track_builders, spec_builder)
+
+    {result, state}
   end
 
-  defp link_output({:ivf, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:ivf, location, _opts}, track_builders, spec_builder, _ctx, state) do
     maybe_warn_about_dropped_tracks(track_builders, :audio, :ivf)
-    Boombox.InternalBin.StorageEndpoints.IVF.link_output(location, track_builders, spec_builder)
+
+    result =
+      Boombox.InternalBin.StorageEndpoints.IVF.link_output(location, track_builders, spec_builder)
+
+    {result, state}
   end
 
-  defp link_output({:ogg, location, _opts}, track_builders, spec_builder, _ctx, _state) do
+  defp link_output({:ogg, location, _opts}, track_builders, spec_builder, _ctx, state) do
     maybe_warn_about_dropped_tracks(track_builders, :video, :ogg)
-    Boombox.InternalBin.StorageEndpoints.Ogg.link_output(location, track_builders, spec_builder)
+
+    result =
+      Boombox.InternalBin.StorageEndpoints.Ogg.link_output(location, track_builders, spec_builder)
+
+    {result, state}
   end
 
-  defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.InternalBin.HLS.link_output(location, opts, track_builders, spec_builder)
+  defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, state) do
+    result =
+      Boombox.InternalBin.HLS.link_output(location, opts, track_builders, spec_builder)
+
+    {result, state}
   end
 
-  defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.InternalBin.RTP.link_output(opts, track_builders, spec_builder)
+  defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, state) do
+    result =
+      Boombox.InternalBin.RTP.link_output(opts, track_builders, spec_builder)
+
+    {result, state}
   end
 
-  defp link_output({:stream, stream_process, params}, track_builders, spec_builder, _ctx, _state) do
-    Boombox.InternalBin.ElixirStream.link_output(
-      stream_process,
-      params,
-      track_builders,
-      spec_builder
-    )
+  defp link_output({:stream, stream_process, params}, track_builders, spec_builder, _ctx, state) do
+    result =
+      Boombox.InternalBin.ElixirStream.link_output(
+        stream_process,
+        params,
+        track_builders,
+        spec_builder
+      )
+
+    {result, state}
   end
 
   defp link_output(:membrane_pad, track_builder, spec_builder, ctx, state) do
