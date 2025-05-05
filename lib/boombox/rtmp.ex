@@ -38,7 +38,7 @@ defmodule Boombox.RTMP do
         {RTMPServer, server_options}
       )
 
-    send(boombox, {:external_resource_ready, server_options})
+    send(boombox, :external_resource_ready)
 
     %Wait{}
   end

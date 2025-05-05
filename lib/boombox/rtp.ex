@@ -121,9 +121,8 @@ defmodule Boombox.RTP do
   end
 
   def udp_ready(_input, _ctx, state) do
-    send(state.parent, {:external_resource_ready, self()})
-
-    {:ok, %{}}
+    send(state.parent, :external_resource_ready)
+    :ok
   end
 
   @spec link_output(

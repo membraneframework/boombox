@@ -118,22 +118,12 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
-  def handle_child_playing(:udp_source, ctx, state) do
+  def handle_child_setup_completed(:udp_source, ctx, state) do
     Boombox.RTP.udp_ready(state.input, ctx, state)
     {[], state}
   end
 
-  def handle_child_playing(:rtsp_source, ctx, state) do
-    Boombox.RTP.udp_ready(state.input, ctx, state)
-    {[], state}
-  end
-
-  def handle_child_playing(_child, _ctx, state) do
-    {[], state}
-  end
-
-  @impl true
-  def handle_child_setup_completed(:udp_rtp_sink, ctx, state) do
+  def handle_child_setup_completed(:rtsp_source, ctx, state) do
     Boombox.RTP.udp_ready(state.input, ctx, state)
     {[], state}
   end
@@ -227,8 +217,8 @@ defmodule Boombox.Pipeline do
     |> proceed_result(ctx, state)
   end
 
-  def handle_info({:external_resource_ready, _}, _, state) do
-    state.parent |> send({:external_resource_ready, self()})
+  def handle_info(:external_resource_ready, _ctx, state) do
+    state.parent |> send(:external_resource_ready)
     {[], state}
   end
 

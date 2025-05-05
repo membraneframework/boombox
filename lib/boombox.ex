@@ -174,19 +174,9 @@ defmodule Boombox do
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
+      # In case of rtsp, rtmp, rtp, rtmps, we need to wait for the tcp/udp server to be ready
+      # before returning from async/2.
       %{input: {protocol, _opts}} when protocol in [:rtmp, :rtp, :rtsp, :rtmps] ->
-        procs = start_pipeline(opts)
-
-        task =
-          Task.async(fn ->
-            Process.monitor(procs.supervisor)
-            await_pipeline(procs)
-          end)
-
-        await_external_resource_ready()
-        task
-
-      %{output: {protocol, _opts}} when protocol in [:rtmp, :rtp, :rtsp, :rtmps] ->
         procs = start_pipeline(opts)
 
         task =
@@ -466,7 +456,7 @@ defmodule Boombox do
 
   defp await_external_resource_ready() do
     receive do
-      {:external_resource_ready, _value} ->
+      :external_resource_ready ->
         :ok
     end
   end
