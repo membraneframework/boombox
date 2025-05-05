@@ -1,9 +1,9 @@
-defmodule Boombox.RTMP do
+defmodule Boombox.InternalBin.RTMP do
   @moduledoc false
 
   import Membrane.ChildrenSpec
   require Membrane.Logger
-  alias Boombox.Pipeline.{Ready, Wait}
+  alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.{RTMP, RTMPServer}
 
   @spec create_input(String.t() | pid(), pid()) :: Wait.t()
@@ -38,9 +38,7 @@ defmodule Boombox.RTMP do
         {RTMPServer, server_options}
       )
 
-    send(boombox, :external_resource_ready)
-
-    %Wait{}
+    %Wait{actions: [notify_parent: :external_resource_ready]}
   end
 
   @spec handle_connection(pid()) :: Ready.t()

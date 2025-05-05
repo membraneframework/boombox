@@ -1,30 +1,25 @@
-defmodule Boombox.MP4 do
+defmodule Boombox.InternalBin.StorageEndpoints.MP4 do
   @moduledoc false
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
-  alias Boombox.Pipeline.{Ready, Wait}
+  alias Boombox.InternalBin.{Ready, Wait}
+  alias Boombox.InternalBin.StorageEndpoints
   alias Membrane.H264
   alias Membrane.H265
 
   defguardp is_h26x(format) when is_struct(format) and format.__struct__ in [H264, H265]
 
-  @spec create_input(String.t(), [Boombox.force_transcoding() | {:transport, :file | :http}]) ::
+  @spec create_input(String.t(), [{:transport, :file | :http}]) ::
           Wait.t()
   def create_input(location, opts) do
-    spec =
-      case opts[:transport] do
-        :file ->
-          child(:mp4_in_file_source, %Membrane.File.Source{location: location, seekable?: true})
-          |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
+    optimize_for_non_fast_start = opts[:transport] == :file
 
-        :http ->
-          child(:mp4_in_http_source, %Membrane.Hackney.Source{
-            location: location,
-            hackney_opts: [follow_redirect: true]
-          })
-          |> child(:mp4_demuxer, Membrane.MP4.Demuxer.ISOM)
-      end
+    spec =
+      StorageEndpoints.get_source(location, opts[:transport], optimize_for_non_fast_start)
+      |> child(:mp4_demuxer, %Membrane.MP4.Demuxer.ISOM{
+        optimize_for_non_fast_start?: optimize_for_non_fast_start
+      })
 
     %Wait{actions: [spec: spec]}
   end
@@ -54,24 +49,24 @@ defmodule Boombox.MP4 do
 
   @spec link_output(
           String.t(),
-          [Boombox.force_transcoding()],
-          Boombox.Pipeline.track_builders(),
+          [Boombox.transcoding_policy()],
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, opts, track_builders, spec_builder) do
-    force_transcoding = opts |> Keyword.get(:force_transcoding, false)
+    transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
 
-    spec =
-      [
-        spec_builder,
-        child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
-        |> child(:mp4_file_sink, %Membrane.File.Sink{location: location}),
-        Enum.map(track_builders, fn
-          {:audio, builder} ->
-            builder
+    audio_branch =
+      case track_builders[:audio] do
+        nil ->
+          []
+
+        audio_builder ->
+          [
+            audio_builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.AAC,
-              force_transcoding?: force_transcoding in [true, :audio]
+              transcoding_policy: transcoding_policy
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
@@ -79,9 +74,17 @@ defmodule Boombox.MP4 do
             })
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:mp4_muxer)
+          ]
+      end
 
-          {:video, builder} ->
-            builder
+    video_branch =
+      case track_builders[:video] do
+        nil ->
+          []
+
+        video_builder ->
+          [
+            video_builder
             |> child(:mp4_video_transcoder, %Membrane.Transcoder{
               output_stream_format: fn
                 %H264{stream_structure: :annexb} = h264 ->
@@ -96,12 +99,19 @@ defmodule Boombox.MP4 do
                 _not_h26x ->
                   %H264{stream_structure: :avc3, alignment: :au}
               end,
-              force_transcoding?: force_transcoding in [true, :video]
+              transcoding_policy: transcoding_policy
             })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)
-        end)
-      ]
+          ]
+      end
+
+    spec =
+      [
+        spec_builder,
+        child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
+        |> child(:file_sink, %Membrane.File.Sink{location: location})
+      ] ++ audio_branch ++ video_branch
 
     %Ready{actions: [spec: spec]}
   end

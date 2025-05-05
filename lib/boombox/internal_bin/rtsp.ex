@@ -1,4 +1,4 @@
-defmodule Boombox.RTSP do
+defmodule Boombox.InternalBin.RTSP do
   @moduledoc false
   import Membrane.ChildrenSpec
 
@@ -6,7 +6,7 @@ defmodule Boombox.RTSP do
 
   require Membrane.Logger
   alias Membrane.{RTP, RTSP}
-  alias Boombox.Pipeline.{Ready, State, Wait}
+  alias Boombox.InternalBin.{Ready, State, Wait}
 
   @type state :: %{
           set_up_tracks: %{
@@ -14,7 +14,7 @@ defmodule Boombox.RTSP do
             optional(:video) => Membrane.RTSP.Source.track()
           },
           tracks_left_to_link: non_neg_integer(),
-          track_builders: Boombox.Pipeline.track_builders()
+          track_builders: Boombox.InternalBin.track_builders()
         }
 
   @spec create_input(URI.t()) :: Wait.t()
