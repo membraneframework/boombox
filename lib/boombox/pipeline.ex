@@ -123,6 +123,11 @@ defmodule Boombox.Pipeline do
     {[], state}
   end
 
+  def handle_child_playing(:rtsp_source, ctx, state) do
+    Boombox.RTP.udp_ready(state.input, ctx, state)
+    {[], state}
+  end
+
   def handle_child_playing(_child, _ctx, state) do
     {[], state}
   end
