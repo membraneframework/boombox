@@ -183,7 +183,7 @@ defmodule Boombox do
             await_pipeline(procs)
           end)
 
-        await_stream_ready()
+        await_external_resource_ready()
         task
 
       %{output: {protocol, _opts}} when protocol in [:rtmp, :rtp, :rtsp, :rtmps] ->
@@ -195,7 +195,7 @@ defmodule Boombox do
             await_pipeline(procs)
           end)
 
-        await_stream_ready()
+        await_external_resource_ready()
         task
 
       opts ->
@@ -464,9 +464,9 @@ defmodule Boombox do
     end
   end
 
-  defp await_stream_ready() do
+  defp await_external_resource_ready() do
     receive do
-      {:stream_ready, _value} ->
+      {:external_resource_ready, _value} ->
         :ok
     end
   end
