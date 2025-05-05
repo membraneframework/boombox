@@ -220,4 +220,33 @@ defmodule Boombox.BinTest do
       assert_receive {:DOWN, ^ref, :process, _supervisor, _reason}
     end
   end
+
+  @tag :tmp_dir
+  @tag :xd
+  test ":new_tracks notification", %{tmp_dir: tmp_dir} do
+    spec = child(:source_boombox, %Boombox.Bin{input: @bbb_mp4})
+    pipeline = Testing.Pipeline.start_link_supervised!(spec: spec)
+
+    assert_pipeline_notified(pipeline, :source_boombox, {:new_tracks, tracks})
+    assert MapSet.new(tracks) == MapSet.new([:video, :audio])
+
+    out_file = Path.join(tmp_dir, "out.mp4")
+
+    spec =
+      [child(:sink_boombox, %Boombox.Bin{output: out_file})] ++
+        for kind <- [:video, :audio] do
+          get_child(:source_boombox)
+          |> via_out(:output, options: [kind: kind])
+          |> via_in(:input, options: [kind: kind])
+          |> get_child(:sink_boombox)
+        end
+
+    Testing.Pipeline.execute_actions(pipeline, spec: spec)
+
+    assert_pipeline_notified(pipeline, :sink_boombox, :processing_finished)
+    Testing.Pipeline.terminate(pipeline)
+
+    assert File.exists?(out_file)
+    Compare.compare(out_file, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:video, :audio])
+  end
 end
