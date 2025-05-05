@@ -38,6 +38,8 @@ defmodule Boombox.RTMP do
         {RTMPServer, server_options}
       )
 
+    send(boombox, {:stream_ready, server_options})
+
     %Wait{}
   end
 

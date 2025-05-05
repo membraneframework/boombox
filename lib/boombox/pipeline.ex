@@ -118,6 +118,26 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_child_playing(:udp_source, ctx, state) do
+    Boombox.RTP.udp_source_playing(state.input, ctx, state)
+    {[], state}
+  end
+
+  def handle_child_playing(_child, _ctx, state) do
+    {[], state}
+  end
+
+  @impl true
+  def handle_child_setup_completed(:udp_rtp_sink, ctx, state) do
+    Boombox.RTP.udp_source_playing(state.input, ctx, state)
+    {[], state}
+  end
+
+  def handle_child_setup_completed(_child, _ctx, state) do
+    {[], state}
+  end
+
+  @impl true
   def handle_child_notification({:new_tracks, tracks}, :mp4_demuxer, ctx, state) do
     Boombox.MP4.handle_input_tracks(tracks)
     |> proceed_result(ctx, state)
@@ -200,6 +220,11 @@ defmodule Boombox.Pipeline do
   def handle_info({:rtmp_client_ref, client_ref}, ctx, state) do
     Boombox.RTMP.handle_connection(client_ref)
     |> proceed_result(ctx, state)
+  end
+
+  def handle_info({:stream_ready, _}, _, state) do
+    state.parent |> send({:stream_ready, self()})
+    {[], state}
   end
 
   @impl true

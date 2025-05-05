@@ -174,6 +174,30 @@ defmodule Boombox do
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
+      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtp, :rtsp, :rtmps] ->
+        procs = start_pipeline(opts)
+
+        task =
+          Task.async(fn ->
+            Process.monitor(procs.supervisor)
+            await_pipeline(procs)
+          end)
+
+        await_stream_ready()
+        task
+
+      %{output: {protocol, _opts}} when protocol in [:rtmp, :rtp, :rtsp, :rtmps] ->
+        procs = start_pipeline(opts)
+
+        task =
+          Task.async(fn ->
+            Process.monitor(procs.supervisor)
+            await_pipeline(procs)
+          end)
+
+        await_stream_ready()
+        task
+
       opts ->
         procs = start_pipeline(opts)
 
@@ -440,6 +464,13 @@ defmodule Boombox do
   defp await_source_ready() do
     receive do
       {:boombox_ex_stream_source, source} -> source
+    end
+  end
+
+  defp await_stream_ready() do
+    receive do
+      {:stream_ready, _value} ->
+        :ok
     end
   end
 

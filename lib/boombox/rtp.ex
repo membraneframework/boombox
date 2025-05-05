@@ -120,6 +120,12 @@ defmodule Boombox.RTP do
     %Ready{spec_builder: spec, track_builders: track_builders}
   end
 
+  def udp_source_playing(_input, _ctx, state) do
+    send(state.parent, {:stream_ready, self()})
+
+    {:ok, %{}}
+  end
+
   @spec link_output(
           Boombox.out_rtp_opts(),
           Boombox.Pipeline.track_builders(),
