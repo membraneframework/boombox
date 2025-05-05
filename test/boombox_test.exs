@@ -63,8 +63,6 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  ### Asyncs
-
   @tag :file_webrtc
   async_test "mp4 file -> webrtc -> mp4 file", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
@@ -429,7 +427,7 @@ defmodule BoomboxTest do
         })
         |> via_in(Pad.ref(:audio, 0))
         |> get_child(:rtmp_sink),
-        child(:rtmp_sink, %Membrane.RTMP.Sink{rtmp_url: url, max_attempts: 3})
+        child(:rtmp_sink, %Membrane.RTMP.Sink{rtmp_url: url})
       ]
     )
 
