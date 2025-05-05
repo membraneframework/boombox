@@ -5,22 +5,79 @@ defmodule Boombox.InternalBin.Pad do
 
   require Membrane.Pad, as: Pad
 
-  alias Boombox.InternalBin.{Ready, Wait}
+  alias Boombox.InternalBin.{Ready, State, Wait}
   alias Membrane.Bin.{Action, CallbackContext}
   alias Membrane.Connector
 
-  @spec handle_pad_added(Membrane.Pad.ref(), :audio | :video, CallbackContext.t()) ::
-          [Action.t()] | no_return()
-  def handle_pad_added(pad_ref, _kind, ctx) when ctx.playback == :playing do
-    raise """
-    Boombox.InternalBin pad #{inspect(pad_ref)} was added while the Boombox.InternalBin playback \
-    is already :playing. All Boombox.InternalBin pads have to be linked before it enters \
-    :playing playback. To achieve it, link all the pads of Boombox.InternalBin in the same \
-    spec where you spawn it.
-    """
+  @type new_tracks_notification_status ::
+          :not_resolved
+          | :maybe_will_be_sent
+          | :sent
+          | :never_sent_in_script
+          | :never_sent_in_bin
+
+  #                        used in Boombox.run/2
+  # :not_resolved -----------------------------------> :never_sent_in_script
+  #   |
+  #   | membrane_pad option?
+  #   | (== boombox.bin)
+  #   |
+  #   \/                      pads are linked before playing
+  # :maybe_will_be_sent ------------------------------------------> :never_sent_in_bin
+  #   |
+  #   | no pads linked before playing
+  #   |
+  #   \/
+  #  :sending
+  #   |
+  #   |
+  #   \/
+  # :sent
+
+  # should be executed:
+  # - on init
+  # - on pad added
+  # - on playback changed
+  def resolve_new_tracks_notification_status(%Boombox.InternalBin.State{} = state, ctx) do
+    {actions, status} =
+      case state.new_tracks_notification_status do
+        :not_resolved when state.input == :membrane_pad or state.output == :membrane_pad ->
+          {[], :maybe_will_be_sent}
+
+        :not_resolved ->
+          {[], :never_sent_in_script}
+
+        :maybe_will_be_sent when ctx.playback == :stopped and map_size(ctx.pads) > 0 ->
+          {[], :never_sent_in_bin}
+
+        :maybe_will_be_sent when ctx.playback == :playing and map_size(ctx.pads) == 0 ->
+          # todo: resolve tracks
+          actions = [notify_parent: {:new_tracks, []}]
+          {actions, :sent}
+
+        status when status in [:never_sent_in_script, :never_sent_in_bin, :sent] ->
+          {[], status}
+      end
+
+    state = %{state | new_tracks_notification_status: status}
+    {actions, state}
   end
 
-  def handle_pad_added(pad_ref, kind, _ctx) do
+  @spec handle_pad_added(Membrane.Pad.ref(), :audio | :video, CallbackContext.t()) ::
+          [Action.t()] | no_return()
+  def handle_pad_added(pad_ref, kind, ctx, state) do
+    {new_tracks_actions, state} = resolve_new_tracks_notification_status(state, ctx)
+
+    # todo: refactor error message
+    if ctx.playback == :playing and state.new_tracks_notification_status != :sent do
+      raise """
+      Boombox.InternalBin pad #{inspect(pad_ref)} was added while the Boombox.InternalBin playback \
+      is already :playing. All Boombox.InternalBin pads have to be linked before it enters \
+      :playing playback. To achieve it, link all the pads of Boombox.InternalBin in the same \
+      spec where you spawn it.
+      """
+    end
+
     spec =
       case Pad.name_by_ref(pad_ref) do
         :input ->
@@ -32,7 +89,7 @@ defmodule Boombox.InternalBin.Pad do
           |> bin_output(pad_ref)
       end
 
-    [spec: spec]
+    {new_tracks_actions ++ [spec: spec], state}
   end
 
   @spec create_input(CallbackContext.t()) :: Ready.t() | Wait.t() | no_return()

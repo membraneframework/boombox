@@ -61,7 +61,7 @@ defmodule Boombox.InternalBin do
                   rtsp_state: nil,
                   pending_new_tracks: %{input: [], output: []},
                   output_webrtc_state: nil,
-                  new_tracks_notification_status: :not_resolved_yet
+                  new_tracks_notification_status: :to_be_resolved
                 ]
 
     @typedoc """
@@ -92,7 +92,8 @@ defmodule Boombox.InternalBin do
             eos_info: term(),
             rtsp_state: Boombox.InternalBin.RTSP.state() | nil,
             output_webrtc_state: Boombox.InternalBin.WebRTC.output_webrtc_state() | nil,
-            new_tracks_notification_status: :sent | :to_be_sent | :never_sent | :not_resolved_yet
+            new_tracks_notification_status:
+              Boombox.InternalBin.Pad.new_tracks_notification_status()
           }
   end
 
@@ -140,41 +141,47 @@ defmodule Boombox.InternalBin do
       """
     end
 
-    state = %State{
-      input: parse_endpoint_opt!(:input, opts.input),
-      output: parse_endpoint_opt!(:output, opts.output),
-      status: :init
-    }
+    state =
+      %State{
+        input: parse_endpoint_opt!(:input, opts.input),
+        output: parse_endpoint_opt!(:output, opts.output),
+        status: :init
+      }
+
+    {new_tracks_actions, state} =
+      Boombox.InternalBin.Pad.resolve_new_tracks_notification_status(state, ctx)
 
     :ok = maybe_log_transcoding_related_warning(state.input, state.output)
-    proceed(ctx, state)
+    {proceed_actions, state} = proceed(ctx, state)
+    {new_tracks_actions ++ proceed_actions, state}
   end
 
   @impl true
-  def handle_playing(ctx, state) when :membrane_pad in [state.input, state.output] do
-    new_tracks_notification_status =
-      if state.output == :membrane_pad and map_size(ctx.pads) == 0,
-        do: :to_be_sent,
-        else: :never_sent
+  def handle_playing(ctx, state) do
+    {new_tracks_actions, state} =
+      Boombox.InternalBin.Pad.resolve_new_tracks_notification_status(state, ctx)
 
-    state = %{state | new_tracks_notification_status: new_tracks_notification_status}
+    {proceed_actions, state} =
+      case state.status do
+        :awaiting_input when state.input == :membrane_pad ->
+          Boombox.InternalBin.Pad.create_input(ctx)
+          |> proceed_result(ctx, state)
 
-    case state.status do
-      :awaiting_input when state.input == :membrane_pad ->
-        Boombox.InternalBin.Pad.create_input(ctx)
-        |> proceed_result(ctx, state)
+        :awaiting_output_link when state.output == :membrane_pad ->
+          Boombox.InternalBin.Pad.link_output(
+            ctx,
+            state.track_builders,
+            state.spec_builder,
+            state
+          )
+          |> proceed_result(ctx, state)
 
-      :awaiting_output_link when state.output == :membrane_pad ->
-        Boombox.InternalBin.Pad.link_output(ctx, state.track_builders, state.spec_builder, state)
-        |> proceed_result(ctx, state)
+        _status ->
+          {[], state}
+      end
 
-      _status ->
-        {[], state}
-    end
+    {new_tracks_actions ++ proceed_actions, state}
   end
-
-  @impl true
-  def handle_playing(_ctx, state), do: {[], state}
 
   @impl true
   def handle_pad_added(Pad.ref(direction, _id) = pad_ref, ctx, state) do
@@ -185,8 +192,7 @@ defmodule Boombox.InternalBin do
       """
     end
 
-    actions = Boombox.InternalBin.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx)
-    {actions, state}
+    Boombox.InternalBin.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx, state)
   end
 
   @impl true

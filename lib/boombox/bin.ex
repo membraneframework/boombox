@@ -77,6 +77,11 @@ defmodule Boombox.Bin do
           | {:hls, location :: String.t(), [Boombox.transcoding_policy()]}
           | {:rtp, Boombox.out_rtp_opts()}
 
+  @typedoc """
+  todo: Add description
+  """
+  @type new_tracks :: {:new_tracks, [:video | :audio]}
+
   def_input_pad :input,
     accepted_format:
       format
@@ -214,6 +219,11 @@ defmodule Boombox.Bin do
   @impl true
   def handle_child_notification(:processing_finished, :boombox, _ctx, state) do
     {[notify_parent: :processing_finished], state}
+  end
+
+  @impl true
+  def handle_child_notification({:new_tracks, tracks}, :boombox, _ctx, state) do
+    {[notify_parent: {:new_tracks, tracks}], state}
   end
 
   defp validate_opts!(opts) do
