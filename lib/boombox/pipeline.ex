@@ -1,16 +1,108 @@
 defmodule Boombox.Pipeline do
   @moduledoc false
+  # The pipeline that spawns all the Boombox children.
+  # Support for each endpoint is handled via create_output, create_input
+  # and link_output functions. Each of them should return one of:
+  # - `t:Ready.t/0` - Returns the control to Boombox.
+  # - `t:Wait.t/0 - Waits for some endpoint-specific action to happen.
+  #   When it does, `proceed_result` needs to be called with `Ready`
+  #   or another `Wait`.
+  #
+  # The purpose of each function is the following:
+  # - create_output - Called at the beginning, initializes the output.
+  #   Needed only when the output needs initialization before tracks
+  #   are known.
+  # - create_input - Initializes the input. Called after the output finishes
+  #   initialization. Should return `t:track_builders/0` in `Ready`.
+  #   If there's any spec that needs to be returned with the track builders,
+  #   it can be set in the `spec_builder` field of `Ready`.
+  # - link_output - Gets the track builders and spec builder. It should
+  #   link the track builders to appropriate inputs and return the spec
+  #   builder in the same spec.
+
   use Membrane.Pipeline
 
-  @impl true
-  def handle_init(_ctx, opts) do
-    spec =
-      child(:boombox, %Boombox.InternalBin{
-        input: opts.input,
-        output: opts.output
-      })
+  require Membrane.Logger
 
-    {[spec: spec], %{}}
+  @type track_builders :: %{
+          optional(:audio) => Membrane.ChildrenSpec.t(),
+          optional(:video) => Membrane.ChildrenSpec.t()
+        }
+  @type storage_type :: :file | :http
+
+  defmodule Ready do
+    @moduledoc false
+
+    @type t :: %__MODULE__{
+            actions: [Membrane.Pipeline.Action.t()],
+            track_builders: Boombox.Pipeline.track_builders() | nil,
+            spec_builder: Membrane.ChildrenSpec.t() | nil,
+            eos_info: term
+          }
+
+    defstruct actions: [], track_builders: nil, spec_builder: [], eos_info: nil
+  end
+
+  defmodule Wait do
+    @moduledoc false
+
+    @type t :: %__MODULE__{actions: [Membrane.Pipeline.Action.t()]}
+    defstruct actions: []
+  end
+
+  defmodule State do
+    @moduledoc false
+
+    @enforce_keys [
+      :status,
+      :input,
+      :output,
+      :parent
+      # :force_transcoding
+    ]
+
+    defstruct @enforce_keys ++
+                [
+                  actions_acc: [],
+                  spec_builder: [],
+                  track_builders: nil,
+                  last_result: nil,
+                  eos_info: nil,
+                  rtsp_state: nil,
+                  pending_new_tracks: %{input: [], output: []},
+                  output_webrtc_state: nil
+                ]
+
+    @typedoc """
+    Statuses of the Boombox pipeline in the order of occurence.
+
+    Statuses starting with `awaiting_` occur only if
+    the `proceed` function returns `t:Wait.t/0` when in the
+    preceeding status.
+    """
+    @type status ::
+            :init
+            | :awaiting_output
+            | :output_ready
+            | :awaiting_input
+            | :input_ready
+            | :awaiting_output_link
+            | :output_linked
+            | :running
+
+    @type t :: %__MODULE__{
+            status: status(),
+            input: Boombox.input(),
+            output: Boombox.output(),
+            actions_acc: [Membrane.Pipeline.Action.t()],
+            spec_builder: Membrane.ChildrenSpec.t(),
+            track_builders: Boombox.Pipeline.track_builders() | nil,
+            last_result: Boombox.Pipeline.Ready.t() | Boombox.Pipeline.Wait.t() | nil,
+            eos_info: term(),
+            rtsp_state: Boombox.RTSP.state() | nil,
+            parent: pid(),
+            output_webrtc_state: Boombox.WebRTC.output_webrtc_state() | nil
+          }
   end
 
   @impl true
