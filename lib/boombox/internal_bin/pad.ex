@@ -11,7 +11,7 @@ defmodule Boombox.InternalBin.Pad do
 
   @type new_tracks_notification_status ::
           :not_resolved
-          | :maybe_will_be_sent
+          | :will_be_sent
           | :sent
           | :never_sent
 

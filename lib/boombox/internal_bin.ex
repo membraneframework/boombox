@@ -187,8 +187,25 @@ defmodule Boombox.InternalBin do
       """
     end
 
-    actions = Boombox.InternalBin.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx, state)
-    {actions, state}
+    spec_actions =
+      Boombox.InternalBin.Pad.handle_pad_added(pad_ref, ctx.pad_options.kind, ctx, state)
+
+    {link_output_actions, state} =
+      with %{status: :awaiting_output_link, output: :membrane_pad} <- state do
+        {result, state} =
+          Boombox.InternalBin.Pad.link_output(
+            ctx,
+            state.track_builders,
+            state.spec_builder,
+            state
+          )
+
+        proceed_result(result, ctx, state)
+      else
+        state -> {[], state}
+      end
+
+    {spec_actions ++ link_output_actions, state}
   end
 
   @impl true

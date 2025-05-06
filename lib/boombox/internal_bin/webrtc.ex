@@ -281,10 +281,12 @@ defmodule Boombox.InternalBin.WebRTC do
     end
   end
 
-  defp resolve_input_webrtc_codec_options(ctx, state) when state.output == :membrane_pad do
+  # case when Boombox.Bin has pads linked before handle_playing
+  defp resolve_input_webrtc_codec_options(ctx, state)
+       when state.output == :membrane_pad and map_size(ctx.pads) > 0 do
     output_video_pad_options =
       ctx.pads
-      |> Enum.find(fn
+      |> Enum.find_value(fn
         {Pad.ref(:output, _id), %{options: %{kind: :video} = options}} -> options
         _pad_entry -> false
       end)
@@ -308,6 +310,12 @@ defmodule Boombox.InternalBin.WebRTC do
         # value returned from this function will be ignored
         {:h264, []}
     end
+  end
+
+  # case when Boombox.Bin returns a :new_tracks notification
+  defp resolve_input_webrtc_codec_options(ctx, state)
+       when state.output == :membrane_pad and map_size(ctx.pads) == 0 do
+    {:h264, [:h264, :vp8]}
   end
 
   defp resolve_input_webrtc_codec_options(_ctx, _state) do
