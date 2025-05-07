@@ -22,14 +22,18 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP3 do
 
   @spec link_output(
           String.t(),
+          [Boombox.transcoding_policy()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(location, track_builders, _spec_builder) do
+  def link_output(location, opts, track_builders, _spec_builder) do
+    transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
+
     spec =
       track_builders[:audio]
       |> child(:mp3_audio_transcoder, %Membrane.Transcoder{
-        output_stream_format: Membrane.MPEGAudio
+        output_stream_format: Membrane.MPEGAudio,
+        transcoding_policy: transcoding_policy
       })
       |> child(:file_sink, %Membrane.File.Sink{location: location})
 
