@@ -28,6 +28,11 @@ defmodule Boombox.Bin do
 
   `Boombox.Bin` cannot have `:input` and `:output` options set
   at the same time.
+
+  If you use Boombox.Bin as a source, you can either:
+    * link output pads in the same spec where you spawn it
+    * or wait until Boombox.Bin returns a notification `{:new_tracks, [:audio | :video]}`
+      and then link the pads according to the notification.
   """
 
   use Membrane.Bin
@@ -78,7 +83,12 @@ defmodule Boombox.Bin do
           | {:rtp, Boombox.out_rtp_opts()}
 
   @typedoc """
-  todo: Add description
+  Type of notification sent to the parent of Boombox.Bin when new tracks arrive.
+
+  It is sent only when Boombox.Bin is used as a source (the `:input` option is set).
+
+  This notification is sent by Boombox.Bin only if its pads weren't linked
+  before `handle_playing/2` callback.
   """
   @type new_tracks :: {:new_tracks, [:video | :audio]}
 

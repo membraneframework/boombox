@@ -272,12 +272,10 @@ defmodule Boombox.BinTest do
 
       Testing.Pipeline.execute_actions(source_pipeline, spec: output_webrtc_spec)
 
-      input_webrtc_spec(
-        = /
-          child(:webrtc_source_boombox, %Boombox.Bin{
-            input: {:webrtc, webrtc_signaling}
-          })
-      )
+      input_webrtc_spec =
+        child(:webrtc_source_boombox, %Boombox.Bin{
+          input: {:webrtc, webrtc_signaling}
+        })
 
       sink_pipeline = Testing.Pipeline.start_link_supervised!(spec: input_webrtc_spec)
 

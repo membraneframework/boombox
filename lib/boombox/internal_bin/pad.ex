@@ -62,13 +62,15 @@ defmodule Boombox.InternalBin.Pad do
         ) ::
           [Action.t()] | no_return()
   def handle_pad_added(pad_ref, kind, ctx, state) do
-    # todo: refactor error message
     if ctx.playback == :playing and state.new_tracks_notification_status != :sent do
       raise """
       Boombox.InternalBin pad #{inspect(pad_ref)} was added while the Boombox.InternalBin playback \
-      is already :playing. All Boombox.InternalBin pads have to be linked before it enters \
-      :playing playback. To achieve it, link all the pads of Boombox.InternalBin in the same \
-      spec where you spawn it.
+      is already :playing, but {:new_tracks, tracks} notification was not sent yet.
+
+      You can either:
+        * link all the pads of Boombox.InternalBin in the same spec where you spawn it,
+        * or wait until Boombox.InternalBin returns a notification {:new_tracks, tracks} and then \
+        link the pads accodring to the notification.
       """
     end
 
@@ -127,7 +129,6 @@ defmodule Boombox.InternalBin.Pad do
       :will_be_sent when ctx.playback == :playing ->
         actions = [notify_parent: {:new_tracks, Map.keys(track_builders)}]
         state = %{state | new_tracks_notification_status: :sent}
-        # todo: what if track_builders == %{}?
         {%Wait{actions: actions}, state}
 
       :sent when ctx.playback == :playing ->
