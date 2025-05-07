@@ -1,10 +1,10 @@
 defmodule Boombox.Server do
   @moduledoc """
-  This module provides a GenServer interface for boombox. To run boombox the server needs to be
+  This module provides a GenServer interface for Boombox. To run Boombox the server needs to be
   called with `{:run_boombox, boombox_opts}` - it can be done by calling `run_boombox/2`, sending a
   `{:call, :run_boombox, boombox_opts}` message to the server or calling the server directly with `GenServer.call/3`.
-  The return value signals what mode boombox is in. Once boombox is running it can be interacted
-  with through appropriate calls.
+  The return value signals what mode Boombox is in. Once Boombox is running it can be interacted
+  with through appropriate functions, GenServer calls and messages.
   """
   use GenServer
 
@@ -16,26 +16,47 @@ defmodule Boombox.Server do
 
   @typedoc """
   Mode in which Boombox is operating:
-    * `:consuming` - Boombox consumes packets provided with `{:consume_packet, packet}` calls.
-    * `:producing` - Boombox produces packets in response to being called with `:produce_packet`.
+    * `:consuming` - Boombox consumes packets provided with `consume_packet/2` calls and `{:consume_packet, packet}` GenServer calls.
+    * `:producing` - Boombox produces packets in response to `produce_packet/1` calls and being called directly with `:produce_packet`.
     * `:standalone` - Boombox neither consumes nor produces packets.
   """
   @type boombox_mode :: :consuming | :producing | :standalone
 
-  @type serialized_audio_data :: %{
+  @typedoc """
+  Serialized audio payload that can be present in a serialized packet.
+  Consists of raw data along with audio specific metadata.
+  """
+  @type serialized_audio_payload :: %{
           data: binary(),
           sample_format: Membrane.RawAudio.SampleFormat.t(),
           sample_rate: pos_integer(),
           channels: pos_integer()
         }
-  @type serialized_video_data :: %{
+
+  @typedoc """
+  Serialized video payload that can be present in a serialized packet.
+  Consists of raw data along with video specific metadata.
+  """
+  @type serialized_video_payload :: %{
           data: binary(),
           width: pos_integer(),
           height: pos_integer(),
           channels: pos_integer()
         }
+
+  @typedoc """
+  Serialized raw media packet. Data in this form is sent by the server when demanded from
+  and is expected by the server when it demands it.
+
+  This serialization was designed to accomodate constraints set by
+  [Pyrlang](https://github.com/Pyrlang/Pyrlang) and to enable interoperability with Python.
+
+  ### Fields
+    * `:payload` - record containing either video or audio data.
+    * `:timestamp` - timestamp of the packet in milliseconds.
+  """
   @type serialized_packet :: %{
-          payload: {:audio, serialized_audio_data()} | {:video, serialized_video_data()},
+          payload: {:audio, serialized_audio_payload()} | {:video, serialized_video_payload()},
           timestamp: integer()
         }
 
@@ -52,37 +73,67 @@ defmodule Boombox.Server do
     defstruct @enforce_keys ++ []
   end
 
+  @doc """
+  Starts the server and links it to the current process, for more information see `GenServer.start_link/3`
+  """
   @spec start_link(term()) :: GenServer.on_start()
   def start_link(arg) do
     GenServer.start_link(__MODULE__, arg)
   end
 
+  @doc """
+  Starts the server for more information see `GenServer.start/3`
+  """
   @spec start(term()) :: GenServer.on_start()
   def start(arg) do
     GenServer.start(__MODULE__, arg)
   end
 
+  @doc """
+  Runs Boombox with provided options and enables the usage of other functions for communicating with it.
+  Different functionalities are available depending on the mode (`t:boombox_mode/0`) in which Boombox is running.
+  """
   @spec run_boombox(GenServer.server(), boombox_opts()) :: boombox_mode()
   def run_boombox(server, boombox_opts) do
     GenServer.call(server, {:run_boombox, boombox_opts})
   end
 
+  @doc """
+  Returns the pid of the server.
+  """
   @spec get_pid(GenServer.server()) :: pid()
   def get_pid(server) do
     GenServer.call(server, :get_pid)
   end
 
+  @doc """
+  Makes Boombox consume provided packet. Returns `:ok` if more packets can be provided, and
+  `:finished` when Boombox finished consuming and will not accept any more packets.
+  Can be called only when Boombox is in `:consuming` mode.
+  """
   @spec consume_packet(GenServer.server(), serialized_packet()) ::
-          :ok | :finished | {:error, :boombox_not_running}
+          :ok | :finished | {:error, :boombox_not_running | :incompatible_mode}
   def consume_packet(server, packet) do
     GenServer.call(server, {:consume_packet, packet})
   end
 
-  @spec finish_consuming(GenServer.server()) :: :finished | {:error, :boombox_not_running}
+  @doc """
+  Informs Boombox that it will not be provided any more packets and should operate and terminate
+  accordingly.
+  Can be called only when Boombox is in `:consuming` mode.
+  """
+  @spec finish_consuming(GenServer.server()) ::
+          :finished | {:error, :boombox_not_running | :incompatible_mode}
   def finish_consuming(server) do
     GenServer.call(server, :finish_consuming)
   end
 
+  @doc """
+  Requests a packet from Boombox. If returned with `:ok`, then this function can be called
+  again to request the next packet, and if returned with `:finished`, then Boombox finished it's
+  operation and will not produce any more packets.
+  Can be called only when Boombox is in `:producing` mode.
+  """
   @spec produce_packet(GenServer.server()) ::
           {:ok | :finished, serialized_packet()} | {:error, :boombox_not_running}
   def produce_packet(server) do
@@ -140,7 +191,7 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call({:consume_packet, packet}, _from, %State{} = state) do
+  def handle_call({:consume_packet, packet}, _from, %State{boombox_mode: :consuming} = state) do
     packet = deserialize_packet(packet)
     send(state.boombox_pid, {:consume_packet, packet})
 
@@ -154,7 +205,12 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call(:finish_consuming, _from, %State{} = state) do
+  def handle_call({:consume_packet, _packet}, _from, %State{boombox_mode: _other_mode} = state) do
+    {:reply, {:error, :incompatible_mode}, state}
+  end
+
+  @impl true
+  def handle_call(:finish_consuming, _from, %State{boombox_mode: :consuming} = state) do
     send(state.boombox_pid, :finish_consuming)
 
     receive do
@@ -164,7 +220,12 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call(:produce_packet, _from, %State{} = state) do
+  def handle_call(:finish_consuming, _from, %State{boombox_mode: _other_mode} = state) do
+    {:reply, {:error, :incompatible_mode}, state}
+  end
+
+  @impl true
+  def handle_call(:produce_packet, _from, %State{boombox_mode: :producing} = state) do
     send(state.boombox_pid, :produce_packet)
 
     last_produced_packet = state.last_produced_packet
@@ -177,6 +238,11 @@ defmodule Boombox.Server do
 
     serialized_packet = serialize_packet(last_produced_packet)
     {:reply, {production_phase, serialized_packet}, state}
+  end
+
+  @impl true
+  def handle_call(:produce_packet, _from, %State{boombox_mode: _other_mode} = state) do
+    {:reply, {:error, :incompatible_mode}, state}
   end
 
   @impl true
@@ -200,6 +266,62 @@ defmodule Boombox.Server do
   def handle_info(info, state) do
     Logger.warning("Ignoring message #{inspect(info)}")
     {:noreply, state}
+  end
+
+  @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
+  defp get_boombox_mode(boombox_opts) do
+    case Map.new(boombox_opts) do
+      %{input: {:stream, _input_opts}, output: {:stream, _output_opts}} ->
+        raise ArgumentError, ":stream on both input and output is not supported"
+
+      %{input: {:stream, _input_opts}} ->
+        :consuming
+
+      %{output: {:stream, _output_opts}} ->
+        :producing
+
+      _neither_input_or_output ->
+        :standalone
+    end
+  end
+
+  @spec consuming_boombox_function(boombox_opts(), pid()) :: :ok
+  defp consuming_boombox_function(boombox_opts, server_pid) do
+    Stream.resource(
+      fn -> nil end,
+      fn nil ->
+        send(server_pid, :packet_consumed)
+
+        receive do
+          {:consume_packet, packet} ->
+            {[packet], nil}
+
+          :finish_consuming ->
+            {:halt, nil}
+        end
+      end,
+      fn nil -> send(server_pid, :finished) end
+    )
+    |> Boombox.run(boombox_opts)
+  end
+
+  @spec producing_boombox_function(boombox_opts(), pid()) :: :ok
+  defp producing_boombox_function(boombox_opts, server_pid) do
+    Boombox.run(boombox_opts)
+    |> Enum.each(fn packet ->
+      send(server_pid, {:packet_produced, packet})
+
+      receive do
+        :produce_packet -> :ok
+      end
+    end)
+
+    send(server_pid, :finished)
+  end
+
+  @spec standalone_boombox_function(boombox_opts()) :: :ok
+  defp standalone_boombox_function(boombox_opts) do
+    Boombox.run(boombox_opts)
   end
 
   @spec deserialize_packet(serialized_packet()) :: Packet.t()
@@ -267,61 +389,5 @@ defmodule Boombox.Server do
       payload: serialized_payload,
       timestamp: Membrane.Time.as_milliseconds(packet.pts, :round)
     }
-  end
-
-  @spec consuming_boombox_function(boombox_opts(), pid()) :: :ok
-  defp consuming_boombox_function(boombox_opts, server_pid) do
-    Stream.resource(
-      fn -> nil end,
-      fn nil ->
-        send(server_pid, :packet_consumed)
-
-        receive do
-          {:consume_packet, packet} ->
-            {[packet], nil}
-
-          :finish_consuming ->
-            {:halt, nil}
-        end
-      end,
-      fn nil -> send(server_pid, :finished) end
-    )
-    |> Boombox.run(boombox_opts)
-  end
-
-  @spec producing_boombox_function(boombox_opts(), pid()) :: :ok
-  defp producing_boombox_function(boombox_opts, server_pid) do
-    Boombox.run(boombox_opts)
-    |> Enum.each(fn packet ->
-      send(server_pid, {:packet_produced, packet})
-
-      receive do
-        :produce_packet -> :ok
-      end
-    end)
-
-    send(server_pid, :finished)
-  end
-
-  @spec standalone_boombox_function(boombox_opts()) :: :ok
-  defp standalone_boombox_function(boombox_opts) do
-    Boombox.run(boombox_opts)
-  end
-
-  @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
-  defp get_boombox_mode(boombox_opts) do
-    case Map.new(boombox_opts) do
-      %{input: {:stream, _input_opts}, output: {:stream, _output_opts}} ->
-        raise ArgumentError, ":stream on both input and output is not supported"
-
-      %{input: {:stream, _input_opts}} ->
-        :consuming
-
-      %{output: {:stream, _output_opts}} ->
-        :producing
-
-      _neither_input_or_output ->
-        :standalone
-    end
   end
 end
