@@ -93,11 +93,12 @@ defmodule Boombox do
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(), [transcoding_policy()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
-          | {:mp4, location :: String.t(), [transcoding_policy()]}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
+             [transcoding_policy()]}
           | {:webrtc, webrtc_signaling()}
           | {:webrtc, webrtc_signaling(), [transcoding_policy()]}
           | {:whip, uri :: String.t(),
-             [{:token, String.t()} | {bandit_option :: atom(), term()}, transcoding_policy()]}
+             [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy()]}
           | {:hls, location :: String.t()}
           | {:hls, location :: String.t(), [transcoding_policy()]}
           | {:rtp, out_rtp_opts()}
