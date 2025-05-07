@@ -15,32 +15,38 @@ defmodule Boombox.InternalBin.Pad do
           | :sent
           | :never_sent
 
-  #                 output != membrane_pad or handle_playing with pads linked
-  # :not_resolved -------------------------------------------------------------> :never_sent
+  # The lifecycle of the new_tracks_notification_status and executing Boombox.InternalBin.link_output function
+  #
+  # BEGIN: InternalBin handle_playing
   #   |
-  #   | membrane_pad as output
-  #   | and handle_playing with no pads linked
+  #   |
+  #   |                                                         state output != membrane_pad or
+  #   \/                                                 there are some pads linked before handle_playing
+  # new_tracks_notification_status == :not_resolved ----------------------------------------------------------> new_tracks_notification_status == :never_sent
+  #   |
+  #   |     state.output == :membrane_pad and
+  #   | there are no pads linked during handle_playing
   #   |
   #   \/
-  # :will_be_sent
+  # new_tracks_notification_status == :will_be_sent
   #   |
   #   | sending notification in link_output
   #   |
   #   \/
-  # :sent
+  # new_tracks_notification_status == :sent
+  #   |
+  #   |
   #   |       |-----------------------------------------------------------|
   #   |       |                                                           |
   #   \/      \/         not all required pads are linked                 |
   # handle_pad_added  --------------------------------------> wait on next handle_pad_added
   #   |
-  #   | all pads with matching tracks are linked
+  #   | all tracks from {:new_tracks, tracks}
+  #   |    have their related pad linked
   #   |
   #   \/
-  # status output linked
+  # state.status == :output_linked
 
-  # should be executed:
-  # - on init
-  # - on playback changed
   @spec resolve_new_tracks_notification_status(
           Boombox.InternalBin.State.t(),
           CallbackContext.t()
