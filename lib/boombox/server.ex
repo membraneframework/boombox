@@ -1,10 +1,19 @@
 defmodule Boombox.Server do
   @moduledoc """
   This module provides a GenServer interface for Boombox. To run Boombox the server needs to be
-  called with `{:run_boombox, boombox_opts}` - it can be done by calling `run_boombox/2`, sending a
-  `{:call, :run_boombox, boombox_opts}` message to the server or calling the server directly with `GenServer.call/3`.
-  The return value signals what mode Boombox is in. Once Boombox is running it can be interacted
-  with through appropriate functions, GenServer calls and messages.
+  called with `{:run, boombox_opts}` - it can be done by calling `run/2`, sending a
+  `{:call, :run, boombox_opts}` message to the server or calling the server directly with
+  `GenServer.call/3`. The return value signals what mode Boombox is in. Once Boombox is running
+  it can be interacted with through appropriate functions, GenServer calls and messages:
+    * Function calls - `consume_packet/2`, `finish_consuming/1` and `produce_packet/1` are functions
+                       that can be used for communication with the server.
+    * GenServer calls - `{:consume_packet, packet}`, `:finish_consuming` and `:produce_packet` are
+                        terms that the server can be called with. These calls will behave the same
+                        way as their respective functions mentioned above.
+    * Messages - `{:call, sender, {:consume_packet, packet}}`, `{:call, sender, :finish_consuming}`
+                 and `{:call, sender, :produce_packet}` messages will cause the server to handle the
+                 call specified by the third element of the tuple and send the result to `sender`
+                 when finished.
   """
   use GenServer
 
@@ -16,8 +25,12 @@ defmodule Boombox.Server do
 
   @typedoc """
   Mode in which Boombox is operating:
-    * `:consuming` - Boombox consumes packets provided with `consume_packet/2` calls and `{:consume_packet, packet}` GenServer calls.
-    * `:producing` - Boombox produces packets in response to `produce_packet/1` calls and being called directly with `:produce_packet`.
+    * `:consuming` - Boombox consumes packets provided with `consume_packet/2` calls,
+                     `{:consume_packet, packet}` GenServer calls or receiving
+                     `{:call, sender, {:consume_packet, packet}.
+    * `:producing` - Boombox produces packets in response to `produce_packet/1` calls,
+                     being called directly with `:produce_packet` or receiving
+                     `{:call, sender, :produce_packet}` messages.
     * `:standalone` - Boombox neither consumes nor produces packets.
   """
   @type boombox_mode :: :consuming | :producing | :standalone
@@ -90,12 +103,19 @@ defmodule Boombox.Server do
   end
 
   @doc """
-  Runs Boombox with provided options and enables the usage of other functions for communicating with it.
-  Different functionalities are available depending on the mode (`t:boombox_mode/0`) in which Boombox is running.
+  Runs Boombox with provided options and enables the usage of other functionalities for communicating
+  with it. Availability of different functionalities depends on the mode (`t:boombox_mode/0`) in which
+  Boombox is operating.
+
+  All endpoints work the same way as in `Boombox.run/2` with the exception of `:stream` endpoints.
+  When run with `:stream` input, Boombox will not expect a stream, but rather will operate in
+  `:consuming` mode, and when run with `:stream` output it won't produce a stream, but rather
+  will operate in `:procuding` mode. If neither input nor output is `:stream`, Boombox will operate
+  in `:standalone` mode.
   """
-  @spec run_boombox(GenServer.server(), boombox_opts()) :: boombox_mode()
-  def run_boombox(server, boombox_opts) do
-    GenServer.call(server, {:run_boombox, boombox_opts})
+  @spec run(GenServer.server(), boombox_opts()) :: boombox_mode()
+  def run(server, boombox_opts) do
+    GenServer.call(server, {:run, boombox_opts})
   end
 
   @doc """
@@ -108,7 +128,8 @@ defmodule Boombox.Server do
 
   @doc """
   Makes Boombox consume provided packet. Returns `:ok` if more packets can be provided, and
-  `:finished` when Boombox finished consuming and will not accept any more packets.
+  `:finished` when Boombox finished consuming and will not accept any more packets. Returns
+  synchronously once the packet has been processed by Boombox.
   Can be called only when Boombox is in `:consuming` mode.
   """
   @spec consume_packet(GenServer.server(), serialized_packet()) ::
@@ -147,7 +168,7 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call({:run_boombox, boombox_opts}, _from, _state) do
+  def handle_call({:run, boombox_opts}, _from, _state) do
     boombox_mode = get_boombox_mode(boombox_opts)
     server_pid = self()
 
