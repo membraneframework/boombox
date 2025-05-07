@@ -1,8 +1,4 @@
-<<<<<<< HEAD:lib/boombox/internal_bin/elixir_stream.ex
 defmodule Boombox.InternalBin.ElixirStream do
-=======
-defmodule Boombox.ElixirStream do
->>>>>>> 5914bea (Fix for release, go back to elixir_stream):lib/boombox/elixir_stream.ex
   @moduledoc false
 
   import Membrane.ChildrenSpec
