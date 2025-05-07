@@ -96,7 +96,8 @@ defmodule Boombox do
           | {:mp4, location :: String.t(), [transcoding_policy()]}
           | {:webrtc, webrtc_signaling()}
           | {:webrtc, webrtc_signaling(), [transcoding_policy()]}
-          | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
+          | {:whip, uri :: String.t(),
+             [{:token, String.t()} | {bandit_option :: atom(), term()}, transcoding_policy()]}
           | {:hls, location :: String.t()}
           | {:hls, location :: String.t(), [transcoding_policy()]}
           | {:rtp, out_rtp_opts()}
