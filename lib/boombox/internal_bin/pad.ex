@@ -30,7 +30,8 @@ defmodule Boombox.InternalBin.Pad do
   #   \/
   # new_tracks_notification_status == :will_be_sent
   #   |
-  #   | sending notification in link_output
+  #   |    sending {:new_tracks, tracks}
+  #   | notification in link_output function
   #   |
   #   \/
   # new_tracks_notification_status == :sent
