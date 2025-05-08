@@ -1,6 +1,7 @@
 from dataclasses import dataclass, KW_ONLY, fields, is_dataclass
 from term import Atom
-from typing import Any, Literal, override
+from typing import Any, Literal
+from typing_extensions import override
 from abc import ABC
 
 
