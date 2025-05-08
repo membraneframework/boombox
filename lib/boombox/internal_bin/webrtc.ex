@@ -134,6 +134,7 @@ defmodule Boombox.InternalBin.WebRTC do
 
   defp do_link_output(opts, track_builders, spec_builder, tracks, state) do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
+    # todo: get rid of `tracks` from this function, use only track_builders
     tracks = Map.new(tracks, &{&1.kind, &1.id})
 
     spec = [
