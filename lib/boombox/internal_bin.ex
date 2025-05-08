@@ -289,19 +289,30 @@ defmodule Boombox.InternalBin do
     {[notify_parent: :processing_finished], state}
   end
 
-  @impl true
-  def handle_child_notification(notification, child, _ctx, state) do
-    Membrane.Logger.debug_verbose(
-      "Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
-    )
+  # @impl true
+  # def handle_child_notification(notification, child, _ctx, state) do
+  #   Membrane.Logger.debug_verbose(
+  #     "Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
+  #   )
 
-    {[], state}
-  end
+  #   {[], state}
+  # end
 
   def handle_child_notification(notification, child, ctx, state) do
-    endpoint = Endpoint.get_child_endpoint!(child)
-    {ready_or_wait, state} = endpoint.handle_child_notification(notification, child, ctx, state)
-    proceed_result(ready_or_wait, ctx, state)
+    case Endpoint.get_child_endpoint(child) do
+      {:ok, endpoint} ->
+        {ready_or_wait, state} =
+          endpoint.handle_child_notification(notification, child, ctx, state)
+
+        proceed_result(ready_or_wait, ctx, state)
+
+      :error ->
+        Membrane.Logger.debug_verbose(
+          "Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
+        )
+
+        {[], state}
+    end
   end
 
   @impl true

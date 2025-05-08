@@ -104,17 +104,17 @@ defmodule Boombox.Endpoint do
     end
   end
 
-  @spec get_child_endpoint!(Membrane.Child.name()) :: endpoint_module()
-  def get_child_endpoint!(child_name, state) do
+  @spec get_child_endpoint(Membrane.Child.name()) :: endpoint_module()
+  def get_child_endpoint(child_name, state) do
     cond do
       state.input_endpoint.has_child?(child_name, :input) ->
-        state.input_endpoint
+        {:ok, state.input_endpoint}
 
       state.output_endpoint.has_child?(child_name, :output) ->
-        state.output_endpoint
+        {:ok, state.output_endpoint}
 
       true ->
-        raise "No endpoint found for child name #{inspect(child_name)}"
+        :error
     end
   end
 
@@ -137,4 +137,13 @@ defmodule Boombox.Endpoint do
       Pad
     ]
   end
+
+  @optional_callbacks [
+    has_child?: 2,
+    endpoint_option?: 1,
+    handle_child_notification: 4,
+    create_input: 3,
+    create_output: 3,
+    link_output: 5
+  ]
 end
