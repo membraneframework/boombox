@@ -1,20 +1,20 @@
 defmodule Boombox.Server do
-  @moduledoc """
-  This module provides a GenServer interface for Boombox. To run Boombox the server needs to be
-  called with `{:run, boombox_opts}` - it can be done by calling `run/2`, sending a
-  `{:call, :run, boombox_opts}` message to the server or calling the server directly with
-  `GenServer.call/3`. The return value signals what mode Boombox is in. Once Boombox is running
-  it can be interacted with through appropriate functions, GenServer calls and messages:
-    * Function calls - `consume_packet/2`, `finish_consuming/1` and `produce_packet/1` are functions
-                       that can be used for communication with the server.
-    * GenServer calls - `{:consume_packet, packet}`, `:finish_consuming` and `:produce_packet` are
-                        terms that the server can be called with. These calls will behave the same
-                        way as their respective functions mentioned above.
-    * Messages - `{:call, sender, {:consume_packet, packet}}`, `{:call, sender, :finish_consuming}`
-                 and `{:call, sender, :produce_packet}` messages will cause the server to handle the
-                 call specified by the third element of the tuple and send the result to `sender`
-                 when finished.
-  """
+  @moduledoc false
+  # This module provides a GenServer interface for Boombox. To run Boombox the server needs to be
+  # called with `{:run, boombox_opts}` - it can be done by calling `run/2`, sending a
+  # `{:call, :run, boombox_opts}` message to the server or calling the server directly with
+  # `GenServer.call/3`. The return value signals what mode Boombox is in. Once Boombox is running
+  # it can be interacted with through appropriate functions, GenServer calls and messages:
+  #   * Function calls - `consume_packet/2`, `finish_consuming/1` and `produce_packet/1` are functions
+  #                      that can be used for communication with the server.
+  #   * GenServer calls - `{:consume_packet, packet}`, `:finish_consuming` and `:produce_packet` are
+  #                        terms that the server can be called with. These calls will behave the same
+  #                        way as their respective functions mentioned above.
+  #   * Messages - `{:call, sender, {:consume_packet, packet}}`, `{:call, sender, :finish_consuming}`
+  #                and `{:call, sender, :produce_packet}` messages will cause the server to handle the
+  #                call specified by the third element of the tuple and send the result to `sender`
+  #                when finished.
+
   use GenServer
 
   require Logger
