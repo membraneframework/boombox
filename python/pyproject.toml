@@ -1,0 +1,31 @@
+[project]
+name = "boombox"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "noarkhh", email = "jakub.pryc@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pyrlang @ git+https://github.com/Pyrlang/Pyrlang",
+    "numpy>=2.2.5",
+    "pyrlang-term @ git+https://github.com/Pyrlang/Term",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["**"]
+
+[tool.distutils.bdist_wheel]
+plat-name = "macosx_14_4_arm64"
+
