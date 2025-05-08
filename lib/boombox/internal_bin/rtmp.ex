@@ -38,6 +38,8 @@ defmodule Boombox.InternalBin.RTMP do
         {RTMPServer, server_options}
       )
 
+    send(boombox, :external_resource_ready)
+
     %Wait{}
   end
 

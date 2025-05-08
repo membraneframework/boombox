@@ -4,14 +4,12 @@ defmodule Boombox do
 
   See `run/1` for details and [examples.livemd](examples.livemd) for examples.
   """
-
   require Logger
   require Membrane.Time
-  require Membrane.Transcoder.{Audio, Video}
 
   alias Membrane.RTP
 
-  @type transcoding_policy() :: {:transcoding_policy, :always | :if_needed | :never}
+  @type force_transcoding() :: {:force_transcoding, boolean() | :audio | :video}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
   @type in_stream_opts :: [
@@ -70,21 +68,12 @@ defmodule Boombox do
           | {:address, :inet.ip_address() | String.t()}
           | {:port, :inet.port_number()}
           | {:target, String.t()}
-          | transcoding_policy()
+          | force_transcoding()
         ]
 
   @type input ::
           (path_or_uri :: String.t())
           | {:mp4, location :: String.t(), transport: :file | :http}
-          | {:h264, location :: String.t(),
-             transport: :file | :http, framerate: Membrane.H264.framerate()}
-          | {:h265, location :: String.t(),
-             transport: :file | :http, framerate: Membrane.H265.framerate_t()}
-          | {:aac, location :: String.t(), transport: :file | :http}
-          | {:wav, location :: String.t(), transport: :file | :http}
-          | {:mp3, location :: String.t(), transport: :file | :http}
-          | {:ivf, location :: String.t(), transport: :file | :http}
-          | {:ogg, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
@@ -94,21 +83,14 @@ defmodule Boombox do
 
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [transcoding_policy()]}
+          | {path_or_uri :: String.t(), [force_transcoding()]}
           | {:mp4, location :: String.t()}
-          | {:h264, location :: String.t()}
-          | {:h265, location :: String.t()}
-          | {:aac, location :: String.t()}
-          | {:wav, location :: String.t()}
-          | {:mp3, location :: String.t()}
-          | {:ivf, location :: String.t()}
-          | {:ogg, location :: String.t()}
-          | {:mp4, location :: String.t(), [transcoding_policy()]}
+          | {:mp4, location :: String.t(), [force_transcoding()]}
           | {:webrtc, webrtc_signaling()}
-          | {:webrtc, webrtc_signaling(), [transcoding_policy()]}
+          | {:webrtc, webrtc_signaling(), [force_transcoding()]}
           | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [transcoding_policy()]}
+          | {:hls, location :: String.t(), [force_transcoding()]}
           | {:rtp, out_rtp_opts()}
           | {:stream, out_stream_opts()}
 
@@ -143,28 +125,19 @@ defmodule Boombox do
           input: input(),
           output: output()
         ) :: :ok | Enumerable.t()
-  @endpoint_opts [:input, :output]
   def run(stream \\ nil, opts) do
-    opts = Map.new(opts)
-
-    if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
-      raise "#{key} is not provided"
-    end
+    opts = validate_opts!(stream, opts)
 
     case opts do
-      %{input: {:stream, _in_stream_opts}, output: {:stream, _out_stream_opts}} ->
-        raise ArgumentError, ":stream on both input and output is not supported"
-
       %{input: {:stream, _stream_opts}} ->
-        unless Enumerable.impl_for(stream) do
-          raise ArgumentError,
-                "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
-        end
-
-        consume_stream(stream, opts)
+        procs = start_pipeline(opts)
+        source = await_source_ready()
+        consume_stream(stream, source, procs)
 
       %{output: {:stream, _stream_opts}} ->
-        produce_stream(opts)
+        procs = start_pipeline(opts)
+        sink = await_sink_ready()
+        produce_stream(sink, procs)
 
       opts ->
         opts
@@ -172,6 +145,85 @@ defmodule Boombox do
         |> await_pipeline()
     end
   end
+
+  @doc """
+  Asynchronous version of run/2
+  Doesn't block the calling process until the termination of the pipeline.
+  It returns a `Task` that can be awaited later.
+  If the output is a stream the behaviour is identical to run/2
+  """
+  @spec async(Enumerable.t() | nil,
+          input: input(),
+          output: output()
+        ) :: Task.t() | Enumerable.t()
+  def async(stream \\ nil, opts) do
+    opts = validate_opts!(stream, opts)
+
+    case opts do
+      %{input: {:stream, _stream_opts}} ->
+        procs = start_pipeline(opts)
+        source = await_source_ready()
+
+        Task.async(fn ->
+          Process.monitor(procs.supervisor)
+          consume_stream(stream, source, procs)
+        end)
+
+      %{output: {:stream, _stream_opts}} ->
+        procs = start_pipeline(opts)
+        sink = await_sink_ready()
+        produce_stream(sink, procs)
+
+      # In case of rtsp, rtmp, rtp, rtmps, we need to wait for the tcp/udp server to be ready
+      # before returning from async/2.
+      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtp, :rtsp, :rtmps] ->
+        procs = start_pipeline(opts)
+
+        task =
+          Task.async(fn ->
+            Process.monitor(procs.supervisor)
+            await_pipeline(procs)
+          end)
+
+        await_external_resource_ready()
+        task
+
+      opts ->
+        procs = start_pipeline(opts)
+
+        Task.async(fn ->
+          Process.monitor(procs.supervisor)
+          await_pipeline(procs)
+        end)
+    end
+  end
+
+  @endpoint_opts [:input, :output]
+  defp validate_opts!(stream, opts) do
+    opts =
+      opts
+      |> Keyword.validate!(@endpoint_opts)
+      |> Map.new(fn {key, value} -> {key, parse_endpoint_opt!(key, value)} end)
+
+    cond do
+      Map.keys(opts) -- @endpoint_opts != [] ->
+        raise ArgumentError, "Both input and output are required"
+
+      is_stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
+        raise ArgumentError,
+              "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
+
+      is_stream?(opts[:input]) && is_stream?(opts[:output]) ->
+        raise ArgumentError,
+              ":stream on both input and output is not supported"
+
+      true ->
+        opts
+    end
+  end
+
+  defp is_stream?({:stream, _opts}), do: true
+  defp is_stream?(_), do: false
 
   @doc """
   Runs boombox with CLI arguments.
@@ -195,15 +247,8 @@ defmodule Boombox do
     end
   end
 
-  @spec consume_stream(Enumerable.t(), opts_map()) :: term()
-  defp consume_stream(stream, opts) do
-    procs = start_pipeline(opts)
-
-    source =
-      receive do
-        {:boombox_ex_stream_source, source} -> source
-      end
-
+  @spec consume_stream(Enumerable.t(), opts_map(), procs()) :: term()
+  defp consume_stream(stream, source, procs) do
     Enum.reduce_while(
       stream,
       %{demand: 0},
@@ -237,15 +282,11 @@ defmodule Boombox do
     end
   end
 
-  @spec produce_stream(opts_map()) :: Enumerable.t()
-  defp produce_stream(opts) do
+  @spec produce_stream(pid(), procs()) :: Enumerable.t()
+  defp produce_stream(sink, procs) do
     Stream.resource(
       fn ->
-        procs = start_pipeline(opts)
-
-        receive do
-          {:boombox_ex_stream_sink, sink} -> %{sink: sink, procs: procs}
-        end
+        %{sink: sink, procs: procs}
       end,
       fn %{sink: sink, procs: procs} = state ->
         send(sink, :boombox_demand)
@@ -269,13 +310,8 @@ defmodule Boombox do
 
   @spec start_pipeline(opts_map()) :: procs()
   defp start_pipeline(opts) do
-    opts =
-      opts
-      |> Map.update!(:input, &resolve_stream_endpoint(&1, self()))
-      |> Map.update!(:output, &resolve_stream_endpoint(&1, self()))
-
     {:ok, supervisor, pipeline} =
-      Membrane.Pipeline.start_link(Boombox.Pipeline, opts)
+      Membrane.Pipeline.start_link(Boombox.Pipeline, Map.put(opts, :parent, self()))
 
     Process.monitor(supervisor)
     %{supervisor: supervisor, pipeline: pipeline}
@@ -291,6 +327,27 @@ defmodule Boombox do
   defp await_pipeline(%{supervisor: supervisor}) do
     receive do
       {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
+    end
+  end
+
+  @spec await_source_ready() :: pid()
+  defp await_source_ready() do
+    receive do
+      {:boombox_ex_stream_source, source} -> source
+    end
+  end
+
+  defp await_external_resource_ready() do
+    receive do
+      :external_resource_ready ->
+        :ok
+    end
+  end
+
+  @spec await_sink_ready() :: pid()
+  defp await_sink_ready() do
+    receive do
+      {:boombox_ex_stream_sink, sink} -> sink
     end
   end
 
@@ -313,8 +370,29 @@ defmodule Boombox do
     :ok
   end
 
-  defp resolve_stream_endpoint({:stream, stream_options}, parent),
-    do: {:stream, parent, stream_options}
+  @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
+  defp resolve_transport(location, opts) do
+    case Keyword.validate!(opts, transport: nil, force_transcoding: false)[:transport] do
+      nil ->
+        uri = URI.parse(location)
 
-  defp resolve_stream_endpoint(endpoint, _parent), do: endpoint
+        case uri.scheme do
+          nil -> :file
+          "http" -> :http
+          "https" -> :http
+          _other -> raise ArgumentError, "Unsupported URI: #{location}"
+        end
+
+      transport when transport in [:file, :http] ->
+        transport
+
+      transport ->
+        raise ArgumentError, "Invalid transport: #{inspect(transport)}"
+    end
+  end
+
+  defp split_webrtc_and_whip_opts(opts) do
+    opts
+    |> Enum.split_with(fn {key, _value} -> key == :force_transcoding end)
+  end
 end
