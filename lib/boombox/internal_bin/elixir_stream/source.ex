@@ -79,17 +79,17 @@ defmodule Boombox.InternalBin.ElixirStream.Source do
     %Boombox.Packet{payload: payload, format: format} = packet
     buffer = %Membrane.Buffer{payload: payload, pts: packet.pts}
 
-    case {format, state.audio_format} do
-      {empty_format, nil} when empty_format == %{} ->
+    case format do
+      empty_format when empty_format == %{} and state.audio_format == nil ->
         raise "No audio stream format provided"
 
-      {empty_format, _state_audio_format} when empty_format == %{} ->
+      empty_format when empty_format == %{} ->
         {[buffer: {Pad.ref(:output, :audio), buffer}], state}
 
-      {unchanged_format, unchanged_format} ->
+      unchanged_format when unchanged_format == state.audio_format ->
         {[buffer: {Pad.ref(:output, :audio), buffer}], state}
 
-      {new_format, _old_format} ->
+      new_format ->
         stream_format = %Membrane.RawAudio{
           sample_format: new_format.audio_format,
           sample_rate: new_format.audio_rate,

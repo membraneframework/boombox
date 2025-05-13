@@ -14,6 +14,8 @@ defmodule Boombox.Server do
   #                and `{:call, sender, :produce_packet}` messages will cause the server to handle the
   #                call specified by the third element of the tuple and send the result to `sender`
   #                when finished.
+  # The packets that Boombox is consuming and producing are in the form of
+  # `t:serialized_boombox_packet/0`
 
   use GenServer
 
@@ -58,7 +60,7 @@ defmodule Boombox.Server do
         }
 
   @typedoc """
-  Serialized raw media packet. Data in this form is sent by the server when demanded from
+  Serialized `t:Boombox.Packet.t/0`. Data in this form is sent by the server when demanded from
   and is expected by the server when it demands it.
 
   This serialization was designed to accomodate constraints set by
@@ -68,7 +70,7 @@ defmodule Boombox.Server do
     * `:payload` - record containing either video or audio data.
     * `:timestamp` - timestamp of the packet in milliseconds.
   """
-  @type serialized_packet :: %{
+  @type serialized_boombox_packet :: %{
           payload: {:audio, serialized_audio_payload()} | {:video, serialized_video_payload()},
           timestamp: integer()
         }
@@ -78,7 +80,7 @@ defmodule Boombox.Server do
     @type t :: %__MODULE__{
             boombox_pid: pid(),
             boombox_mode: Boombox.Server.boombox_mode(),
-            last_produced_packet: Boombox.Server.serialized_packet() | nil
+            last_produced_packet: Boombox.Server.serialized_boombox_packet() | nil
           }
 
     @enforce_keys [:boombox_pid, :boombox_mode, :last_produced_packet]
@@ -132,7 +134,7 @@ defmodule Boombox.Server do
   synchronously once the packet has been processed by Boombox.
   Can be called only when Boombox is in `:consuming` mode.
   """
-  @spec consume_packet(GenServer.server(), serialized_packet()) ::
+  @spec consume_packet(GenServer.server(), serialized_boombox_packet()) ::
           :ok | :finished | {:error, :boombox_not_running | :incompatible_mode}
   def consume_packet(server, packet) do
     GenServer.call(server, {:consume_packet, packet})
@@ -156,7 +158,7 @@ defmodule Boombox.Server do
   Can be called only when Boombox is in `:producing` mode.
   """
   @spec produce_packet(GenServer.server()) ::
-          {:ok | :finished, serialized_packet()} | {:error, :boombox_not_running}
+          {:ok | :finished, serialized_boombox_packet()} | {:error, :boombox_not_running}
   def produce_packet(server) do
     GenServer.call(server, :produce_packet)
   end
@@ -345,7 +347,7 @@ defmodule Boombox.Server do
     Boombox.run(boombox_opts)
   end
 
-  @spec deserialize_packet(serialized_packet()) :: Packet.t()
+  @spec deserialize_packet(serialized_boombox_packet()) :: Packet.t()
   defp deserialize_packet(%{payload: {:audio, payload}} = serialized_packet) do
     %Boombox.Packet{
       kind: :audio,
@@ -376,7 +378,7 @@ defmodule Boombox.Server do
     }
   end
 
-  @spec serialize_packet(Packet.t()) :: serialized_packet()
+  @spec serialize_packet(Packet.t()) :: serialized_boombox_packet()
   defp serialize_packet(%Packet{kind: :audio} = packet) do
     serialized_payload =
       {:audio,
