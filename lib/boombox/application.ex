@@ -1,6 +1,6 @@
 defmodule Boombox.Application do
   @moduledoc """
-  Boombox application. When released as a standalone server will start `Boombox.Server` under the
+  Boombox application. When released as a standalone server will start Boombox.Server under the
   supervision tree.
   """
   use Application
