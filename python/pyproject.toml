@@ -5,7 +5,7 @@ description = "Boombox SDK for Python"
 readme = "README.md"
 authors = [
     { name = "Membrane Team" }
-}
+]
 license = "Apache-2.0"
 license-files = [ "LICENSE" ]
 requires-python = ">=3.11"
