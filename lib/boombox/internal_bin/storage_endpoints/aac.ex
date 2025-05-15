@@ -16,7 +16,7 @@ defmodule Boombox.InternalBin.StorageEndpoints.AAC do
 
   @spec link_output(
           String.t(),
-          [Boombox.transcoding_policy()],
+          [Boombox.transcoding_policy_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()

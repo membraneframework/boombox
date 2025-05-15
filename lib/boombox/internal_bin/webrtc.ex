@@ -100,7 +100,7 @@ defmodule Boombox.InternalBin.WebRTC do
   end
 
   @spec link_output(
-          [Boombox.transcoding_policy()],
+          [Boombox.transcoding_policy_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
@@ -116,7 +116,7 @@ defmodule Boombox.InternalBin.WebRTC do
   end
 
   @spec handle_output_tracks_negotiated(
-          [Boombox.transcoding_policy()],
+          [Boombox.transcoding_policy_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),

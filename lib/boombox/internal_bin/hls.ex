@@ -10,7 +10,7 @@ defmodule Boombox.InternalBin.HLS do
 
   @spec link_output(
           Path.t(),
-          [Boombox.transcoding_policy()],
+          [Boombox.transcoding_policy_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()

@@ -78,20 +78,20 @@ defmodule Boombox.Bin do
   """
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [Boombox.transcoding_policy()]}
+          | {path_or_uri :: String.t(), [Boombox.transcoding_policy_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
-             [Boombox.transcoding_policy()]}
+             [Boombox.transcoding_policy_opt()]}
           | {:webrtc, Boombox.webrtc_signaling()}
-          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy()]}
+          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy_opt()]}
           | {:whip, uri :: String.t(),
              [
                {:token, String.t()}
                | {bandit_option :: atom(), term()}
-               | Boombox.transcoding_policy()
+               | Boombox.transcoding_policy_opt()
              ]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [Boombox.transcoding_policy()]}
+          | {:hls, location :: String.t(), [Boombox.transcoding_policy_opt()]}
           | {:rtp, Boombox.out_rtp_opts()}
 
   @typedoc """
