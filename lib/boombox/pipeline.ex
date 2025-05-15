@@ -10,11 +10,16 @@ defmodule Boombox.Pipeline do
         output: opts.output
       })
 
-    {[spec: spec], %{}}
+    {[spec: spec], %{parent: opts.parent}}
   end
 
   @impl true
-  def handle_child_notification(:processing_finished, :boombox, _ctx, state) do
-    {[terminate: :normal], state}
+  def handle_child_notification(:external_resource_ready, _element, _context, state) do
+    send(state.parent, :external_resource_ready)
+    {[], state}
+  end
+
+  def handle_child_notification(_notification, _element, _context, state) do
+    {[], state}
   end
 end
