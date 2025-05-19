@@ -1,5 +1,5 @@
 defmodule Boombox.BinTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   import Membrane.ChildrenSpec
   import Membrane.Testing.Assertions
@@ -218,6 +218,97 @@ defmodule Boombox.BinTest do
 
       Testing.Pipeline.execute_actions(pipeline, spec: new_spec)
       assert_receive {:DOWN, ^ref, :process, _supervisor, _reason}
+    end
+  end
+
+  describe "Boombox.Bin when it returns :new_tracks notification" do
+    @tag :tmp_dir
+    test "(mp4 -> mp4)", %{tmp_dir: tmp_dir} do
+      spec = child(:source_boombox, %Boombox.Bin{input: @bbb_mp4})
+      pipeline = Testing.Pipeline.start_link_supervised!(spec: spec)
+
+      assert_pipeline_notified(pipeline, :source_boombox, {:new_tracks, tracks})
+      assert MapSet.new(tracks) == MapSet.new([:video, :audio])
+
+      out_file = Path.join(tmp_dir, "out.mp4")
+
+      spec =
+        [child(:sink_boombox, %Boombox.Bin{output: out_file})] ++
+          for kind <- [:video, :audio] do
+            get_child(:source_boombox)
+            |> via_out(:output, options: [kind: kind])
+            |> via_in(:input, options: [kind: kind])
+            |> get_child(:sink_boombox)
+          end
+
+      Testing.Pipeline.execute_actions(pipeline, spec: spec)
+
+      assert_pipeline_notified(pipeline, :sink_boombox, :processing_finished, 5_000)
+
+      Testing.Pipeline.terminate(pipeline)
+
+      assert File.exists?(out_file)
+      Compare.compare(out_file, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:video, :audio])
+    end
+
+    @tag :tmp_dir
+    test "(mp4 -> webrtc -> mp4)", %{tmp_dir: tmp_dir} do
+      input_mp4_spec = child(:mp4_source_boombox, %Boombox.Bin{input: @bbb_mp4})
+      source_pipeline = Testing.Pipeline.start_link_supervised!(spec: input_mp4_spec)
+
+      assert_pipeline_notified(source_pipeline, :mp4_source_boombox, {:new_tracks, tracks})
+      assert MapSet.new(tracks) == MapSet.new([:video, :audio])
+
+      webrtc_signaling = Membrane.WebRTC.Signaling.new()
+
+      output_webrtc_spec =
+        [child(:webrtc_sink_boombox, %Boombox.Bin{output: {:webrtc, webrtc_signaling}})] ++
+          for kind <- tracks do
+            get_child(:mp4_source_boombox)
+            |> via_out(:output, options: [kind: kind])
+            |> via_in(:input, options: [kind: kind])
+            |> get_child(:webrtc_sink_boombox)
+          end
+
+      Testing.Pipeline.execute_actions(source_pipeline, spec: output_webrtc_spec)
+
+      input_webrtc_spec =
+        child(:webrtc_source_boombox, %Boombox.Bin{
+          input: {:webrtc, webrtc_signaling}
+        })
+
+      sink_pipeline = Testing.Pipeline.start_link_supervised!(spec: input_webrtc_spec)
+
+      assert_pipeline_notified(sink_pipeline, :webrtc_source_boombox, {:new_tracks, tracks})
+      assert MapSet.new(tracks) == MapSet.new([:video, :audio])
+
+      out_file = Path.join(tmp_dir, "out.mp4")
+
+      output_mp4_spec =
+        [child(:mp4_sink_boombox, %Boombox.Bin{output: out_file})] ++
+          for kind <- tracks do
+            get_child(:webrtc_source_boombox)
+            |> via_out(:output, options: [kind: kind])
+            |> via_in(:input, options: [kind: kind])
+            |> get_child(:mp4_sink_boombox)
+          end
+
+      Testing.Pipeline.execute_actions(sink_pipeline, spec: output_mp4_spec)
+
+      assert_pipeline_notified(
+        source_pipeline,
+        :webrtc_sink_boombox,
+        :processing_finished,
+        12_000
+      )
+
+      Testing.Pipeline.terminate(source_pipeline)
+
+      assert_pipeline_notified(sink_pipeline, :mp4_sink_boombox, :processing_finished)
+      Testing.Pipeline.terminate(sink_pipeline)
+
+      assert File.exists?(out_file)
+      Compare.compare(out_file, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:video, :audio])
     end
   end
 end

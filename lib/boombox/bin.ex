@@ -28,6 +28,11 @@ defmodule Boombox.Bin do
 
   `Boombox.Bin` cannot have `:input` and `:output` options set
   at the same time.
+
+  If you use Boombox.Bin as a source, you can either:
+    * link output pads in the same spec where you spawn it
+    * or wait until Boombox.Bin returns a notification `{:new_tracks, [:audio | :video]}`
+      and then link the pads according to the notification.
   """
 
   use Membrane.Bin
@@ -51,7 +56,13 @@ defmodule Boombox.Bin do
   """
   @type input() ::
           (path_or_uri :: String.t())
-          | {:mp4, location :: String.t(), transport: :file | :http}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
+             transport: :file | :http}
+          | {:h264, location :: String.t(),
+             transport: :file | :http, framerate: Membrane.H264.framerate()}
+          | {:h265, location :: String.t(),
+             transport: :file | :http, framerate: Membrane.H265.framerate_t()}
           | {:webrtc, Boombox.webrtc_signaling()}
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
@@ -67,15 +78,31 @@ defmodule Boombox.Bin do
   """
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [Boombox.transcoding_policy()]}
-          | {:mp4, location :: String.t()}
-          | {:mp4, location :: String.t(), [Boombox.transcoding_policy()]}
+          | {path_or_uri :: String.t(), [Boombox.transcoding_policy_opt()]}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
+             [Boombox.transcoding_policy_opt()]}
           | {:webrtc, Boombox.webrtc_signaling()}
-          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy()]}
-          | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
+          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy_opt()]}
+          | {:whip, uri :: String.t(),
+             [
+               {:token, String.t()}
+               | {bandit_option :: atom(), term()}
+               | Boombox.transcoding_policy_opt()
+             ]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [Boombox.transcoding_policy()]}
+          | {:hls, location :: String.t(), [Boombox.transcoding_policy_opt()]}
           | {:rtp, Boombox.out_rtp_opts()}
+
+  @typedoc """
+  Type of notification sent to the parent of Boombox.Bin when new tracks arrive.
+
+  It is sent only when Boombox.Bin is used as a source (the `:input` option is set).
+
+  This notification is sent by Boombox.Bin only if its pads weren't linked
+  before `handle_playing/2` callback.
+  """
+  @type new_tracks :: {:new_tracks, [:video | :audio]}
 
   def_input_pad :input,
     accepted_format:
@@ -214,6 +241,11 @@ defmodule Boombox.Bin do
   @impl true
   def handle_child_notification(:processing_finished, :boombox, _ctx, state) do
     {[notify_parent: :processing_finished], state}
+  end
+
+  @impl true
+  def handle_child_notification({:new_tracks, tracks}, :boombox, _ctx, state) do
+    {[notify_parent: {:new_tracks, tracks}], state}
   end
 
   defp validate_opts!(opts) do

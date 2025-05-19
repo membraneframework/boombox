@@ -9,18 +9,78 @@ defmodule Boombox.InternalBin.Pad do
   alias Membrane.Bin.{Action, CallbackContext}
   alias Membrane.Connector
 
-  @spec handle_pad_added(Membrane.Pad.ref(), :audio | :video, CallbackContext.t()) ::
-          [Action.t()] | no_return()
-  def handle_pad_added(pad_ref, _kind, ctx) when ctx.playback == :playing do
-    raise """
-    Boombox.InternalBin pad #{inspect(pad_ref)} was added while the Boombox.InternalBin playback \
-    is already :playing. All Boombox.InternalBin pads have to be linked before it enters \
-    :playing playback. To achieve it, link all the pads of Boombox.InternalBin in the same \
-    spec where you spawn it.
-    """
+  @type new_tracks_notification_status ::
+          :not_resolved
+          | :will_be_sent
+          | :sent
+          | :never_sent
+
+  # The lifecycle of the new_tracks_notification_status and executing Boombox.InternalBin.link_output function
+  #
+  # BEGIN: InternalBin handle_playing
+  #   |
+  #   |
+  #   |                                                         state output != membrane_pad or
+  #   \/                                                 there are some pads linked before handle_playing
+  # new_tracks_notification_status == :not_resolved ----------------------------------------------------------> new_tracks_notification_status == :never_sent
+  #   |
+  #   |     state.output == :membrane_pad and
+  #   | there are no pads linked during handle_playing
+  #   |
+  #   \/
+  # new_tracks_notification_status == :will_be_sent
+  #   |
+  #   |    sending {:new_tracks, tracks}
+  #   | notification in link_output function
+  #   |
+  #   \/
+  # new_tracks_notification_status == :sent
+  #   |
+  #   |
+  #   |       |-----------------------------------------------------------|
+  #   |       |                                                           |
+  #   \/      \/         not all required pads are linked                 |
+  # handle_pad_added  --------------------------------------> wait on next handle_pad_added
+  #   |
+  #   | all tracks from {:new_tracks, tracks}
+  #   |    have their related pad linked
+  #   |
+  #   \/
+  # state.status == :output_linked
+
+  @spec resolve_new_tracks_notification_status(
+          Boombox.InternalBin.State.t(),
+          CallbackContext.t()
+        ) :: Boombox.InternalBin.State.t()
+  def resolve_new_tracks_notification_status(state, %{playback: :playing} = ctx) do
+    status =
+      if state.output == :membrane_pad and map_size(ctx.pads) == 0,
+        do: :will_be_sent,
+        else: :never_sent
+
+    %{state | new_tracks_notification_status: status}
   end
 
-  def handle_pad_added(pad_ref, kind, _ctx) do
+  @spec handle_pad_added(
+          Membrane.Pad.ref(),
+          :audio | :video,
+          CallbackContext.t(),
+          Boombox.InternalBin.State.t()
+        ) ::
+          [Action.t()] | no_return()
+  def handle_pad_added(pad_ref, kind, ctx, state) do
+    if ctx.playback == :playing and state.new_tracks_notification_status != :sent do
+      raise """
+      Boombox.InternalBin pad #{inspect(pad_ref)} was added while the Boombox.InternalBin playback \
+      is already :playing, but {:new_tracks, tracks} notification was not sent yet.
+
+      You can either:
+        * link all the pads of Boombox.InternalBin in the same spec where you spawn it,
+        * or wait until Boombox.InternalBin returns a notification {:new_tracks, tracks} and then \
+        link the pads accodring to the notification.
+      """
+    end
+
     spec =
       case Pad.name_by_ref(pad_ref) do
         :input ->
@@ -67,8 +127,28 @@ defmodule Boombox.InternalBin.Pad do
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           Boombox.InternalBin.State.t()
-        ) :: Ready.t() | Wait.t()
-  def link_output(ctx, track_builders, spec_builder, state) when ctx.playback == :playing do
+        ) :: {Ready.t() | Wait.t(), Boombox.InternalBin.State.t()}
+  def link_output(ctx, track_builders, spec_builder, state) do
+    case state.new_tracks_notification_status do
+      _any when ctx.playback == :stopped ->
+        {%Wait{}, state}
+
+      :will_be_sent when ctx.playback == :playing ->
+        actions = [notify_parent: {:new_tracks, Map.keys(track_builders)}]
+        state = %{state | new_tracks_notification_status: :sent}
+        {%Wait{actions: actions}, state}
+
+      :sent when ctx.playback == :playing ->
+        if map_size(ctx.pads) == map_size(track_builders),
+          do: do_link_output(ctx, track_builders, spec_builder, state),
+          else: {%Wait{}, state}
+
+      :never_sent when ctx.playback == :playing ->
+        do_link_output(ctx, track_builders, spec_builder, state)
+    end
+  end
+
+  defp do_link_output(ctx, track_builders, spec_builder, state) do
     validate_pads_and_tracks!(ctx, track_builders)
 
     linked_tracks =
@@ -90,11 +170,7 @@ defmodule Boombox.InternalBin.Pad do
       end)
 
     spec = [spec_builder, linked_tracks]
-    %Ready{actions: [spec: spec]}
-  end
-
-  def link_output(ctx, _track_builder, _spec_builder, _state) when ctx.playback == :stopped do
-    %Wait{}
+    {%Ready{actions: [spec: spec]}, state}
   end
 
   defp resolve_stream_format(%input_codec{}, %{kind: pad_kind, codec: pad_codec}, state) do

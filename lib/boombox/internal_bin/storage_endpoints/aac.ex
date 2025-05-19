@@ -16,14 +16,18 @@ defmodule Boombox.InternalBin.StorageEndpoints.AAC do
 
   @spec link_output(
           String.t(),
+          [Boombox.transcoding_policy_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(location, track_builders, _spec_builder) do
+  def link_output(location, opts, track_builders, _spec_builder) do
+    transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
+
     spec =
       track_builders[:audio]
       |> child(:aac_audio_transcoder, %Membrane.Transcoder{
-        output_stream_format: AAC
+        output_stream_format: AAC,
+        transcoding_policy: transcoding_policy
       })
       |> child(:file_sink, %Membrane.File.Sink{location: location})
 
