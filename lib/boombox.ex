@@ -107,7 +107,8 @@ defmodule Boombox do
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
            input: input(),
-           output: output()
+           output: output(),
+           parent: pid()
          }
 
   @doc """
@@ -184,9 +185,9 @@ defmodule Boombox do
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
-      # In case of rtsp, rtmp, rtp, rtmps, we need to wait for the tcp/udp server to be ready
+      # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
-      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtp, :rtsp, :rtmps] ->
+      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp] ->
         procs = start_pipeline(opts)
 
         task =
