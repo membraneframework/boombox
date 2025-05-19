@@ -4,13 +4,14 @@ defmodule Boombox do
 
   See `run/1` for details and [examples.livemd](examples.livemd) for examples.
   """
+
   require Logger
   require Membrane.Time
-  require Boombox.StorageEndpoints, as: StorageEndpoints
+  require Membrane.Transcoder.{Audio, Video}
 
   alias Membrane.RTP
 
-  @type force_transcoding() :: {:force_transcoding, boolean() | :audio | :video}
+  @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
   @type in_stream_opts :: [
@@ -69,21 +70,18 @@ defmodule Boombox do
           | {:address, :inet.ip_address() | String.t()}
           | {:port, :inet.port_number()}
           | {:target, String.t()}
-          | force_transcoding()
+          | transcoding_policy_opt()
         ]
 
   @type input ::
           (path_or_uri :: String.t())
-          | {:mp4, location :: String.t(), transport: :file | :http}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
+             transport: :file | :http}
           | {:h264, location :: String.t(),
              transport: :file | :http, framerate: Membrane.H264.framerate()}
           | {:h265, location :: String.t(),
              transport: :file | :http, framerate: Membrane.H265.framerate_t()}
-          | {:aac, location :: String.t(), transport: :file | :http}
-          | {:wav, location :: String.t(), transport: :file | :http}
-          | {:mp3, location :: String.t(), transport: :file | :http}
-          | {:ivf, location :: String.t(), transport: :file | :http}
-          | {:ogg, location :: String.t(), transport: :file | :http}
           | {:webrtc, webrtc_signaling()}
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
@@ -93,28 +91,24 @@ defmodule Boombox do
 
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [force_transcoding()]}
-          | {:mp4, location :: String.t()}
-          | {:h264, location :: String.t()}
-          | {:h265, location :: String.t()}
-          | {:aac, location :: String.t()}
-          | {:wav, location :: String.t()}
-          | {:mp3, location :: String.t()}
-          | {:ivf, location :: String.t()}
-          | {:ogg, location :: String.t()}
-          | {:mp4, location :: String.t(), [force_transcoding()]}
+          | {path_or_uri :: String.t(), [transcoding_policy_opt()]}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
+          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
+             [transcoding_policy_opt()]}
           | {:webrtc, webrtc_signaling()}
-          | {:webrtc, webrtc_signaling(), [force_transcoding()]}
-          | {:whip, uri :: String.t(), [{:token, String.t()} | {bandit_option :: atom(), term()}]}
+          | {:webrtc, webrtc_signaling(), [transcoding_policy_opt()]}
+          | {:whip, uri :: String.t(),
+             [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [force_transcoding()]}
+          | {:hls, location :: String.t(), [transcoding_policy_opt()]}
           | {:rtp, out_rtp_opts()}
           | {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
            input: input(),
-           output: output()
+           output: output(),
+           parent: pid()
          }
 
   @doc """
@@ -167,7 +161,7 @@ defmodule Boombox do
   Asynchronous version of run/2
   Doesn't block the calling process until the termination of the pipeline.
   It returns a `Task` that can be awaited later.
-  If the output is a stream the behaviour is idential to run/2
+  If the output is a stream the behaviour is identical to run/2
   """
   @spec async(Enumerable.t() | nil,
           input: input(),
@@ -191,6 +185,20 @@ defmodule Boombox do
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
+      # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
+      # before returning from async/2.
+      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp] ->
+        procs = start_pipeline(opts)
+
+        task =
+          Task.async(fn ->
+            Process.monitor(procs.supervisor)
+            await_pipeline(procs)
+          end)
+
+        await_external_resource_ready()
+        task
+
       opts ->
         procs = start_pipeline(opts)
 
@@ -203,19 +211,11 @@ defmodule Boombox do
 
   @endpoint_opts [:input, :output]
   defp validate_opts!(stream, opts) do
-    opts =
-      opts
-      |> Keyword.validate!(@endpoint_opts)
-      |> Map.new(fn {key, value} -> {key, parse_endpoint_opt!(key, value)} end)
-
-    :ok = maybe_log_transcoding_related_warning(opts)
+    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
 
     cond do
       Map.keys(opts) -- @endpoint_opts != [] ->
         raise ArgumentError, "Both input and output are required"
-
-      is_stream?(opts[:input]) && stream == nil ->
-        raise ArgumentError, "Stream is required for input stream"
 
       is_stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
         raise ArgumentError,
@@ -254,147 +254,6 @@ defmodule Boombox do
       {:script, script} -> Code.eval_file(script)
     end
   end
-
-  @spec parse_endpoint_opt!(:input, input()) :: input()
-  @spec parse_endpoint_opt!(:output, output()) :: output()
-  defp parse_endpoint_opt!(direction, value) when is_binary(value) do
-    parse_endpoint_opt!(direction, {value, []})
-  end
-
-  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
-    uri = URI.parse(value)
-    scheme = uri.scheme
-    extension = if uri.path, do: Path.extname(uri.path)
-
-    case {scheme, extension, direction} do
-      {scheme, extension, :input}
-      when scheme in [nil, "http", "https"] and
-             StorageEndpoints.is_storage_endpoint_extension(extension) ->
-        {StorageEndpoints.get_storage_endpoint_type!(extension), value, opts}
-
-      {nil, extension, :output} when StorageEndpoints.is_storage_endpoint_extension(extension) ->
-        {StorageEndpoints.get_storage_endpoint_type!(extension), value, opts}
-
-      {scheme, _ext, :input} when scheme in ["rtmp", "rtmps"] ->
-        {:rtmp, value}
-
-      {"rtsp", _ext, :input} ->
-        {:rtsp, value}
-
-      {nil, ".m3u8", :output} ->
-        {:hls, value, opts}
-
-      _other ->
-        raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
-    end
-    |> then(&parse_endpoint_opt!(direction, &1))
-  end
-
-  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_endpoint_opt!(direction, value) when is_tuple(value) do
-    case value do
-      {endpoint_type, location}
-      when is_binary(location) and direction == :input and
-             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
-        parse_endpoint_opt!(:input, {endpoint_type, location, []})
-
-      {endpoint_type, location, opts}
-      when endpoint_type in [:h264, :h265] and is_binary(location) and direction == :input ->
-        {endpoint_type, location,
-         transport: resolve_transport(location, opts), framerate: opts[:framerate] || {30, 1}}
-
-      {endpoint_type, location, opts}
-      when is_binary(location) and direction == :input and
-             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
-        {endpoint_type, location, transport: resolve_transport(location, opts)}
-
-      {endpoint_type, location}
-      when is_binary(location) and direction == :output and
-             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
-        {endpoint_type, location, []}
-
-      {endpoint_type, location, _opts}
-      when is_binary(location) and direction == :output and
-             StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
-        value
-
-      {:webrtc, %Membrane.WebRTC.Signaling{}} when direction == :input ->
-        value
-
-      {:webrtc, %Membrane.WebRTC.Signaling{} = signaling} ->
-        {:webrtc, signaling, []}
-
-      {:webrtc, %Membrane.WebRTC.Signaling{}, _opts} when direction == :output ->
-        value
-
-      {:webrtc, uri} when is_binary(uri) and direction == :input ->
-        value
-
-      {:webrtc, uri} when is_binary(uri) and direction == :output ->
-        {:webrtc, uri, []}
-
-      {:webrtc, uri, _opts} when is_binary(uri) and direction == :output ->
-        value
-
-      {:whip, uri} when is_binary(uri) ->
-        parse_endpoint_opt!(direction, {:whip, uri, []})
-
-      {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :input ->
-        if Keyword.keyword?(opts), do: {:webrtc, value}
-
-      {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :output ->
-        {webrtc_opts, whip_opts} = split_webrtc_and_whip_opts(opts)
-        if Keyword.keyword?(opts), do: {:webrtc, {:whip, uri, whip_opts}, webrtc_opts}
-
-      {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
-        value
-
-      {:hls, location} when direction == :output and is_binary(location) ->
-        {:hls, location, []}
-
-      {:hls, location, opts}
-      when direction == :output and is_binary(location) and is_list(opts) ->
-        value
-
-      {:rtsp, location} when direction == :input and is_binary(location) ->
-        value
-
-      {:rtp, opts} ->
-        if Keyword.keyword?(opts), do: value
-
-      {:stream, opts} ->
-        if Keyword.keyword?(opts), do: value
-
-      _other ->
-        nil
-    end
-    |> case do
-      nil -> raise ArgumentError, "Invalid #{direction} specification: #{inspect(value)}"
-      value -> value
-    end
-  end
-
-  defguardp is_webrtc_endpoint(endpoint)
-            when is_tuple(endpoint) and elem(endpoint, 0) in [:webrtc, :whip]
-
-  @spec maybe_log_transcoding_related_warning(opts_map()) :: :ok
-  def maybe_log_transcoding_related_warning(opts) do
-    if is_webrtc_endpoint(opts.output) and not is_webrtc_endpoint(opts.input) and
-         webrtc_output_force_transcoding(opts) not in [true, :video] do
-      Logger.warning("""
-      Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
-      might lead to issues with the output video if the output stream isn't sent only by localhost. You \
-      can solve this by setting `:force_transcoding` output option to `true` or `:video`, but be aware \
-      that it will increase Boombox CPU usage.
-      """)
-    end
-
-    :ok
-  end
-
-  defp webrtc_output_force_transcoding(%{output: {:webrtc, _singaling, opts}}),
-    do: Keyword.get(opts, :force_transcoding)
 
   @spec consume_stream(Enumerable.t(), pid(), procs()) :: term()
   defp consume_stream(stream, source, procs) do
@@ -459,8 +318,14 @@ defmodule Boombox do
 
   @spec start_pipeline(opts_map()) :: procs()
   defp start_pipeline(opts) do
+    opts =
+      opts
+      |> Map.update!(:input, &resolve_stream_endpoint(&1, self()))
+      |> Map.update!(:output, &resolve_stream_endpoint(&1, self()))
+      |> Map.put(:parent, self())
+
     {:ok, supervisor, pipeline} =
-      Membrane.Pipeline.start_link(Boombox.Pipeline, Map.put(opts, :parent, self()))
+      Membrane.Pipeline.start_link(Boombox.Pipeline, opts)
 
     Process.monitor(supervisor)
     %{supervisor: supervisor, pipeline: pipeline}
@@ -493,6 +358,14 @@ defmodule Boombox do
     end
   end
 
+  @spec await_external_resource_ready() :: :ok
+  defp await_external_resource_ready() do
+    receive do
+      :external_resource_ready ->
+        :ok
+    end
+  end
+
   @spec verify_packet!(term()) :: :ok
   defp verify_packet!(packet) do
     %Boombox.Packet{kind: kind, pts: pts, format: format} = packet
@@ -512,29 +385,8 @@ defmodule Boombox do
     :ok
   end
 
-  @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
-  defp resolve_transport(location, opts) do
-    case Keyword.merge([transport: nil, force_transcoding: false], opts)[:transport] do
-      nil ->
-        uri = URI.parse(location)
+  defp resolve_stream_endpoint({:stream, stream_options}, parent),
+    do: {:stream, parent, stream_options}
 
-        case uri.scheme do
-          nil -> :file
-          "http" -> :http
-          "https" -> :http
-          _other -> raise ArgumentError, "Unsupported URI: #{location}"
-        end
-
-      transport when transport in [:file, :http] ->
-        transport
-
-      transport ->
-        raise ArgumentError, "Invalid transport: #{inspect(transport)}"
-    end
-  end
-
-  defp split_webrtc_and_whip_opts(opts) do
-    opts
-    |> Enum.split_with(fn {key, _value} -> key == :force_transcoding end)
-  end
+  defp resolve_stream_endpoint(endpoint, _parent), do: endpoint
 end

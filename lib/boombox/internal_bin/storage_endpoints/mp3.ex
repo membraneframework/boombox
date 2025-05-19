@@ -1,8 +1,8 @@
-defmodule Boombox.StorageEndpoints.MP3 do
+defmodule Boombox.InternalBin.StorageEndpoints.MP3 do
   @moduledoc false
   import Membrane.ChildrenSpec
-  alias Boombox.Pipeline.Ready
-  alias Boombox.StorageEndpoints
+  alias Boombox.InternalBin.Ready
+  alias Boombox.InternalBin.StorageEndpoints
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
   def create_input(location, opts) do
@@ -22,14 +22,18 @@ defmodule Boombox.StorageEndpoints.MP3 do
 
   @spec link_output(
           String.t(),
-          Boombox.Pipeline.track_builders(),
+          [Boombox.transcoding_policy_opt()],
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(location, track_builders, _spec_builder) do
+  def link_output(location, opts, track_builders, _spec_builder) do
+    transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
+
     spec =
       track_builders[:audio]
       |> child(:mp3_audio_transcoder, %Membrane.Transcoder{
-        output_stream_format: Membrane.MPEGAudio
+        output_stream_format: Membrane.MPEGAudio,
+        transcoding_policy: transcoding_policy
       })
       |> child(:file_sink, %Membrane.File.Sink{location: location})
 

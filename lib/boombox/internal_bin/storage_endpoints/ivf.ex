@@ -1,8 +1,8 @@
-defmodule Boombox.StorageEndpoints.IVF do
+defmodule Boombox.InternalBin.StorageEndpoints.IVF do
   @moduledoc false
   import Membrane.ChildrenSpec
-  alias Boombox.Pipeline.Ready
-  alias Boombox.StorageEndpoints
+  alias Boombox.InternalBin.Ready
+  alias Boombox.InternalBin.StorageEndpoints
   alias Membrane.{VP8, VP9}
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
@@ -16,10 +16,13 @@ defmodule Boombox.StorageEndpoints.IVF do
 
   @spec link_output(
           String.t(),
-          Boombox.Pipeline.track_builders(),
+          [Boombox.transcoding_policy_opt()],
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(location, track_builders, _spec_builder) do
+  def link_output(location, opts, track_builders, _spec_builder) do
+    transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
+
     spec =
       track_builders[:video]
       |> child(:ivf_video_transcoder, %Membrane.Transcoder{
@@ -28,7 +31,8 @@ defmodule Boombox.StorageEndpoints.IVF do
           %Membrane.RemoteStream{content_format: VP8} -> VP8
           %VP9{} -> VP9
           _other -> VP9
-        end
+        end,
+        transcoding_policy: transcoding_policy
       })
       |> child(:ivf_serializer, Membrane.IVF.Serializer)
       |> child(:file_sink, %Membrane.File.Sink{location: location})

@@ -644,3 +644,46 @@ Boombox.run(
   output: {:webrtc, "ws://localhost:8830"}
 )
 ```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Use Boombox.Bin to discard video from MP4 and to stream audio via WebRTC at the same time
+
+To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below.
+
+```elixir
+defmodule VideoDiscardingPipeline do
+  use Membrane.Pipeline
+
+  @impl true
+  def handle_init(_ctx, opts) do
+    spec = [
+      child(:input_boombox, %Boombox.Bin{
+        input: opts[:boombox_input]
+      })
+      |> via_out(:output, options: [kind: :audio])
+      |> via_in(:input, options: [kind: :audio])
+      |> child(:output_boombox, %Boombox.Bin{
+        output: opts[:boombox_output]
+      }),
+      get_child(:input_boombox)
+      |> via_out(:output, options: [kind: :video])
+      |> child(Membrane.Fake.Sink)
+    ]
+
+    {[spec: spec], %{}}
+  end
+end
+
+{:ok, supervisor, _pipeline} = 
+  Membrane.Pipeline.start_link(VideoDiscardingPipeline, 
+    boombox_input: "#{input_dir}/bun.mp4", 
+    boombox_output: {:webrtc, "ws://localhost:8830"}
+  )
+
+monitor_ref = Process.monitor(supervisor)
+
+receive do
+  {:DOWN, ^monitor_ref, :process, _pid, _reason} -> :ok
+end
+```

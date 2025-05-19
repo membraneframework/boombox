@@ -1,10 +1,10 @@
-defmodule Boombox.StorageEndpoints.MP4 do
+defmodule Boombox.InternalBin.StorageEndpoints.MP4 do
   @moduledoc false
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
-  alias Boombox.Pipeline.{Ready, Wait}
-  alias Boombox.StorageEndpoints
+  alias Boombox.InternalBin.{Ready, Wait}
+  alias Boombox.InternalBin.StorageEndpoints
   alias Membrane.H264
   alias Membrane.H265
 
@@ -49,12 +49,12 @@ defmodule Boombox.StorageEndpoints.MP4 do
 
   @spec link_output(
           String.t(),
-          [Boombox.force_transcoding()],
-          Boombox.Pipeline.track_builders(),
+          [Boombox.transcoding_policy_opt()],
+          Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, opts, track_builders, spec_builder) do
-    force_transcoding = opts |> Keyword.get(:force_transcoding, false)
+    transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
 
     audio_branch =
       case track_builders[:audio] do
@@ -66,7 +66,7 @@ defmodule Boombox.StorageEndpoints.MP4 do
             audio_builder
             |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.AAC,
-              force_transcoding?: force_transcoding in [true, :audio]
+              transcoding_policy: transcoding_policy
             })
             |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
               out_encapsulation: :none,
@@ -99,7 +99,7 @@ defmodule Boombox.StorageEndpoints.MP4 do
                 _not_h26x ->
                   %H264{stream_structure: :avc3, alignment: :au}
               end,
-              force_transcoding?: force_transcoding in [true, :video]
+              transcoding_policy: transcoding_policy
             })
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:mp4_muxer)

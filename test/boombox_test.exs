@@ -100,6 +100,97 @@ defmodule BoomboxTest do
     port
   end
 
+  @tag :file_file_mp4_video
+  async_test "mp4 file -> mp4 file video", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: @bbb_mp4_v, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:video])
+  end
+
+  @tag :http_file_mp4
+  async_test "http mp4 -> mp4 file", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    Boombox.run(input: @bbb_mp4_url, output: output)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  @tag :file_webrtc
+  async_test "mp4 file -> webrtc -> mp4 file", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    signaling = Membrane.WebRTC.Signaling.new()
+    t = Boombox.async(input: @bbb_mp4, output: {:webrtc, signaling})
+    Boombox.run(input: {:webrtc, signaling}, output: output)
+    Task.await(t)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
+  end
+
+  @tag :file_whip
+  async_test "mp4 file -> webrtc/whip -> mp4 file", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+
+    port = get_free_port()
+
+    t = Boombox.async(input: @bbb_mp4, output: {:whip, "http://127.0.0.1:#{port}"})
+
+    Boombox.run(input: {:whip, "http://127.0.0.1:#{port}"}, output: output)
+    Task.await(t)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
+  end
+
+  @tag :http_webrtc
+  async_test "http mp4 -> webrtc -> mp4 file", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    signaling = Membrane.WebRTC.Signaling.new()
+    t = Boombox.async(input: @bbb_mp4_url, output: {:webrtc, signaling})
+    Boombox.run(input: {:webrtc, signaling}, output: output)
+    Task.await(t)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
+  end
+
+  @tag :webrtc_audio
+  async_test "mp4 -> webrtc -> mp4 audio", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    signaling = Membrane.WebRTC.Signaling.new()
+
+    t =
+      Boombox.async(input: @bbb_mp4_a, output: {:webrtc, signaling})
+
+    Boombox.run(input: {:webrtc, signaling}, output: "#{tmp}/output.mp4")
+    Task.await(t)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", kinds: [:audio])
+  end
+
+  @tag :webrtc_video
+  async_test "mp4 -> webrtc -> mp4 video", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    signaling = Membrane.WebRTC.Signaling.new()
+
+    t =
+      Boombox.async(input: @bbb_mp4_v, output: {:webrtc, signaling})
+
+    Boombox.run(input: {:webrtc, signaling}, output: output)
+    Task.await(t)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4", kinds: [:video])
+  end
+
+  @tag :webrtc2
+  async_test "mp4 -> webrtc -> webrtc -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    signaling1 = Membrane.WebRTC.Signaling.new()
+    signaling2 = Membrane.WebRTC.Signaling.new()
+
+    t1 =
+      Boombox.async(input: @bbb_mp4, output: {:webrtc, signaling1})
+
+    t2 =
+      Boombox.async(input: {:webrtc, signaling1}, output: {:webrtc, signaling2})
+
+    Boombox.run(input: {:webrtc, signaling2}, output: output)
+    Task.await(t1)
+    Task.await(t2)
+    Compare.compare(output, "test/fixtures/ref_bun10s_opus2_aac.mp4")
+  end
+
   @tag :rtmp
   async_test "rtmp -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
@@ -386,7 +477,7 @@ defmodule BoomboxTest do
         })
         |> via_in(Pad.ref(:audio, 0))
         |> get_child(:rtmp_sink),
-        child(:rtmp_sink, %Membrane.RTMP.Sink{rtmp_url: url, max_attempts: 3})
+        child(:rtmp_sink, %Membrane.RTMP.Sink{rtmp_url: url})
       ]
     )
 
