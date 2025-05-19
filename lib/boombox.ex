@@ -217,11 +217,11 @@ defmodule Boombox do
       Map.keys(opts) -- @endpoint_opts != [] ->
         raise ArgumentError, "Both input and output are required"
 
-      is_stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
+      stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
         raise ArgumentError,
               "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
 
-      is_stream?(opts[:input]) && is_stream?(opts[:output]) ->
+      stream?(opts[:input]) && stream?(opts[:output]) ->
         raise ArgumentError,
               ":stream on both input and output is not supported"
 
@@ -230,8 +230,8 @@ defmodule Boombox do
     end
   end
 
-  defp is_stream?({:stream, _opts}), do: true
-  defp is_stream?(_), do: false
+  defp stream?({:stream, _opts}), do: true
+  defp stream?(_io), do: false
 
   @doc """
   Runs boombox with CLI arguments.
