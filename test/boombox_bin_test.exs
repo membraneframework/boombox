@@ -1,5 +1,5 @@
 defmodule Boombox.BinTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: System.get_env("CIRCLECI") == "true"
 
   import Membrane.ChildrenSpec
   import Membrane.Testing.Assertions
