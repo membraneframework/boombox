@@ -1,5 +1,5 @@
 defmodule BoomboxStorageEndpointsTest do
-  use ExUnit.Case, async: System.get_env("CIRCLECI") == "true"
+  use ExUnit.Case, async: System.get_env("CIRCLECI") != "true"
   import Support.Async
   alias Support.Compare
 

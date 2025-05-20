@@ -1,5 +1,5 @@
 defmodule Boombox.Utils.CLITest do
-  use ExUnit.Case, async: System.get_env("CIRCLECI") == "true"
+  use ExUnit.Case, async: System.get_env("CIRCLECI") != "true"
 
   alias Boombox.Utils.CLI
 
