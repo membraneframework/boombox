@@ -12,7 +12,7 @@ import sys
 import warnings
 
 from term import Atom, Pid
-from endpoints import BoomboxEndpoint, Array
+from boombox.endpoints import BoomboxEndpoint, Array
 from dataclasses import dataclass, KW_ONLY
 
 from typing import Generator, ClassVar, Optional, Any, Literal, TypeAlias, get_args
@@ -43,12 +43,24 @@ AudioSampleFormat: TypeAlias = Literal[
 
 @dataclass
 class VideoPacket:
+    """A Boombox packet containing raw video.
+
+    When writing to or reading video from Boombox it will
+    be in form of numpy arrays of shape (width, height, channels).
+    """
+
     payload: np.ndarray
     timestamp: int
 
 
 @dataclass
 class AudioPacket:
+    """A Boombox packet containing raw audio.
+
+    When writing to or reading video from Boombox it will
+    be in form of numpy arrays.
+    """
+
     payload: np.ndarray
     timestamp: int
     _: KW_ONLY
@@ -57,6 +69,11 @@ class AudioPacket:
 
 
 class Boombox(pyrlang.process.Process):
+    """Boombox class.
+
+    Blah blah
+    """
+
     _python_node_name: ClassVar[str]
     _cookie: ClassVar[str]
 
@@ -109,7 +126,7 @@ class Boombox(pyrlang.process.Process):
             (Atom("input"), self._serialize_endpoint(input)),
             (Atom("output"), self._serialize_endpoint(output)),
         ]
-        self._call((Atom("run_boombox"), boombox_arg))
+        self._call((Atom("run"), boombox_arg))
         self.get_node().link_nowait(self.pid_, self._receiver)
 
     def write(self, packet: AudioPacket | VideoPacket) -> None:
@@ -119,7 +136,7 @@ class Boombox(pyrlang.process.Process):
 
     def read(self) -> Generator[AudioPacket | VideoPacket, None, None]:
         production_phase = Atom("ok")
-        while production_phase != Atom("_finished"):
+        while production_phase != Atom("finished"):
             production_phase, packet = self._call(Atom("produce_packet"))
             deserialized_packet = self._deserialize_packet(packet)
             yield deserialized_packet
@@ -139,11 +156,13 @@ class Boombox(pyrlang.process.Process):
 
     @override
     def handle_one_inbox_message(self, msg: Any) -> None:
+        """:meta private:"""
         if self._response_received is not None:
             self._response_received.set_result(msg)
 
     @override
     def exit(self, reason: Any = None) -> None:
+        """:meta private:"""
         self._finished.set_result(None)
         super().exit(reason)
 

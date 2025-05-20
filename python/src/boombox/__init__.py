@@ -1,7 +1,37 @@
-from .boombox import Boombox, AudioPacket, VideoPacket
-from .endpoints import H264, H265, MP4, MP3, AAC, WAV, WebRTC, WHIP, Ogg, HLS, RTP, RTSP, RTMP, Array
+from boombox.boombox import Boombox, AudioPacket, VideoPacket
+from boombox.endpoints import (
+    H264,
+    H265,
+    MP4,
+    MP3,
+    AAC,
+    WAV,
+    WebRTC,
+    WHIP,
+    Ogg,
+    HLS,
+    RTP,
+    RTSP,
+    RTMP,
+    Array,
+)
 
-__all__ = ['Boombox', 'AudioPacket', 'VideoPacket',
-           'H264', 'H265', 'MP4', 'MP3', 'AAC', 'WAV', 'WebRTC', 'WHIP', 'Ogg', 'HLS', 'RTP', 'RTSP', 'RTMP', 'Array']
-
-
+__all__ = [
+    "Boombox",
+    "AudioPacket",
+    "VideoPacket",
+    "H264",
+    "H265",
+    "MP4",
+    "MP3",
+    "AAC",
+    "WAV",
+    "WebRTC",
+    "WHIP",
+    "Ogg",
+    "HLS",
+    "RTP",
+    "RTSP",
+    "RTMP",
+    "Array",
+]
