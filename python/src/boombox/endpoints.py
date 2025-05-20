@@ -5,6 +5,7 @@ from typing_extensions import override
 from abc import ABC
 
 
+@dataclass
 class BoomboxEndpoint(ABC):
     """Abstract base class of a Boombox endpoint.
 
@@ -12,7 +13,25 @@ class BoomboxEndpoint(ABC):
     class is a base class for these definitions. When creating a Boombox
     instance it expects a specification of it's input and output as
     BoomboxEndpoints.
+
+    Attributes
+    ----------
+    transcoding_policy : {"if_needed", "always", "never"}
+        Allowed only for output. The default transcoding behavior is "if_needed",
+        which means that if the format of the media is the same for input and
+        output, then the stream is not decoded and encoded. This approach saves
+        resources and time, but in some cases transcoding can be necessary. To
+        force transcoding regardless if the formats differ or not, this option
+        can be set to "always". If set to "never", Boombox will never transcode,
+        raising if the desired operation can't be done without transcoding.
     """
+
+    _: KW_ONLY
+    force_transcoding: Literal["if_needed", "always", "never"] = "if_needed"
+
+    def get_atom_fields(self) -> set[str]:
+        """:meta private:"""
+        return {"force_transcoding"}
 
     # TODO: consider checking whether an endpoint with given attributes is
     #  valid for a direction, like so:
@@ -27,7 +46,9 @@ class BoomboxEndpoint(ABC):
         serializes the endpoint to a tuple that matches the structure of
         Boombox endpoints in elixir.
 
-        Returns:
+        Returns
+        -------
+        endpoint_tuple : tuple
             A tuple representing the endpoint. The first element is an Atom
             representing the endpoint name, next elements are required field
             values and in case there are any keyword fields they are in the
@@ -35,7 +56,7 @@ class BoomboxEndpoint(ABC):
         """
 
         assert is_dataclass(self)
-        atom_fields = self._get_atom_fields()
+        atom_fields = self.get_atom_fields()
         required_field_values = [
             self._serialize_field(f.name, atom_fields)
             for f in fields(self)
@@ -47,16 +68,13 @@ class BoomboxEndpoint(ABC):
             if f.kw_only and self.__dict__[f.name] is not None
         ]
         if not keyword_fields:
-            return self._get_endpoint_name(), *required_field_values
+            return self.get_endpoint_name(), *required_field_values
         else:
-            return (self._get_endpoint_name(), *required_field_values,
-                    keyword_fields)
+            return (self.get_endpoint_name(), *required_field_values, keyword_fields)
 
-    def _get_endpoint_name(self) -> Atom:
+    def get_endpoint_name(self) -> Atom:
+        """:meta private:"""
         return Atom(self.__class__.__name__.lower())
-
-    def _get_atom_fields(self) -> set[str]:
-        return set()
 
     def _serialize_field(self, field_name: str, atom_fields: set[str]) -> Any:
         field_value = self.__dict__[field_name]
@@ -69,28 +87,58 @@ class BoomboxEndpoint(ABC):
 
 
 @dataclass
+class Array(BoomboxEndpoint):
+    """Endpoint for communication throught numpy arrays.
+
+    This endpoint defines the behavior of Boombox allowing
+    for interacting with Python code directly. For more
+    details refer to :py:class:`.Boombox` class.
+    """
+
+    _: KW_ONLY
+    audio: bool = False
+    video: bool = False
+    audio_format: str | None = None
+    audio_rate: int | None = None
+    audio_channels: int | None = None
+    video_width: int | None = None
+    video_height: int | None = None
+
+    @override
+    def get_endpoint_name(self) -> Atom:
+        return Atom("stream")
+
+    @override
+    def get_atom_fields(self) -> set[str]:
+        return {"audio_format"} & super().get_atom_fields()
+
+
+@dataclass
 class StorageEndpoint(BoomboxEndpoint, ABC):
     """Abstract base class for storage endpoints.
 
     Storage endpoints are endpoints that are used for putting the media in
     some type of storage.
 
-    Attributes:
-        location:
-          A path to a file or an HTTP URL, location where the media should be
-          read from or written to.
-        transport:
-          An optional attribute that explicitly states whether a file or HTTP
-          storage should be assumed.
+    Attributes
+    ----------
+    location : str
+        A path to a file or an HTTP URL, location where the media should be
+        read from or written to.
+    transport : {None, "file", "http"}:
+        An optional attribute that explicitly states whether a file or HTTP
+        storage should be assumed. If not provided transport will be determined
+        from `location` - paths will resolve to "file" location,
+        HTTP URLs to "http".
     """
 
     location: str
     _: KW_ONLY
-    transport: Literal['file', 'http'] | None = None
+    transport: Literal["file", "http"] | None = None
 
     @override
-    def _get_atom_fields(self) -> set[str]:
-        return {'transport'}
+    def get_atom_fields(self) -> set[str]:
+        return {"transport"} & super().get_atom_fields()
 
 
 @dataclass
@@ -100,9 +148,10 @@ class H264(StorageEndpoint):
     When used for output the stored stream will have Annex-B format, and when
     reading the stream has to already be in Annex-B format.
 
-    Attributes:
-        framerate:
-          Framerate of the stream, if not provided 30 FPS will be assumed.
+    Attributes
+    ----------
+    framerate : tuple[int, int], optional
+        Framerate of the stream, if not provided 30 FPS will be assumed.
     """
 
     _: KW_ONLY
@@ -116,9 +165,11 @@ class H265(StorageEndpoint):
     When used for output the stored stream will have Annex-B format, when
     reading the stream has to already be in Annex-B format.
 
-    Attributes:
-        framerate:
-          Framerate of the stream, if not provided 30 FPS will be assumed.
+
+    Attributes
+    ----------
+    framerate : tuple[int, int], optional
+        Framerate of the stream, if not provided 30 FPS will be assumed.
     """
 
     _: KW_ONLY
@@ -127,47 +178,43 @@ class H265(StorageEndpoint):
 
 @dataclass
 class MP4(BoomboxEndpoint):
-    """Endpoint for MP4 container format.
+    """Endpoint for MP4 container format."""
 
-    Attributes:
-        force_transcoding:
-          Allowed only for output. The default transcoding behavior is that if
-          the format of the media is the same for input and output, then the
-          stream is not decoded and encoded. This approach saves resources and
-          time, but in some cases transcoding can be necessary. This attribute
-          determines whether Boombox should transcode audio, video or both.
-        """
-
-    force_transcoding: bool | Literal['audio', 'video'] | None = None
+    pass
 
 
 @dataclass
 class AAC(StorageEndpoint):
     """Endpoint for AAC codec."""
+
     pass
 
 
 @dataclass
 class WAV(StorageEndpoint):
     """Endpoint for WAV format."""
+
     pass
 
 
 @dataclass
 class MP3(StorageEndpoint):
     """Endpoint for MP3 format."""
+
     pass
 
 
 @dataclass
 class IVF(StorageEndpoint):
     """Endpoint for IVF container format."""
+
     pass
 
 
 @dataclass
 class Ogg(StorageEndpoint):
     """Endpoint for Ogg container format."""
+
     pass
 
 
@@ -175,34 +222,28 @@ class Ogg(StorageEndpoint):
 class WebRTC(BoomboxEndpoint):
     """Endpoint for communication over WebRTC.
 
-    Attributes:
-        signaling:
-          URL of the WebSocket that is the signaling channel of the WebRTC
-          connection.
-        force_transcoding:
-          Allowed only for output. The default transcoding behavior is that if
-          the format of the media is the same for input and output, then the
-          stream is not decoded and encoded. This approach saves resources and
-          time, but in some cases transcoding can be necessary. This attribute
-          determines whether Boombox should transcode audio, video or both.
+    Attributes
+    ----------
+    signaling : str
+        URL of the WebSocket that is the signaling channel of the WebRTC
+        connection.
     """
-    signaling: str
-    _: KW_ONLY
-    force_transcoding: bool | Literal['audio', 'video'] | None = None
 
-    @override
-    def _get_atom_fields(self) -> set[str]:
-        return {'force_transcoding'}
+    signaling: str
 
 
 @dataclass
 class WHIP(BoomboxEndpoint):
-    """Endpoint for communication over WHIP.
+    """Endpoint for communication over WebRTC-HTTP ingestion protocol (WHIP).
 
-    Attributes:
-        url: HTTP url for the WHIP server.
-        token: Token used for authentication and authorization.
+    Attributes
+    ----------
+    url : str
+        HTTP url for the WHIP server.
+    token : str
+        Token used for authentication and authorization.
     """
+
     url: str
     _: KW_ONLY
     token: str
@@ -210,33 +251,85 @@ class WHIP(BoomboxEndpoint):
 
 @dataclass
 class HLS(BoomboxEndpoint):
-    location: str
-    _: KW_ONLY
-    force_transcoding: bool | Literal['audio', 'video'] | None = None
+    """Endpoint for HTTP Live Streaming.
 
-    @override
-    def _get_atom_fields(self) -> set[str]:
-        return {'force_transcoding'}
+    Attributes
+    ----------
+    location : str
+        Path to the location where the HLS files will be created. If the
+        path is to a directory, then an "index.m3u8" manifest file and the
+        other files will be created there. If it's a path to ".m3u8" file,
+        the file will be created in provided location and all the other
+        files will be created in the same directory.
+    """
+
+    location: str
 
 
 @dataclass
 class RTMP(BoomboxEndpoint):
-    uri: str
+    """Endpoint for communication over Real-Time Messaging Protocol (RTMP).
+
+    Currently Boombox supports only client-side functionality - streaming
+    media to a RTMP server.
+
+    Attributes
+    ----------
+    url : str
+        URL of a RTMP server.
+    """
+
+    url: str
 
 
 @dataclass
 class RTSP(BoomboxEndpoint):
-    uri: str
-    _: KW_ONLY
-    force_transcoding: bool | Literal['audio', 'video'] | None = None
+    """Endpoint for communication over Real-Time Streaming Protocol (RTSP).
 
-    @override
-    def _get_atom_fields(self) -> set[str]:
-        return {'force_transcoding'}
+    Currently Boombox supports only client-side functionality - receiving
+    media from a RTSP server.
+
+    Attributes
+    ----------
+    url : str
+        URL of a RTSP server.
+    """
+
+    url: str
 
 
 @dataclass
 class RTP(BoomboxEndpoint):
+    """Endpoint for communication over Real-time Transport Protocol (RTP).
+
+    Since RTP doesn't incorporate any negotiation a lot of information about
+    streamed media has to be provided manually via the attributes.
+
+    Attributes
+    ----------
+    port : int
+        Port on which Boombox will receive the stream or to which it will
+        send it to.
+    address : str, optional
+        IP address which Boombox will send the stream to.
+    audio_encoding, video_encoding : str, optional
+        Encoding name of given media type. Has to be the same as it would be
+        in `rtpmap` attribute of a SDP description.
+    audio_payload_type, video_payload_type : int, optional
+        Payload type of given media type. Has to be the same as it would be
+        in `rtpmap` attribute of a SDP description.
+    audio_clock_rate, video_clock_rate : int, optional
+        Clock rate of given media type. Has to be the same as it would be
+        in `rtpmap` attribute of a SDP description.
+    aac_bitrate_mode : {None, "lbr", "hbr"}
+        Applicable only for AAC payload - defines which mode should be
+        assumed/set when depayloading/payloading.
+    vps, pps, sps : bytes, optional
+        Applicable only for H264 and H265 payloads. Parameter sets, could be
+        obtained from a side channel. They contain information about the
+        encoded stream.
+    """
+
     _: KW_ONLY
     port: int
     address: str | None = None
@@ -251,28 +344,11 @@ class RTP(BoomboxEndpoint):
     vps: bytes | None = None
     pps: bytes | None = None
     sps: bytes | None = None
-    force_transcoding: bool | Literal['audio', 'video'] | None = None
 
     @override
-    def _get_atom_fields(self) -> set[str]:
-        return {'video_encoding', 'audio_encoding', 'force_transcoding'}
-
-
-@dataclass
-class Array(BoomboxEndpoint):
-    _: KW_ONLY
-    audio: bool = False
-    video: bool = False
-    audio_format: str | None = None
-    audio_rate: int | None = None
-    audio_channels: int | None = None
-    video_width: int | None = None
-    video_height: int | None = None
-
-    @override
-    def _get_endpoint_name(self) -> Atom:
-        return Atom('stream')
-
-    @override
-    def _get_atom_fields(self) -> set[str]:
-        return {'audio_format'}
+    def get_atom_fields(self) -> set[str]:
+        return {
+            "video_encoding",
+            "audio_encoding",
+            "aac_bitrate_mode",
+        } & super().get_atom_fields()
