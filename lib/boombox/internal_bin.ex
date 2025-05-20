@@ -290,6 +290,19 @@ defmodule Boombox.InternalBin do
   end
 
   @impl true
+  def handle_child_setup_completed(:udp_source, _ctx, state) do
+    {[notify_parent: :external_resource_ready], state}
+  end
+
+  def handle_child_setup_completed(:rtsp_source, _ctx, state) do
+    {[notify_parent: :external_resource_ready], state}
+  end
+
+  def handle_child_setup_completed(_child, _ctx, state) do
+    {[], state}
+  end
+
+  @impl true
   def handle_info({:rtmp_client_ref, client_ref}, ctx, state) do
     Boombox.InternalBin.RTMP.handle_connection(client_ref)
     |> proceed_result(ctx, state)
