@@ -38,7 +38,7 @@ defmodule Boombox.InternalBin.RTMP do
         {RTMPServer, server_options}
       )
 
-    %Wait{}
+    %Wait{actions: [notify_parent: :external_resource_ready]}
   end
 
   @spec handle_connection(pid()) :: Ready.t()
