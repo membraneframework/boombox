@@ -39,12 +39,12 @@ class BoomboxEndpoint(ABC):
     # bool: ...
 
     def serialize(self) -> tuple:
-        """Serializes itself to an erlang-compatible term.
+        """Serializes itself to an Elixir-compatible term.
 
-        To allow Pyrlang to send the endpoint definition to erlang it first
-        needs to be serialized into an erlang-compatible term. This function
+        To allow Pyrlang to send the endpoint definition to Elixir it first
+        needs to be serialized into an Elixir-compatible term. This function
         serializes the endpoint to a tuple that matches the structure of
-        Boombox endpoints in elixir.
+        Boombox endpoints in Elixir.
 
         Returns
         -------
@@ -93,12 +93,25 @@ class Array(BoomboxEndpoint):
     This endpoint defines the behavior of Boombox allowing
     for interacting with Python code directly. For more
     details refer to :py:class:`.Boombox` class.
+
+    Attributes
+    ----------
+    audio, video : bool
+        Determines whether this endpoint will accept/produce
+        video packets, audio packets, or both.
+    audio_rate : int, optional
+        Applicable only when `audio` is set to True. Determines
+        the sample rate of the stream (number of samples per
+        second).
+    audio_channels : int, optional
+        Applicable only when `audio` is set to True. Determines
+        how many channels does the stream have. The channels are
+        interleaved.
     """
 
     _: KW_ONLY
     audio: bool = False
     video: bool = False
-    audio_format: str | None = None
     audio_rate: int | None = None
     audio_channels: int | None = None
     video_width: int | None = None

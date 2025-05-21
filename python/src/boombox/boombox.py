@@ -1,5 +1,7 @@
 """Boombox class and Packet classes."""
 
+from __future__ import annotations
+
 import numpy as np
 import asyncio
 import pyrlang.process
@@ -12,12 +14,11 @@ import sys
 import warnings
 
 from term import Atom, Pid
-from boombox.endpoints import BoomboxEndpoint, Array
+from .endpoints import BoomboxEndpoint, Array
 from dataclasses import dataclass, KW_ONLY
 
-from typing import Generator, ClassVar, Optional, Any, Literal, TypeAlias, get_args
+from typing import Generator, ClassVar, TypeAlias, Literal, Optional, Any, get_args
 from typing_extensions import override
-
 
 AudioSampleFormat: TypeAlias = Literal[
     "s8",
@@ -39,33 +40,6 @@ AudioSampleFormat: TypeAlias = Literal[
     "f64le",
     "f64be",
 ]
-
-
-@dataclass
-class VideoPacket:
-    """A Boombox packet containing raw video.
-
-    When writing to or reading video from Boombox it will
-    be in form of numpy arrays of shape (width, height, channels).
-    """
-
-    payload: np.ndarray
-    timestamp: int
-
-
-@dataclass
-class AudioPacket:
-    """A Boombox packet containing raw audio.
-
-    When writing to or reading video from Boombox it will
-    be in form of numpy arrays.
-    """
-
-    payload: np.ndarray
-    timestamp: int
-    _: KW_ONLY
-    sample_rate: int | None = None
-    channels: int | None = None
 
 
 class Boombox(pyrlang.process.Process):
@@ -113,9 +87,7 @@ class Boombox(pyrlang.process.Process):
         self._receiver = self._call(Atom("get_pid"))
         if isinstance(input, Array) and input.audio:
             self._audio_stream_format = {
-                Atom("sample_format"): Atom(input.audio_format)
-                if input.audio_format is not None
-                else None,
+                Atom("sample_format"): None,
                 Atom("sample_rate"): input.audio_rate,
                 Atom("channels"): input.audio_channels,
             }
@@ -334,3 +306,30 @@ class Boombox(pyrlang.process.Process):
             return endpoint.encode()
         else:
             return endpoint.serialize()
+
+
+@dataclass
+class VideoPacket:
+    """A Boombox packet containing raw video.
+
+    When writing to or reading video from Boombox it will
+    be in form of numpy arrays of shape (width, height, channels).
+    """
+
+    payload: np.ndarray
+    timestamp: int
+
+
+@dataclass
+class AudioPacket:
+    """A Boombox packet containing raw audio.
+
+    When writing to or reading video from Boombox it will
+    be in form of numpy arrays.
+    """
+
+    payload: np.ndarray
+    timestamp: int
+    _: KW_ONLY
+    sample_rate: int | None = None
+    channels: int | None = None
