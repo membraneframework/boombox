@@ -26,6 +26,8 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP4 do
 
   @spec handle_input_tracks(Membrane.MP4.Demuxer.ISOM.new_tracks_t()) :: Ready.t()
   def handle_input_tracks(tracks) do
+    IO.inspect(tracks, label: "aaa")
+
     track_builders =
       Map.new(tracks, fn
         {id, %Membrane.AAC{}} ->

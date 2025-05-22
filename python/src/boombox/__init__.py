@@ -1,5 +1,5 @@
-from boombox.boombox import Boombox, AudioPacket, VideoPacket
-from boombox.endpoints import (
+from .boombox import Boombox, AudioPacket, VideoPacket
+from .endpoints import (
     H264,
     H265,
     MP4,

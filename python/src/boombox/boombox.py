@@ -1,4 +1,4 @@
-"""Boombox class and Packet classes."""
+"""Module containing Boombox class and media packet classes."""
 
 from __future__ import annotations
 
@@ -43,9 +43,53 @@ AudioSampleFormat: TypeAlias = Literal[
 
 
 class Boombox(pyrlang.process.Process):
-    """Boombox class.
+    """
+    Boombox is a tool that allows to transform a media stream from one
+    format into another.
 
-    Blah blah
+    When creating an instance of Boombox the input and output are
+    specified by providing an appropriate endpoint object for each of them.
+    These objects define the format and it's parameters that are used for
+    the input or output, whichever they were provided for.
+
+    For example, if an `RTMP("rtmp://my.stream.source:2137")` endpoint was provided
+    for input and `MP4("path/to/target.mp4")` for output, then Boombox will
+    try to connect to a RTMP server at the provided URL and save the acquired
+    stream to a `.mp4` file at the provided location.
+
+    For more information about endpoints and to see supported formats refer to
+    :py:mod:`.endpoints`.
+
+    One of the main reasons to use Boombox in a Python project is to interact
+    with it from Python code directly. This can be achieved with
+    :py:class:`.Array` endpoint, that enables methods allowing for this
+    interactions.
+
+    If the input is defined by :py:class:`.Array`, Boombox will accept packets
+    provided by :py:meth:`.write` method. This method will return once Boombox
+    has processed the provided packet and is ready for the next one. Once
+    Boombox should stop accepting more packets, :py:meth:`.close` should be
+    called to informing it about the end of the stream. Calling this method can
+    be skipped if opening Boombox using a context manager.
+
+    If the output is defined by :py:class:`.Array`, Boombox will produce
+    packets that are yielded by a generator returned by :py:meth:`.read`.
+
+    These methods operate on :py:class:`.AudioPacket` and
+    :py:class:`.VideoPacket` objects. These objects contain raw media data and
+    accompanying metadata.
+
+    If not using :py:class:`.Array` endpoints Boombox operates fully
+    asynchronously, it'll work in the background if not interacted with. For
+    more control regarding the termination of Boombox refer to
+    :py:meth:`.close`, :py:meth:`.wait` and :py:meth:`.kill` methods.
+
+    Parameters
+    ----------
+    input, output : BoomboxEndpoint or str
+        Definition of an input or output of Boombox. Can be provided explicitly
+        by an appropriate :py:class:`.BoomboxEndpoint` or a string of a path to
+        a file or an URL, that Boombox will attempt to interpret as an endpoint.
     """
 
     _python_node_name: ClassVar[str]
@@ -85,6 +129,7 @@ class Boombox(pyrlang.process.Process):
         self._finished = self.get_node().get_loop().create_future()
         self._receiver = (self._erlang_node_name, Atom("boombox_server"))
         self._receiver = self._call(Atom("get_pid"))
+        self.get_node().link_nowait(self.pid_, self._receiver)
         if isinstance(input, Array) and input.audio:
             self._audio_stream_format = {
                 Atom("sample_format"): None,
@@ -99,32 +144,90 @@ class Boombox(pyrlang.process.Process):
             (Atom("output"), self._serialize_endpoint(output)),
         ]
         self._call((Atom("run"), boombox_arg))
-        self.get_node().link_nowait(self.pid_, self._receiver)
-
-    def write(self, packet: AudioPacket | VideoPacket) -> None:
-        serialized_packet = self._serialize_packet(packet)
-
-        self._call((Atom("consume_packet"), serialized_packet))
 
     def read(self) -> Generator[AudioPacket | VideoPacket, None, None]:
+        """Read media packets produced by Boombox.
+
+        Enabled only if Boombox has been initialized with output set to
+        :py:class:`.Array` endpoint.
+
+        This generator yields packets as fast as Boombox produces them.
+
+        Yields
+        ------
+        AudioPacket or VideoPacket
+            Raw media packets produced by Boombox.
+        """
         production_phase = Atom("ok")
         while production_phase != Atom("finished"):
             production_phase, packet = self._call(Atom("produce_packet"))
             deserialized_packet = self._deserialize_packet(packet)
             yield deserialized_packet
 
+    def write(self, packet: AudioPacket | VideoPacket) -> bool:
+        """Write packets to Boombox.
+
+        Enabled only if Boombox has been initialized with input set to
+        :py:class:`.Array` endpoint.
+
+        This method provides Boombox with a packet to process and returns once
+        Boombox is ready to accept the next packet.
+
+        Parameters
+        ----------
+        packet : AudioPacket or VideoPacket
+            Raw media packet to be consumed by Boombox.
+
+        Returns
+        -------
+        finished : bool
+            Informs if Boombox has finished writing to it's output and won't
+            accept any more packets to consume.
+        """
+        serialized_packet = self._serialize_packet(packet)
+
+        result = self._call((Atom("consume_packet"), serialized_packet))
+        return result == Atom("finished")
+
     def close(self, wait: bool = False, kill: bool = False) -> None:
+        """Closes Boombox for writing.
+
+        Enabled only if Boombox has been initialized with input set to
+        :py:class:`.Array` endpoint.
+
+        This method informs Boombox that it shouldn't expect any more packets.
+
+        Parameters
+        ----------
+        wait : bool, default=False
+            Determines whether this method should wait until Boombox finishes
+            it's operation and only then return, or if it should return
+            immediately and let Boombox finish in the background.
+        kill : bool, default=False
+            Determines whether Boombox should be killed without waiting for it
+            to gracefully finish it's operation. If True this method will
+            return immediately.
+        """
         self._call(Atom("finish_consuming"))
-        if wait:
-            self.wait()
-        elif kill:
+        if kill:
             self.kill()
+        elif wait:
+            self.wait()
 
     def wait(self) -> None:
+        """Waits until Boombox finishes it's operation and then returns."""
         self.get_node().get_loop().run_until_complete(self._finished)
 
     def kill(self) -> None:
+        """Forces Boombox to exit without waiting for it to gracefully finish
+        it's operation."""
         self._erlang_process.kill()
+
+    def __start__(self) -> Boombox:
+        return self
+
+    def __exit__(self, *_) -> None:
+        self.close()
 
     @override
     def handle_one_inbox_message(self, msg: Any) -> None:
@@ -312,8 +415,16 @@ class Boombox(pyrlang.process.Process):
 class VideoPacket:
     """A Boombox packet containing raw video.
 
-    When writing to or reading video from Boombox it will
-    be in form of numpy arrays of shape (width, height, channels).
+    Objects of this class are used when writing/reading video data to/from
+    Boombox.
+
+    Attributes
+    ----------
+    payload : np.ndarray
+        Raw data of a single frame of the video stream. Shape of the array is
+        (width, height, channels).
+    timestamp : int
+        Timestamp of the frame in milliseconds.
     """
 
     payload: np.ndarray
@@ -324,8 +435,22 @@ class VideoPacket:
 class AudioPacket:
     """A Boombox packet containing raw audio.
 
-    When writing to or reading video from Boombox it will
-    be in form of numpy arrays.
+    Objects of this class are used when writing/reading audio data to/from
+    Boombox.
+
+    Attributes
+    ----------
+    payload : np.ndarray
+        Raw data of an audio chunk of the video stream. The array is
+        one-dimentional.
+    timestamp : int
+        Timestamp of the chunk in milliseconds.
+    sample_rate : int, optional
+        Number of audio samples per second. If not provided, the previous value
+        will be assumed.
+    channels : int, optional
+        Number of channels interleaved in the stream. If not provided, the
+        previous value will be assumed.
     """
 
     payload: np.ndarray

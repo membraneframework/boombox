@@ -73,7 +73,7 @@ For more examples, see [examples.livemd](examples.livemd).
 | WHIP | `{:whip, "http://*", token: "token"}` | `{:whip, "http://*", token: "token"}` |
 | RTMP | `"rtmp://*"` | _not supported_ |
 | RTSP | `"rtsp://*"` | _not supported_ |
-| RTP | `{:rtp, opts}` | _not yet supported_ |
+| RTP | `{:rtp, opts}` | `{:rtp, opts}` |
 | HLS | _not supported_ | `"*.m3u8"` |
 | `Enumerable.t()` | `{:stream, opts}` | `{:stream, opts}` |
 
