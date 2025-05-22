@@ -291,6 +291,11 @@ defmodule Boombox.Server do
     {:noreply, state}
   end
 
+  @impl true
+  def terminate(_reason, _state) do
+    Application.stop(:boombox)
+  end
+
   @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
   defp get_boombox_mode(boombox_opts) do
     case Map.new(boombox_opts) do

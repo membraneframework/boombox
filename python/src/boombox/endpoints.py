@@ -16,7 +16,7 @@ class BoomboxEndpoint(ABC):
 
     Attributes
     ----------
-    transcoding_policy : {"if_needed", "always", "never"}
+    transcoding_policy : {None, "if_needed", "always", "never"}
         Allowed only for output. The default transcoding behavior is "if_needed",
         which means that if the format of the media is the same for input and
         output, then the stream is not decoded and encoded. This approach saves
@@ -27,11 +27,11 @@ class BoomboxEndpoint(ABC):
     """
 
     _: KW_ONLY
-    force_transcoding: Literal["if_needed", "always", "never"] = "if_needed"
+    transcoding_policy: Literal["if_needed", "always", "never"] | None = None
 
     def get_atom_fields(self) -> set[str]:
         """:meta private:"""
-        return {"force_transcoding"}
+        return {"transcoding_policy"}
 
     # TODO: consider checking whether an endpoint with given attributes is
     #  valid for a direction, like so:
@@ -190,7 +190,7 @@ class H265(StorageEndpoint):
 
 
 @dataclass
-class MP4(BoomboxEndpoint):
+class MP4(StorageEndpoint):
     """Endpoint for MP4 container format."""
 
     pass
