@@ -31,4 +31,9 @@ defmodule Boombox.Application do
 
     Supervisor.start_link([Boombox.Server], strategy: :one_for_one)
   end
+
+  @impl true
+  def stop(_state) do
+    System.stop(0)
+  end
 end
