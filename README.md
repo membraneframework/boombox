@@ -84,7 +84,7 @@ For the full list of input and output options, see [`Boombox.run/2`](https://hex
 To use Boombox as an Elixir library, add
 
 ```elixir
-{:boombox, "~> 0.2.0"}
+{:boombox, "~> 0.2.1"}
 ```
 
 to your dependencies or `Mix.install`.
