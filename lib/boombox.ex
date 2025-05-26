@@ -107,7 +107,8 @@ defmodule Boombox do
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
            input: input(),
-           output: output()
+           output: output(),
+           parent: pid()
          }
 
   @doc """
@@ -135,28 +136,19 @@ defmodule Boombox do
           input: input(),
           output: output()
         ) :: :ok | Enumerable.t()
-  @endpoint_opts [:input, :output]
   def run(stream \\ nil, opts) do
-    opts = Map.new(opts)
-
-    if key = Enum.find(@endpoint_opts, fn k -> not is_map_key(opts, k) end) do
-      raise "#{key} is not provided"
-    end
+    opts = validate_opts!(stream, opts)
 
     case opts do
-      %{input: {:stream, _in_stream_opts}, output: {:stream, _out_stream_opts}} ->
-        raise ArgumentError, ":stream on both input and output is not supported"
-
       %{input: {:stream, _stream_opts}} ->
-        unless Enumerable.impl_for(stream) do
-          raise ArgumentError,
-                "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
-        end
-
-        consume_stream(stream, opts)
+        procs = start_pipeline(opts)
+        source = await_source_ready()
+        consume_stream(stream, source, procs)
 
       %{output: {:stream, _stream_opts}} ->
-        produce_stream(opts)
+        procs = start_pipeline(opts)
+        sink = await_sink_ready()
+        produce_stream(sink, procs)
 
       opts ->
         opts
@@ -164,6 +156,83 @@ defmodule Boombox do
         |> await_pipeline()
     end
   end
+
+  @doc """
+  Asynchronous version of run/2
+  Doesn't block the calling process until the termination of the pipeline.
+  It returns a `Task` that can be awaited later.
+  If the output is a stream the behaviour is identical to run/2
+  """
+  @spec async(Enumerable.t() | nil,
+          input: input(),
+          output: output()
+        ) :: Task.t() | Enumerable.t()
+  def async(stream \\ nil, opts) do
+    opts = validate_opts!(stream, opts)
+
+    case opts do
+      %{input: {:stream, _stream_opts}} ->
+        procs = start_pipeline(opts)
+        source = await_source_ready()
+
+        Task.async(fn ->
+          Process.monitor(procs.supervisor)
+          consume_stream(stream, source, procs)
+        end)
+
+      %{output: {:stream, _stream_opts}} ->
+        procs = start_pipeline(opts)
+        sink = await_sink_ready()
+        produce_stream(sink, procs)
+
+      # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
+      # before returning from async/2.
+      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp] ->
+        procs = start_pipeline(opts)
+
+        task =
+          Task.async(fn ->
+            Process.monitor(procs.supervisor)
+            await_pipeline(procs)
+          end)
+
+        await_external_resource_ready()
+        task
+
+      opts ->
+        procs = start_pipeline(opts)
+
+        Task.async(fn ->
+          Process.monitor(procs.supervisor)
+          await_pipeline(procs)
+        end)
+    end
+  end
+
+  @endpoint_opts [:input, :output]
+  defp validate_opts!(stream, opts) do
+    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
+
+    cond do
+      Map.keys(opts) -- @endpoint_opts != [] ->
+        raise ArgumentError,
+              "Both input and output are required. #{@endpoint_opts -- Map.keys(opts)} were not provided"
+
+      stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
+        raise ArgumentError,
+              "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
+
+      stream?(opts[:input]) && stream?(opts[:output]) ->
+        raise ArgumentError,
+              ":stream on both input and output is not supported"
+
+      true ->
+        opts
+    end
+  end
+
+  defp stream?({:stream, _opts}), do: true
+  defp stream?(_io), do: false
 
   @doc """
   Runs boombox with CLI arguments.
@@ -187,15 +256,8 @@ defmodule Boombox do
     end
   end
 
-  @spec consume_stream(Enumerable.t(), opts_map()) :: term()
-  defp consume_stream(stream, opts) do
-    procs = start_pipeline(opts)
-
-    source =
-      receive do
-        {:boombox_ex_stream_source, source} -> source
-      end
-
+  @spec consume_stream(Enumerable.t(), pid(), procs()) :: term()
+  defp consume_stream(stream, source, procs) do
     Enum.reduce_while(
       stream,
       %{demand: 0},
@@ -229,15 +291,11 @@ defmodule Boombox do
     end
   end
 
-  @spec produce_stream(opts_map()) :: Enumerable.t()
-  defp produce_stream(opts) do
+  @spec produce_stream(pid(), procs()) :: Enumerable.t()
+  defp produce_stream(sink, procs) do
     Stream.resource(
       fn ->
-        procs = start_pipeline(opts)
-
-        receive do
-          {:boombox_ex_stream_sink, sink} -> %{sink: sink, procs: procs}
-        end
+        %{sink: sink, procs: procs}
       end,
       fn %{sink: sink, procs: procs} = state ->
         send(sink, :boombox_demand)
@@ -265,6 +323,7 @@ defmodule Boombox do
       opts
       |> Map.update!(:input, &resolve_stream_endpoint(&1, self()))
       |> Map.update!(:output, &resolve_stream_endpoint(&1, self()))
+      |> Map.put(:parent, self())
 
     {:ok, supervisor, pipeline} =
       Membrane.Pipeline.start_link(Boombox.Pipeline, opts)
@@ -283,6 +342,31 @@ defmodule Boombox do
   defp await_pipeline(%{supervisor: supervisor}) do
     receive do
       {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
+    end
+  end
+
+  @spec await_source_ready() :: pid()
+  defp await_source_ready() do
+    receive do
+      {:boombox_ex_stream_source, source} -> source
+    end
+  end
+
+  @spec await_sink_ready() :: pid()
+  defp await_sink_ready() do
+    receive do
+      {:boombox_ex_stream_sink, sink} -> sink
+    end
+  end
+
+  # Waits for the external resource to be ready.
+  # This is used to wait for the tcp/udp server to be ready before returning from async/2.
+  # It is used for rtmp, rtmps, rtp, rtsp.
+  @spec await_external_resource_ready() :: :ok
+  defp await_external_resource_ready() do
+    receive do
+      :external_resource_ready ->
+        :ok
     end
   end
 
