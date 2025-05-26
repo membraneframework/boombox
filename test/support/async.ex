@@ -35,7 +35,7 @@ defmodule Support.Async do
 
         content =
           quote do
-            use ExUnit.Case, async: System.get_env("CIRCLECI") == "true"
+            use ExUnit.Case, async: true
 
             Enum.each(unquote(@tags_attrs), fn {name, value} ->
               Module.put_attribute(__MODULE__, name, value)
