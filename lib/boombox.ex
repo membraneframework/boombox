@@ -215,7 +215,8 @@ defmodule Boombox do
 
     cond do
       Map.keys(opts) -- @endpoint_opts != [] ->
-        raise ArgumentError, "Both input and output are required"
+        raise ArgumentError,
+              "Both input and output are required. #{@endpoint_opts -- Map.keys(opts)} were not provided"
 
       stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
         raise ArgumentError,
@@ -358,6 +359,9 @@ defmodule Boombox do
     end
   end
 
+  # Waits for the external resource to be ready.
+  # This is used to wait for the tcp/udp server to be ready before returning from async/2.
+  # It is used for rtmp, rtmps, rtp, rtsp.
   @spec await_external_resource_ready() :: :ok
   defp await_external_resource_ready() do
     receive do
