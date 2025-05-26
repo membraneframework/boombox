@@ -1,5 +1,5 @@
 defmodule Boombox.BrowserTest do
-  use ExUnit.Case, async: System.get_env("CIRCLECI") != "true"
+  use ExUnit.Case, async: System.get_env("CIRCLECI") == "true"
 
   # Tests from this module are currently switched off on the CI because
   # they raise some errors there, that doesn't occur locally (probably
