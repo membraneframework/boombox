@@ -1,3 +1,22 @@
+"""Boombox endpoints.
+
+Endpoints are classes defining possible inputs and outputs of
+:py:class:`.Boombox`. Each endpoint represents a different media format and has
+appropriate attributes that describe it.
+
+Examples:
+  * MP4("path/to/file.mp4") - an endpoint defining an MP4 container. If
+  provided for input, then Boombox will read a MP4 file from this location. If
+  provided for output, then Boombox will create a file at that location and
+  store the produced stream in it in MP4 format.
+  * HLS("path/to/playlist") - an endpoint defining a HLS playlist. Only
+  output is supported. If used, a playlist will be created in the specified
+  location.
+  * WebRTC("ws://host:port") - an endpoint defining a WebRTC connection.
+  Both input and output is supported. Websocket at the provided URL is used as
+  a signaling channel.
+"""
+
 from dataclasses import dataclass, KW_ONLY, fields, is_dataclass
 from term import Atom
 from typing import Any, Literal
@@ -68,7 +87,7 @@ class BoomboxEndpoint(ABC):
             if f.kw_only and self.__dict__[f.name] is not None
         ]
         if not keyword_fields:
-            return self.get_endpoint_name(), *required_field_values
+            return (self.get_endpoint_name(), *required_field_values)
         else:
             return (self.get_endpoint_name(), *required_field_values, keyword_fields)
 
@@ -266,10 +285,12 @@ class WHIP(BoomboxEndpoint):
 class HLS(BoomboxEndpoint):
     """Endpoint for HTTP Live Streaming.
 
+    Currently Boombox supports only HLS output - creating playlists.
+
     Attributes
     ----------
     location : str
-        Path to the location where the HLS files will be created. If the
+        Path to the location where the HLS playlist will be created. If the
         path is to a directory, then an "index.m3u8" manifest file and the
         other files will be created there. If it's a path to ".m3u8" file,
         the file will be created in provided location and all the other
@@ -335,8 +356,11 @@ class RTP(BoomboxEndpoint):
         Clock rate of given media type. Has to be the same as it would be
         in `rtpmap` attribute of a SDP description.
     aac_bitrate_mode : {None, "lbr", "hbr"}
-        Applicable only for AAC payload - defines which mode should be
+        Applicable only for AAC payload. Defines which mode should be
         assumed/set when depayloading/payloading.
+    audio_specific_config : bytes, optional
+        Applicable only for AAC payload. Contains crucial information about
+        the stream and has to be obtained from a side channel.
     vps, pps, sps : bytes, optional
         Applicable only for H264 and H265 payloads. Parameter sets, could be
         obtained from a side channel. They contain information about the
