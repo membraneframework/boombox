@@ -33,8 +33,8 @@ defmodule Boombox.InternalBin.ElixirStream do
 
     audio_options =
       case Map.take(options, @options_audio_keys) do
-        audio_options when map_size(audio_options) == 3 -> audio_options
-        _no_audio_options -> nil
+        empty_audio_options when map_size(empty_audio_options) == 0 -> nil
+        audio_options -> audio_options
       end
 
     spec_builder =

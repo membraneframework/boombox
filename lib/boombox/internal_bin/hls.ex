@@ -50,7 +50,6 @@ defmodule Boombox.InternalBin.HLS do
               output_stream_format: Membrane.AAC,
               transcoding_policy: transcoding_policy
             })
-            |> child(:hls_audio_realtimer, Membrane.Realtimer)
             |> via_in(Pad.ref(:input, :audio),
               options: [encoding: :AAC, segment_duration: Time.milliseconds(2000)]
             )
@@ -62,7 +61,6 @@ defmodule Boombox.InternalBin.HLS do
               output_stream_format: %H264{alignment: :au, stream_structure: :avc3},
               transcoding_policy: transcoding_policy
             })
-            |> child(:hls_video_realtimer, Membrane.Realtimer)
             |> via_in(Pad.ref(:input, :video),
               options: [encoding: :H264, segment_duration: Time.milliseconds(2000)]
             )
