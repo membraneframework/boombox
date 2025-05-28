@@ -34,7 +34,7 @@ defmodule Boombox.Mixfile do
         if burrito?() do
           {Boombox.Utils.BurritoApp, []}
         else
-          []
+          {Boombox.Application, []}
         end
     ]
   end
@@ -150,8 +150,10 @@ defmodule Boombox.Mixfile do
       boombox:
         [
           steps: [:assemble, &restore_symlinks/1, burrito_wrap]
-        ] ++
-          burrito_config
+        ] ++ burrito_config,
+      server: [
+        steps: [:assemble, &restore_symlinks/1]
+      ]
     ]
   end
 
