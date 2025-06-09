@@ -1,6 +1,6 @@
 defmodule BoomboxStorageEndpointsTest do
   use ExUnit.Case, async: true
-  import Support.Async
+  import AsyncTest
   alias Support.Compare
 
   @just_audio_inputs ["bun10s.aac", "bun10s.ogg", "bun10s.mp3", "bun10s.wav"]
