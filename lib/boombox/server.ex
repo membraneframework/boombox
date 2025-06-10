@@ -170,7 +170,50 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call({:run, boombox_opts}, _from, _state) do
+  def handle_call(request, _from, state) do
+    {reply, state} = handle_request(request, state)
+    {:reply, reply, state}
+  end
+
+  @impl true
+  def handle_info({:call, sender, request}, state) do
+    {reply, state} = handle_request(request, state)
+    send(sender, reply)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:DOWN, _ref, :process, pid, reason}, %State{boombox_pid: pid} = state) do
+    reason =
+      case reason do
+        :normal -> :normal
+        reason -> {:boombox_crash, reason}
+      end
+
+    {:stop, reason, state}
+  end
+
+  @impl true
+  def handle_info(info, state) do
+    Logger.warning("Ignoring message #{inspect(info)}")
+    {:noreply, state}
+  end
+
+  @spec handle_request(:get_pid, State.t() | nil) :: {pid(), State.t() | nil}
+  @spec handle_request({:run, boombox_opts()}, nil) :: {boombox_mode(), State.t()}
+  @spec handle_request({:consume_packet, serialized_boombox_packet()}, State.t()) ::
+          {:ok | :finished | {:error, :incompatible_mode}, State.t()}
+  @spec handle_request(:finish_consuming, State.t()) ::
+          {:finished | {:error, :incompatible_mode}, State.t()}
+  @spec handle_request(:produce_packet, State.t()) ::
+          {{:ok | :finished, serialized_boombox_packet()} | {:error, :incompatible_mode},
+           State.t()}
+  @spec handle_request(
+          {:consume_packet, serialized_boombox_packet()} | :finish_consuming | :produce_packet,
+          nil
+        ) :: {{:error, :boombox_not_running}, nil}
+  @spec handle_request(term(), State.t() | nil) :: {:error, :invalid_request}
+  defp handle_request({:run, boombox_opts}, _state) do
     boombox_mode = get_boombox_mode(boombox_opts)
     server_pid = self()
 
@@ -200,7 +243,7 @@ defmodule Boombox.Server do
           nil
       end
 
-    {:reply, boombox_mode,
+    {boombox_mode,
      %State{
        boombox_pid: boombox_pid,
        boombox_mode: boombox_mode,
@@ -208,59 +251,50 @@ defmodule Boombox.Server do
      }}
   end
 
-  @impl true
-  def handle_call(:get_pid, _from, state) do
+  defp handle_request(:get_pid, state) do
     {:reply, self(), state}
   end
 
-  @impl true
-  def handle_call(
-        {:consume_packet, packet},
-        _from,
-        %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
-      ) do
+  defp handle_request(
+         {:consume_packet, packet},
+         %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
+       ) do
     packet = deserialize_packet(packet)
     send(boombox_pid, {:consume_packet, packet})
 
     receive do
       {:packet_consumed, ^boombox_pid} ->
-        {:reply, :ok, state}
+        {:ok, state}
 
       {:finished, ^boombox_pid} ->
-        {:reply, :finished, state}
+        {:finished, state}
     end
   end
 
-  @impl true
-  def handle_call({:consume_packet, _packet}, _from, %State{boombox_mode: _other_mode} = state) do
-    {:reply, {:error, :incompatible_mode}, state}
+  defp handle_request({:consume_packet, _packet}, %State{boombox_mode: _other_mode} = state) do
+    {{:error, :incompatible_mode}, state}
   end
 
-  @impl true
-  def handle_call(
-        :finish_consuming,
-        _from,
-        %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
-      ) do
+  defp handle_request(
+         :finish_consuming,
+         %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
+       ) do
     send(boombox_pid, :finish_consuming)
 
     receive do
       {:finished, ^boombox_pid} ->
-        {:reply, :finished, state}
+        {:finished, state}
     end
   end
 
-  @impl true
-  def handle_call(:finish_consuming, _from, %State{boombox_mode: _other_mode} = state) do
-    {:reply, {:error, :incompatible_mode}, state}
+  defp handle_request(:finish_consuming, %State{boombox_mode: _other_mode} = state) do
+    {{:error, :incompatible_mode}, state}
   end
 
-  @impl true
-  def handle_call(
-        :produce_packet,
-        _from,
-        %State{boombox_mode: :producing, boombox_pid: boombox_pid} = state
-      ) do
+  defp handle_request(
+         :produce_packet,
+         %State{boombox_mode: :producing, boombox_pid: boombox_pid} = state
+       ) do
     send(boombox_pid, :produce_packet)
 
     last_produced_packet = state.last_produced_packet
@@ -272,35 +306,19 @@ defmodule Boombox.Server do
       end
 
     serialized_packet = serialize_packet(last_produced_packet)
-    {:reply, {production_phase, serialized_packet}, state}
+    {{production_phase, serialized_packet}, state}
   end
 
-  @impl true
-  def handle_call(:produce_packet, _from, %State{boombox_mode: _other_mode} = state) do
-    {:reply, {:error, :incompatible_mode}, state}
+  defp handle_request(:produce_packet, %State{boombox_mode: _other_mode} = state) do
+    {{:error, :incompatible_mode}, state}
   end
 
-  @impl true
-  def handle_call(_request, _from, nil) do
-    {:reply, {:error, :boombox_not_running}, nil}
+  defp handle_request(_request, nil) do
+    {{:error, :boombox_not_running}, nil}
   end
 
-  @impl true
-  def handle_info({:call, sender, message}, state) do
-    {:reply, reply, state} = handle_call(message, sender, state)
-    send(sender, reply)
-    {:noreply, state}
-  end
-
-  @impl true
-  def handle_info({:DOWN, _ref, :process, pid, reason}, %State{boombox_pid: pid} = state) do
-    {:stop, reason, state}
-  end
-
-  @impl true
-  def handle_info(info, state) do
-    Logger.warning("Ignoring message #{inspect(info)}")
-    {:noreply, state}
+  defp handle_request(_invalid_request, state) do
+    {{:error, :invalid_request}, state}
   end
 
   @spec get_boombox_mode(boombox_opts()) :: boombox_mode()

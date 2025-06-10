@@ -1,8 +1,8 @@
 defmodule Boombox.Application do
   @moduledoc """
-  Boombox application. If released with release name set to `"server"`, Boombox.Server under the
-  supervision tree. If `NODE_TO_PING` environment variable is set, then a node with the provided
-  name will be pinged.
+  Boombox application. If released with release name set to `"server"`, Boombox.Server will be
+  started under the supervision tree. If `BOOMBOX_NODE_TO_PING` environment variable is set,
+  then a node with the provided name will be pinged.
   """
   use Application
 
@@ -18,7 +18,7 @@ defmodule Boombox.Application do
   end
 
   defp start_server() do
-    case System.fetch_env("NODE_TO_PING") do
+    case System.fetch_env("BOOMBOX_NODE_TO_PING") do
       :error ->
         :ok
 
