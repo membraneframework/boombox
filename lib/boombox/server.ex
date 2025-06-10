@@ -199,20 +199,7 @@ defmodule Boombox.Server do
     {:noreply, state}
   end
 
-  @spec handle_request(:get_pid, State.t() | nil) :: {pid(), State.t() | nil}
   @spec handle_request({:run, boombox_opts()}, nil) :: {boombox_mode(), State.t()}
-  @spec handle_request({:consume_packet, serialized_boombox_packet()}, State.t()) ::
-          {:ok | :finished | {:error, :incompatible_mode}, State.t()}
-  @spec handle_request(:finish_consuming, State.t()) ::
-          {:finished | {:error, :incompatible_mode}, State.t()}
-  @spec handle_request(:produce_packet, State.t()) ::
-          {{:ok | :finished, serialized_boombox_packet()} | {:error, :incompatible_mode},
-           State.t()}
-  @spec handle_request(
-          {:consume_packet, serialized_boombox_packet()} | :finish_consuming | :produce_packet,
-          nil
-        ) :: {{:error, :boombox_not_running}, nil}
-  @spec handle_request(term(), State.t() | nil) :: {:error, :invalid_request}
   defp handle_request({:run, boombox_opts}, _state) do
     boombox_mode = get_boombox_mode(boombox_opts)
     server_pid = self()
@@ -251,10 +238,13 @@ defmodule Boombox.Server do
      }}
   end
 
+  @spec handle_request(:get_pid, State.t() | nil) :: {pid(), State.t() | nil}
   defp handle_request(:get_pid, state) do
     {self(), state}
   end
 
+  @spec handle_request({:consume_packet, serialized_boombox_packet()}, State.t()) ::
+          {:ok | :finished | {:error, :incompatible_mode}, State.t()}
   defp handle_request(
          {:consume_packet, packet},
          %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
@@ -275,6 +265,8 @@ defmodule Boombox.Server do
     {{:error, :incompatible_mode}, state}
   end
 
+  @spec handle_request(:finish_consuming, State.t()) ::
+          {:finished | {:error, :incompatible_mode}, State.t()}
   defp handle_request(
          :finish_consuming,
          %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
@@ -291,6 +283,9 @@ defmodule Boombox.Server do
     {{:error, :incompatible_mode}, state}
   end
 
+  @spec handle_request(:produce_packet, State.t()) ::
+          {{:ok | :finished, serialized_boombox_packet()} | {:error, :incompatible_mode},
+           State.t()}
   defp handle_request(
          :produce_packet,
          %State{boombox_mode: :producing, boombox_pid: boombox_pid} = state
@@ -313,10 +308,15 @@ defmodule Boombox.Server do
     {{:error, :incompatible_mode}, state}
   end
 
+  @spec handle_request(
+          {:consume_packet, serialized_boombox_packet()} | :finish_consuming | :produce_packet,
+          nil
+        ) :: {{:error, :boombox_not_running}, nil}
   defp handle_request(_request, nil) do
     {{:error, :boombox_not_running}, nil}
   end
 
+  @spec handle_request(term(), State.t() | nil) :: {{:error, :invalid_request}, State.t() | nil}
   defp handle_request(_invalid_request, state) do
     {{:error, :invalid_request}, state}
   end
