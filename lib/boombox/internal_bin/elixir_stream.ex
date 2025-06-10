@@ -31,8 +31,7 @@ defmodule Boombox.InternalBin.ElixirStream do
            |> via_out(Pad.ref(:output, :audio))}
       end)
 
-    spec_builder =
-      child(:elixir_stream_source, %Source{producer: producer})
+    spec_builder = child(:elixir_stream_source, %Source{producer: producer})
 
     %Ready{track_builders: builders, spec_builder: spec_builder}
   end
