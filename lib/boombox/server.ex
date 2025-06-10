@@ -252,7 +252,7 @@ defmodule Boombox.Server do
   end
 
   defp handle_request(:get_pid, state) do
-    {:reply, self(), state}
+    {self(), state}
   end
 
   defp handle_request(

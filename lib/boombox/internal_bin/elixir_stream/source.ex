@@ -10,22 +10,13 @@ defmodule Boombox.InternalBin.ElixirStream.Source do
 
   def_options producer: [
                 spec: pid()
-              ],
-              audio_options: [
-                spec:
-                  %{
-                    audio_format: Membrane.RawAudio.SampleFormat.t(),
-                    audio_rate: Membrane.RawAudio.sample_rate_t(),
-                    audio_channels: Membrane.RawAudio.channels_t()
-                  }
-                  | nil
               ]
 
   @impl true
   def handle_init(_ctx, opts) do
     state = %{
       producer: opts.producer,
-      audio_format: opts.audio_options,
+      audio_format: nil,
       video_dims: nil
     }
 
