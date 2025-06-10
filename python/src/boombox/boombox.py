@@ -113,7 +113,7 @@ class Boombox(pyrlang.process.Process):
         self._process_name = Atom(uuid.uuid4())
         self._erlang_node_name = Atom(f"{self._process_name}@127.0.0.1")
         env = {
-            "NODE_TO_PING": self._python_node_name,
+            "BOOMBOX_NODE_TO_PING": self._python_node_name,
             "RELEASE_NODE": self._erlang_node_name,
             "RELEASE_COOKIE": self._cookie,
             "RELEASE_DISTRIBUTION": "name",
