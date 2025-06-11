@@ -124,7 +124,7 @@ class Boombox(pyrlang.process.Process):
         self._erlang_process = subprocess.Popen([release_path, "start"], env=env)
         atexit.register(lambda: self._erlang_process.kill())
 
-        pyrlang.process.Process.__init__(self)
+        super().__init__(True)
         self.get_node().register_name(self, self._process_name)
         self._finished = self.get_node().get_loop().create_future()
         self._receiver = (self._erlang_node_name, Atom("boombox_server"))
@@ -148,8 +148,8 @@ class Boombox(pyrlang.process.Process):
     def read(self) -> Generator[AudioPacket | VideoPacket, None, None]:
         """Read media packets produced by Boombox.
 
-        Enabled only if Boombox has been initialized with output set to
-        :py:class:`.Array` endpoint.
+        Enabled only if Boombox has been initialized with output defined with
+        an :py:class:`.Array` endpoint.
 
         This generator yields packets as fast as Boombox produces them.
 
@@ -157,17 +157,28 @@ class Boombox(pyrlang.process.Process):
         ------
         AudioPacket or VideoPacket
             Raw media packets produced by Boombox.
+
+        Raises
+        ------
+        RuntimeError
+            If Boombox's output was not defined by an :py:class:`.Array` endpoint.
         """
-        production_phase = Atom("ok")
-        while production_phase != Atom("finished"):
-            production_phase, packet = self._call(Atom("produce_packet"))
-            deserialized_packet = self._deserialize_packet(packet)
-            yield deserialized_packet
+        while True:
+            match self._call(Atom("produce_packet")):
+                case (Atom("ok"), packet):
+                    yield self._deserialize_packet(packet)
+                case (Atom("finished"), packet):
+                    yield self._deserialize_packet(packet)
+                    break
+                case (Atom("error"), Atom("incompatible_mode")):
+                    raise RuntimeError("Output not defined with an Array endpoint.")
+                case other:
+                    raise RuntimeError(f"Unknown response: {other}")
 
     def write(self, packet: AudioPacket | VideoPacket) -> bool:
         """Write packets to Boombox.
 
-        Enabled only if Boombox has been initialized with input set to
+        Enabled only if Boombox has been initialized with input defined with an
         :py:class:`.Array` endpoint.
 
         This method provides Boombox with a packet to process and returns once
@@ -183,16 +194,28 @@ class Boombox(pyrlang.process.Process):
         finished : bool
             Informs if Boombox has finished writing to it's output and won't
             accept any more packets to consume.
+
+        Raises
+        ------
+        RuntimeError
+            If Boombox's input was not defined with an :py:class:`.Array` endpoint.
         """
         serialized_packet = self._serialize_packet(packet)
 
-        result = self._call((Atom("consume_packet"), serialized_packet))
-        return result == Atom("finished")
+        match self._call((Atom("consume_packet"), serialized_packet)):
+            case Atom("finished"):
+                return True
+            case Atom("ok"):
+                return False
+            case (Atom("error"), Atom("incompatible_mode")):
+                raise RuntimeError("Input not defined with an Array endpoint.")
+            case other:
+                raise RuntimeError(f"Unknown response: {other}")
 
     def close(self, wait: bool = False, kill: bool = False) -> None:
         """Closes Boombox for writing.
 
-        Enabled only if Boombox has been initialized with input set to
+        Enabled only if Boombox has been initialized with input defined with an
         :py:class:`.Array` endpoint.
 
         This method informs Boombox that it shouldn't expect any more packets.
@@ -207,12 +230,22 @@ class Boombox(pyrlang.process.Process):
             Determines whether Boombox should be killed without waiting for it
             to gracefully finish it's operation. If True this method will
             return immediately.
+
+        Raises
+        ------
+        RuntimeError
+            If Boombox's input was not defined with an :py:class:`.Array` endpoint.
         """
-        self._call(Atom("finish_consuming"))
-        if kill:
-            self.kill()
-        elif wait:
-            self.wait()
+        match self._call(Atom("finish_consuming")):
+            case Atom("finished"):
+                if kill:
+                    self.kill()
+                elif wait:
+                    self.wait()
+            case (Atom("error"), Atom("incompatible_mode")):
+                raise RuntimeError("Input not defined with an Array endpoint.")
+            case other:
+                raise RuntimeError(f"Unknown response: {other}")
 
     def wait(self) -> None:
         """Waits until Boombox finishes it's operation and then returns."""
@@ -241,11 +274,11 @@ class Boombox(pyrlang.process.Process):
         self._finished.set_result(None)
         super().exit(reason)
 
-    def _call(self, message: Any) -> Any:
+    def _call(self, request: Any) -> Any:
         message = (
             Atom("call"),
             (Atom(self._process_name), Atom(self.node_name_)),
-            message,
+            request,
         )
 
         self.get_node().send_nowait(
