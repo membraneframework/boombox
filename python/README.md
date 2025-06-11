@@ -1,5 +1,21 @@
 ![boombox_transparent](https://github.com/user-attachments/assets/1c5f25a2-cc27-4349-ae72-91315d43d6a1)
 
+## Usage
+The following example will read the MP4 file from the provided URL, flip the video and save it to
+`output.mp4`
+
+```python
+boombox1 = Boombox(
+input="https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun33s.mp4",
+output=Array(video=True, audio=True),
+)
+boombox2 = Boombox(input=Array(video=True, audio=True), output="output.mp4")
+for b in boombox1.read():
+    if isinstance(b, VideoPacket):
+        b.payload = np.flip(b.payload, axis=0)
+    boombox2.write(b)
+boombox2.close(wait=True)
+```
 
 ## Authors
 
