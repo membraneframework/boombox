@@ -12,10 +12,10 @@ import atexit
 import os
 import sys
 import warnings
+import dataclasses
 
 from term import Atom, Pid
-from .endpoints import BoomboxEndpoint, Array
-from dataclasses import dataclass, KW_ONLY
+from .endpoints import BoomboxEndpoint
 
 from typing import Generator, ClassVar, TypeAlias, Literal, Optional, Any, get_args
 from typing_extensions import override
@@ -101,7 +101,6 @@ class Boombox(pyrlang.process.Process):
     _response_received: Optional[asyncio.Future]
     _finished: asyncio.Future
     _erlang_process: subprocess.Popen
-    _audio_stream_format: dict[Atom, Any] | None
 
     _python_node_name = f"{uuid.uuid4()}@127.0.0.1"
     _cookie = str(uuid.uuid4())
@@ -130,14 +129,6 @@ class Boombox(pyrlang.process.Process):
         self._receiver = (self._erlang_node_name, Atom("boombox_server"))
         self._receiver = self._call(Atom("get_pid"))
         self.get_node().link_nowait(self.pid_, self._receiver)
-        if isinstance(input, Array) and input.audio:
-            self._audio_stream_format = {
-                Atom("sample_format"): None,
-                Atom("sample_rate"): input.audio_rate,
-                Atom("channels"): input.audio_channels,
-            }
-        else:
-            self._audio_stream_format = None
 
         boombox_arg = [
             (Atom("input"), self._serialize_endpoint(input)),
@@ -399,27 +390,17 @@ class Boombox(pyrlang.process.Process):
                 sample_format, new_dtype = self._dtype_to_sample_format(
                     packet.payload.dtype
                 )
-                assert self._audio_stream_format is not None
-                self._audio_stream_format[Atom("sample_format")] = Atom(sample_format)
-
-                if packet.sample_rate is not None:
-                    self._audio_stream_format[Atom("sample_rate")] = packet.sample_rate
-                if packet.channels is not None:
-                    self._audio_stream_format[Atom("channels")] = packet.channels
 
                 serialized_payload = (
                     Atom("audio"),
                     {
                         Atom("data"): packet.payload.astype(new_dtype).tobytes(),
-                        **self._audio_stream_format,
+                        Atom("sample_format"): Atom(sample_format),
+                        Atom("sample_rate"): packet.sample_rate,
+                        Atom("channels"): packet.channels,
                     },
                 )
             case VideoPacket():
-                # frame shape (width, height, channels)
-                if len(packet.payload.shape) == 2:
-                    height, width = packet.payload.shape
-                    frame = packet.payload.reshape(width, height, 1)
-
                 frame = packet.payload.clip(0, 255)
                 raw_frame = frame.tobytes()
                 serialized_payload = (
@@ -444,11 +425,11 @@ class Boombox(pyrlang.process.Process):
             return endpoint.serialize()
 
 
-@dataclass
+@dataclasses.dataclass
 class VideoPacket:
     """A Boombox packet containing raw video.
 
-    Objects of this class are used when writing/reading video data to/from
+    Objects of this class are used when writing/reading raw video data to/from
     Boombox.
 
     Attributes
@@ -464,11 +445,11 @@ class VideoPacket:
     timestamp: int
 
 
-@dataclass
+@dataclasses.dataclass
 class AudioPacket:
     """A Boombox packet containing raw audio.
 
-    Objects of this class are used when writing/reading audio data to/from
+    Objects of this class are used when writing/reading raw audio data to/from
     Boombox.
 
     Attributes
@@ -479,15 +460,12 @@ class AudioPacket:
     timestamp : int
         Timestamp of the chunk in milliseconds.
     sample_rate : int, optional
-        Number of audio samples per second. If not provided, the previous value
-        will be assumed.
+        Number of audio samples per second.
     channels : int, optional
-        Number of channels interleaved in the stream. If not provided, the
-        previous value will be assumed.
+        Number of channels interleaved in the stream.
     """
 
     payload: np.ndarray
     timestamp: int
-    _: KW_ONLY
-    sample_rate: int | None = None
-    channels: int | None = None
+    sample_rate: int
+    channels: int

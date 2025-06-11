@@ -6,15 +6,16 @@ appropriate attributes that describe it.
 
 Examples:
   * MP4("path/to/file.mp4") - an endpoint defining an MP4 container. If
-  provided for input, then Boombox will read a MP4 file from this location. If
-  provided for output, then Boombox will create a file at that location and
-  store the produced stream in it in MP4 format.
+    provided for input, then Boombox will read a MP4 file from this location. If
+    provided for output, then Boombox will create a file at that location and
+    store the produced stream in it in MP4 format.
   * HLS("path/to/playlist") - an endpoint defining a HLS playlist. Only
-  output is supported. If used, a playlist will be created in the specified
-  location.
+    output is supported. If used, a playlist will be created in the specified
+    location.
   * WebRTC("ws://host:port") - an endpoint defining a WebRTC connection.
-  Both input and output is supported. Websocket at the provided URL is used as
-  a signaling channel.
+    Both input and output is supported. Websocket at the provided URL is used as
+    a signaling channel.
+
 """
 
 from dataclasses import dataclass, KW_ONLY, fields, is_dataclass
@@ -109,23 +110,26 @@ class BoomboxEndpoint(ABC):
 class Array(BoomboxEndpoint):
     """Endpoint for communication throught numpy arrays.
 
-    This endpoint defines the behavior of Boombox allowing
-    for interacting with Python code directly. For more
-    details refer to :py:class:`.Boombox` class.
+    This endpoint defines the behavior of Boombox allowing for interacting
+    with Python code directly. For more details refer to
+    :py:class:`.Boombox` class.
 
     Attributes
     ----------
     audio, video : bool
-        Determines whether this endpoint will accept/produce
-        video packets, audio packets, or both.
+        Determines whether this endpoint will accept/produce video packets,
+        audio packets, or both.
     audio_rate : int, optional
-        Applicable only when `audio` is set to True. Determines
-        the sample rate of the stream (number of samples per
-        second).
+        Applicable only when `audio` is set to True and the endpoint defines
+        the output. Determines the sample rate of the produced stream (number
+        of samples per second).
     audio_channels : int, optional
-        Applicable only when `audio` is set to True. Determines
-        how many channels does the stream have. The channels are
-        interleaved.
+        Applicable only when `audio` is set to True and the endpoint defines
+        the output. Determines how many channels does the produced stream have.
+        The channels are interleaved.
+    video_width, video_height : int, optional
+        Applicable only when `video` is set to True and the endpoint defines
+        the output. Determines the dimensions of the produced video stream.
     """
 
     _: KW_ONLY
