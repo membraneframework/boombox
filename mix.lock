@@ -1,5 +1,5 @@
 %{
-  "async_test": {:git, "https://github.com/software-mansion-labs/elixir_async_test.git", "11569375a9a659c60e1b5eddd61bd131b18625a0", [branch: "async-test"]},
+  "async_test": {:git, "https://github.com/software-mansion-labs/elixir_async_test.git", "4a877c222682ecbd53fb897971637bbb1bc5da6c", []},
   "bandit": {:hex, :bandit, "1.7.0", "d1564f30553c97d3e25f9623144bb8df11f3787a26733f00b21699a128105c0c", [:mix], [{:hpax, "~> 1.0", [hex: :hpax, repo: "hexpm", optional: false]}, {:plug, "~> 1.18", [hex: :plug, repo: "hexpm", optional: false]}, {:telemetry, "~> 0.4 or ~> 1.0", [hex: :telemetry, repo: "hexpm", optional: false]}, {:thousand_island, "~> 1.0", [hex: :thousand_island, repo: "hexpm", optional: false]}, {:websock, "~> 0.5", [hex: :websock, repo: "hexpm", optional: false]}], "hexpm", "3e2f7a98c7a11f48d9d8c037f7177cd39778e74d55c7af06fe6227c742a8168a"},
   "bimap": {:hex, :bimap, "1.3.0", "3ea4832e58dc83a9b5b407c6731e7bae87458aa618e6d11d8e12114a17afa4b3", [:mix], [], "hexpm", "bf5a2b078528465aa705f405a5c638becd63e41d280ada41e0f77e6d255a10b4"},
   "bunch": {:hex, :bunch, "1.6.1", "5393d827a64d5f846092703441ea50e65bc09f37fd8e320878f13e63d410aec7", [:mix], [], "hexpm", "286cc3add551628b30605efbe2fca4e38cc1bea89bcd0a1a7226920b3364fe4a"},
