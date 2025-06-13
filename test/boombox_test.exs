@@ -3,7 +3,7 @@ defmodule BoomboxTest do
 
   import Membrane.ChildrenSpec
   import Membrane.Testing.Assertions
-  import Support.Async
+  import AsyncTest
 
   require Membrane.Pad, as: Pad
   require Logger
