@@ -58,36 +58,50 @@ defmodule BoomboxTest do
          "output.mp4"
        ], "ref_bun10s_opus_aac.mp4", []}
   ]
-  |> Enum.each(fn {tag, {[input | io], fixture, opts}} ->
+  |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
-    async_test "#{tag}", %{tmp_dir: tmp} do
-      Keyword.get(unquote(opts), :setup, fn -> :ok end).()
+    async_test "#{tag}", %{tmp_dir: tmp_dir} do
+      endpoints = unquote(endpoints) |> parse_endpoint_paths(tmp_dir)
 
-      reduce_test(unquote(io), unquote(input), unquote(fixture), [{:tmp_dir, tmp} | unquote(opts)])
+      endpoints
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.flat_map(fn
+        [input, {:async, output}] ->
+          boombox_task = Boombox.async(input: get_input(input), output: output)
+          [boombox_task]
+
+        [input, output] ->
+          Boombox.run(input: get_input(input), output: output)
+          []
+      end)
+      |> Task.await_many()
+
+      compare_opts = [
+        {:tmp_dir, tmp_dir}
+        | unquote(compare_opts)
+      ]
+
+      List.last(endpoints)
+      |> Compare.compare(
+        "test/fixtures/#{unquote(fixture)}",
+        compare_opts
+      )
     end
   end)
 
-  defp reduce_test([{:async, output} | next], input, fixture, opts) do
-    t = Boombox.async(input: input, output: output)
+  defp parse_endpoint_paths([head | tail], tmp_dir) do
+    modified_tail =
+      Enum.map(tail, fn endpoint ->
+        if is_binary(endpoint),
+          do: Path.join(tmp_dir, endpoint),
+          else: endpoint
+      end)
 
-    reduce_test(
-      next,
-      output,
-      fixture,
-      Keyword.put(opts, :async, [t | Keyword.get(opts, :async, [])])
-    )
+    [head | modified_tail]
   end
 
-  defp reduce_test([output | next], input, fixture, opts) do
-    output_path = Path.join(opts[:tmp_dir], output)
-    Boombox.run(input: input, output: output_path)
-    reduce_test(next, output_path, fixture, opts)
-  end
-
-  defp reduce_test([], input, fixture, opts) do
-    Task.await_many(Keyword.get(opts, :async, []))
-    Compare.compare(input, "test/fixtures/#{fixture}", opts)
-  end
+  defp get_input({:async, input}), do: input
+  defp get_input(input), do: input
 
   defp get_free_local_address() do
     "http://127.0.0.1:#{get_free_port()}"
