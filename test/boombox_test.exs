@@ -141,7 +141,6 @@ defmodule BoomboxTest do
       Task.await_many(async_boomboxes)
 
       List.last(endpoints)
-      # |> get_endpoint()
       |> Compare.compare("test/fixtures/#{fixture}", [{:tmp_dir, tmp_dir} | compare_opts])
     end
   end)
