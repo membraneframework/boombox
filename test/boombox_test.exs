@@ -67,11 +67,11 @@ defmodule BoomboxTest do
       |> Enum.chunk_every(2, 1, :discard)
       |> Enum.flat_map(fn
         [input, {webrtc, _signaling} = output] when webrtc in [:webrtc, :whip] ->
-          boombox_task = Boombox.async(input: get_input(input), output: output)
+          boombox_task = Boombox.async(input: input, output: output)
           [boombox_task]
 
         [input, output] ->
-          Boombox.run(input: get_input(input), output: output)
+          Boombox.run(input: input, output: output)
           []
       end)
       |> Task.await_many()
@@ -99,9 +99,6 @@ defmodule BoomboxTest do
 
     [head | modified_tail]
   end
-
-  defp get_input({:async, input}), do: input
-  defp get_input(input), do: input
 
   defp get_free_local_address() do
     "http://127.0.0.1:#{get_free_port()}"
@@ -189,16 +186,7 @@ defmodule BoomboxTest do
   async_test "mp4 file -> hls", %{tmp_dir: tmp} do
     manifest_filename = Path.join(tmp, "index.m3u8")
     Boombox.run(input: @bbb_mp4, output: manifest_filename)
-    ref_path = "test/fixtures/ref_bun10s_aac_hls"
-    Compare.compare(tmp, ref_path, format: :hls)
-
-    Enum.zip(
-      Path.join(tmp, "*.mp4") |> Path.wildcard(),
-      Path.join(ref_path, "*.mp4") |> Path.wildcard()
-    )
-    |> Enum.each(fn {output_file, ref_file} ->
-      assert File.read!(output_file) == File.read!(ref_file)
-    end)
+    assert_hls(tmp, "test/fixtures/ref_bun10s_aac_hls")
   end
 
   @tag :rtmp_hls
@@ -206,17 +194,21 @@ defmodule BoomboxTest do
     manifest_filename = Path.join(tmp, "index.m3u8")
     port = get_free_port()
     url = "rtmp://localhost:#{port}/app/stream_key"
-    ref_path = "test/fixtures/ref_bun10s_aac_hls"
 
     t = Boombox.async(input: url, output: manifest_filename)
 
     p = send_rtmp(url)
     Task.await(t, 30_000)
     Testing.Pipeline.terminate(p)
-    Compare.compare(tmp, ref_path, format: :hls)
+
+    assert_hls(tmp, "test/fixtures/ref_bun10s_aac_hls")
+  end
+
+  defp assert_hls(out_path, ref_path) do
+    Compare.compare(out_path, ref_path, format: :hls)
 
     Enum.zip(
-      Path.join(tmp, "*.mp4") |> Path.wildcard(),
+      Path.join(out_path, "*.mp4") |> Path.wildcard(),
       Path.join(ref_path, "*.mp4") |> Path.wildcard()
     )
     |> Enum.each(fn {output_file, ref_file} ->
