@@ -3,5 +3,4 @@ max_cases =
     do: 1,
     else: System.schedulers_online() * 2
 
-Logger.configure(level: :warning)
 ExUnit.start(capture_log: true, max_cases: max_cases)
