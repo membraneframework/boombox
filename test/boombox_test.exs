@@ -20,52 +20,153 @@ defmodule BoomboxTest do
   @moduletag :tmp_dir
 
   [
-    file_file_mp4: {[@bbb_mp4, "output.mp4"], "ref_bun10s_aac.mp4", []},
-    file_h265_file_mp4: {[@bbb_mp4_h265, "output.mp4"], "ref_bun10s_h265.mp4", []},
-    file_file_mp4_audio: {[@bbb_mp4_a, "output.mp4"], "ref_bun10s_aac.mp4", kinds: [:audio]},
-    file_file_mp4_video: {[@bbb_mp4_v, "output.mp4"], "ref_bun10s_aac.mp4", kinds: [:video]},
-    http_file_mp4: {[@bbb_mp4_url, "output.mp4"], "ref_bun10s_aac.mp4", []},
-    file_file_file_mp4: {[@bbb_mp4, "mid_output.mp4", "output.mp4"], "ref_bun10s_aac.mp4", []},
+    file_file_mp4:
+      Macro.escape({
+        [@bbb_mp4, "output.mp4"],
+        "ref_bun10s_aac.mp4",
+        []
+      }),
+    file_h265_file_mp4:
+      Macro.escape({
+        [@bbb_mp4_h265, "output.mp4"],
+        "ref_bun10s_h265.mp4",
+        []
+      }),
+    file_file_mp4_audio:
+      Macro.escape({
+        [@bbb_mp4_a, "output.mp4"],
+        "ref_bun10s_aac.mp4",
+        [kinds: [:audio]]
+      }),
+    file_file_mp4_video:
+      Macro.escape({
+        [@bbb_mp4_v, "output.mp4"],
+        "ref_bun10s_aac.mp4",
+        [kinds: [:video]]
+      }),
+    http_file_mp4:
+      Macro.escape({
+        [@bbb_mp4_url, "output.mp4"],
+        "ref_bun10s_aac.mp4",
+        []
+      }),
+    file_file_file_mp4:
+      Macro.escape({
+        [@bbb_mp4, "mid_output.mp4", "output.mp4"],
+        "ref_bun10s_aac.mp4",
+        []
+      }),
     file_webrtc:
-      {[@bbb_mp4, {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}}, "output.mp4"],
-       "ref_bun10s_opus_aac.mp4", []},
+      Macro.escape({
+        [
+          @bbb_mp4,
+          {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+          "output.mp4"
+        ],
+        "ref_bun10s_opus_aac.mp4",
+        []
+      }),
     file_whip:
-      {[@bbb_mp4, {:async, {:whip, quote(do: get_free_local_address())}}, "output.mp4"],
-       "ref_bun10s_opus_aac.mp4", []},
+      Macro.escape({
+        [
+          @bbb_mp4,
+          {:async, {:whip, quote(do: get_free_local_address())}},
+          "output.mp4"
+        ],
+        "ref_bun10s_opus_aac.mp4",
+        []
+      }),
     http_webrtc:
-      {[
-         @bbb_mp4_url,
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", []},
+      Macro.escape({
+        [
+          @bbb_mp4_url,
+          {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+          "output.mp4"
+        ],
+        "ref_bun10s_opus_aac.mp4",
+        []
+      }),
     webrtc_audio:
-      {[
-         @bbb_mp4_a,
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", [kinds: [:audio]]},
+      Macro.escape({
+        [
+          @bbb_mp4_a,
+          {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+          "output.mp4"
+        ],
+        "ref_bun10s_opus_aac.mp4",
+        [kinds: [:audio]]
+      }),
     webrtc_video:
-      {[
-         @bbb_mp4_v,
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", [kinds: [:video]]},
+      Macro.escape({
+        [
+          @bbb_mp4_v,
+          {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+          "output.mp4"
+        ],
+        "ref_bun10s_opus_aac.mp4",
+        [kinds: [:video]]
+      }),
     webrtc_webrtc:
-      {[
-         @bbb_mp4,
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", []}
+      Macro.escape({
+        [
+          @bbb_mp4,
+          {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+          {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+          "output.mp4"
+        ],
+        "ref_bun10s_opus_aac.mp4",
+        []
+      })
   ]
-  |> Enum.each(fn {tag, {[input | io], fixture, opts}} ->
+  |> Enum.each(fn {tag, test_spec} ->
     @tag tag
-    async_test "#{tag}", %{tmp_dir: tmp} do
-      Keyword.get(unquote(opts), :setup, fn -> :ok end).()
+    async_test "#{tag}", %{tmp_dir: tmp_dir} do
+      {endpoints, fixture, compare_opts} = unquote(test_spec)
 
-      reduce_test(unquote(io), unquote(input), unquote(fixture), [{:tmp_dir, tmp} | unquote(opts)])
+      endpoints = endpoints |> Enum.map(&Code.eval_quoted/1) |> preprocess_paths(tmp_dir)
+
+      async_boomboxes =
+        endpoints
+        |> Enum.chunk_every(2, 1, :discard)
+        |> Enum.flat_map(fn
+          [input, {:async, output}] ->
+            async_boombox = Boombox.async(input: get_input(input), output: output)
+            [async_boombox]
+
+          [input, output] ->
+            Boombox.run(input: get_input(input), output: output)
+            []
+        end)
+
+      Task.await_many(async_boomboxes)
+
+      List.last(endpoints)
+      # |> get_endpoint()
+      |> Compare.compare("test/fixtures/#{fixture}", [{:tmp_dir, tmp_dir} | compare_opts])
     end
   end)
+
+  defp preprocess_paths([first | rest], tmp_dir) do
+    rest =
+      rest
+      |> Enum.map(
+        &if is_binary(&1),
+          do: Path.join(tmp_dir, &1),
+          else: &1
+      )
+
+    [first | rest]
+  end
+
+  defp get_input({:async, input}), do: input
+  defp get_input(input), do: input
+
+  # defp preprocess({:asnyc, endpoint}, _tmp_dir), do: endpoint
+  # defp preprocess(endpoint, tmp_dir) when is_binary(endpoint), do: Path.join(tmp_dir, endpoint)
+  # defp preprocess(endpoint, _tmp_dir), do: endpoint
+
+  # defp get_endpoint({:async, endpoint}), do: endpoint
+  # defp get_endpoint(endpoint), do: endpoint
 
   defp reduce_test([{:async, output} | next], input, fixture, opts) do
     t = Boombox.async(input: input, output: output)
