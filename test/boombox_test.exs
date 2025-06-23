@@ -27,34 +27,34 @@ defmodule BoomboxTest do
     http_file_mp4: {[@bbb_mp4_url, "output.mp4"], "ref_bun10s_aac.mp4", []},
     file_file_file_mp4: {[@bbb_mp4, "mid_output.mp4", "output.mp4"], "ref_bun10s_aac.mp4", []},
     file_webrtc:
-      {[@bbb_mp4, {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}}, "output.mp4"],
+      {[@bbb_mp4, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}, "output.mp4"],
        "ref_bun10s_opus_aac.mp4", []},
     file_whip:
-      {[@bbb_mp4, {:async, {:whip, quote(do: get_free_local_address())}}, "output.mp4"],
+      {[@bbb_mp4, {:whip, quote(do: get_free_local_address())}, "output.mp4"],
        "ref_bun10s_opus_aac.mp4", []},
     http_webrtc:
       {[
          @bbb_mp4_url,
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
          "output.mp4"
        ], "ref_bun10s_opus_aac.mp4", []},
     webrtc_audio:
       {[
          @bbb_mp4_a,
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
          "output.mp4"
        ], "ref_bun10s_opus_aac.mp4", [kinds: [:audio]]},
     webrtc_video:
       {[
          @bbb_mp4_v,
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
          "output.mp4"
        ], "ref_bun10s_opus_aac.mp4", [kinds: [:video]]},
     webrtc_webrtc:
       {[
          @bbb_mp4,
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
-         {:async, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}},
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
          "output.mp4"
        ], "ref_bun10s_opus_aac.mp4", []}
   ]
@@ -66,7 +66,7 @@ defmodule BoomboxTest do
       endpoints
       |> Enum.chunk_every(2, 1, :discard)
       |> Enum.flat_map(fn
-        [input, {:async, output}] ->
+        [input, {webrtc, _signaling} = output] when webrtc in [:webrtc, :whip] ->
           boombox_task = Boombox.async(input: get_input(input), output: output)
           [boombox_task]
 
