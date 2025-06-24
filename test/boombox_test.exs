@@ -222,7 +222,8 @@ defmodule BoomboxTest do
     rtsp_port = get_free_port()
     output = Path.join(tmp, "output.mp4")
 
-    Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
+    {:ok, server} = Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
+    on_exit(fn -> Process.exit(server, :normal) end)
 
     Boombox.run(input: "rtsp://localhost:#{rtsp_port}/", output: output)
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
@@ -231,7 +232,9 @@ defmodule BoomboxTest do
   @tag :rtsp_hls
   async_test "rtsp -> hls", %{tmp_dir: tmp} do
     rtsp_port = get_free_port()
-    Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
+    {:ok, server} = Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
+    on_exit(fn -> Process.exit(server, :normal) end)
+
     manifest_filename = Path.join(tmp, "index.m3u8")
     Boombox.run(input: "rtsp://localhost:#{rtsp_port}/", output: manifest_filename)
     Compare.compare(tmp, "test/fixtures/ref_bun10s_aac_hls", format: :hls)
@@ -243,7 +246,8 @@ defmodule BoomboxTest do
     output = Path.join(tmp, "output.mp4")
     signaling = Membrane.WebRTC.Signaling.new()
 
-    Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
+    {:ok, server} = Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
+    on_exit(fn -> Process.exit(server, :normal) end)
 
     t =
       Boombox.async(
