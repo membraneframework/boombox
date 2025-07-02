@@ -62,24 +62,24 @@ class Boombox(pyrlang.process.Process):
 
     One of the main reasons to use Boombox in a Python project is to interact
     with it from Python code directly. This can be achieved with
-    :py:class:`.Array` endpoint, that enables methods allowing for this
+    :py:class:`.RawData` endpoint, that enables methods allowing for this
     interactions.
 
-    If the input is defined by :py:class:`.Array`, Boombox will accept packets
+    If the input is defined by :py:class:`.RawData`, Boombox will accept packets
     provided by :py:meth:`.write` method. This method will return once Boombox
     has processed the provided packet and is ready for the next one. Once
     Boombox should stop accepting more packets, :py:meth:`.close` should be
     called to informing it about the end of the stream. Calling this method can
     be skipped if opening Boombox using a context manager.
 
-    If the output is defined by :py:class:`.Array`, Boombox will produce
+    If the output is defined by :py:class:`.RawData`, Boombox will produce
     packets that are yielded by a generator returned by :py:meth:`.read`.
 
     These methods operate on :py:class:`.AudioPacket` and
     :py:class:`.VideoPacket` objects. These objects contain raw media data and
     accompanying metadata.
 
-    If not using :py:class:`.Array` endpoints Boombox operates fully
+    If not using :py:class:`.RawData` endpoints Boombox operates fully
     asynchronously, it'll work in the background if not interacted with. For
     more control regarding the termination of Boombox refer to
     :py:meth:`.close`, :py:meth:`.wait` and :py:meth:`.kill` methods.
@@ -140,7 +140,7 @@ class Boombox(pyrlang.process.Process):
         """Read media packets produced by Boombox.
 
         Enabled only if Boombox has been initialized with output defined with
-        an :py:class:`.Array` endpoint.
+        an :py:class:`.RawData` endpoint.
 
         This generator yields packets as fast as Boombox produces them.
 
@@ -152,7 +152,7 @@ class Boombox(pyrlang.process.Process):
         Raises
         ------
         RuntimeError
-            If Boombox's output was not defined by an :py:class:`.Array` endpoint.
+            If Boombox's output was not defined by an :py:class:`.RawData` endpoint.
         """
         while True:
             match self._call(Atom("produce_packet")):
@@ -162,7 +162,7 @@ class Boombox(pyrlang.process.Process):
                     yield self._deserialize_packet(packet)
                     break
                 case (Atom("error"), Atom("incompatible_mode")):
-                    raise RuntimeError("Output not defined with an Array endpoint.")
+                    raise RuntimeError("Output not defined with an RawData endpoint.")
                 case other:
                     raise RuntimeError(f"Unknown response: {other}")
 
@@ -170,7 +170,7 @@ class Boombox(pyrlang.process.Process):
         """Write packets to Boombox.
 
         Enabled only if Boombox has been initialized with input defined with an
-        :py:class:`.Array` endpoint.
+        :py:class:`.RawData` endpoint.
 
         This method provides Boombox with a packet to process and returns once
         Boombox is ready to accept the next packet.
@@ -189,7 +189,7 @@ class Boombox(pyrlang.process.Process):
         Raises
         ------
         RuntimeError
-            If Boombox's input was not defined with an :py:class:`.Array` endpoint.
+            If Boombox's input was not defined with an :py:class:`.RawData` endpoint.
         """
         serialized_packet = self._serialize_packet(packet)
 
@@ -199,7 +199,7 @@ class Boombox(pyrlang.process.Process):
             case Atom("ok"):
                 return False
             case (Atom("error"), Atom("incompatible_mode")):
-                raise RuntimeError("Input not defined with an Array endpoint.")
+                raise RuntimeError("Input should be defined with an RawData endpoint.")
             case other:
                 raise RuntimeError(f"Unknown response: {other}")
 
@@ -207,7 +207,7 @@ class Boombox(pyrlang.process.Process):
         """Closes Boombox for writing.
 
         Enabled only if Boombox has been initialized with input defined with an
-        :py:class:`.Array` endpoint.
+        :py:class:`.RawData` endpoint.
 
         This method informs Boombox that it shouldn't expect any more packets.
 
@@ -216,7 +216,8 @@ class Boombox(pyrlang.process.Process):
         wait : bool, default=False
             Determines whether this method should wait until Boombox finishes
             it's operation and only then return, or if it should return
-            immediately and let Boombox finish in the background.
+            immediately and let Boombox finish in the background. Ignored if
+            `kill` set to true.
         kill : bool, default=False
             Determines whether Boombox should be killed without waiting for it
             to gracefully finish it's operation. If True this method will
@@ -225,7 +226,8 @@ class Boombox(pyrlang.process.Process):
         Raises
         ------
         RuntimeError
-            If Boombox's input was not defined with an :py:class:`.Array` endpoint.
+            If Boombox's input was not defined with an :py:class:`.RawData`
+            endpoint.
         """
         match self._call(Atom("finish_consuming")):
             case Atom("finished"):
@@ -234,7 +236,7 @@ class Boombox(pyrlang.process.Process):
                 elif wait:
                     self.wait()
             case (Atom("error"), Atom("incompatible_mode")):
-                raise RuntimeError("Input not defined with an Array endpoint.")
+                raise RuntimeError("Input should be defined with an RawData endpoint.")
             case other:
                 raise RuntimeError(f"Unknown response: {other}")
 
@@ -331,21 +333,20 @@ class Boombox(pyrlang.process.Process):
             data_type = sample_format[0]
             dtype_str = type_mapping[data_type] + "1"
         else:
-            data_type, bit_size, endian = (
-                sample_format[0],
-                sample_format[1:-2],
-                sample_format[-2:],
-            )
-            endian_symbol = "<" if endian == "le" else ">"
+            data_type = sample_format[0]
+            bit_size = sample_format[1:-2]
+            endian = sample_format[-2:]
+
             # numpy doesn't support 24-bit size values
             bit_size = 32 if bit_size == "24" else int(bit_size)
+            endian_symbol = "<" if endian == "le" else ">"
             dtype_str = (
                 endian_symbol + type_mapping[data_type] + str(int(bit_size) // 8)
             )
 
         return np.dtype(dtype_str)
 
-    def _bytes_to_array(
+    def _audio_bytes_to_array(
         self, data: bytes, sample_format: AudioSampleFormat
     ) -> np.ndarray:
         dtype = self._sample_format_to_dtype(sample_format)
@@ -363,7 +364,7 @@ class Boombox(pyrlang.process.Process):
     def _deserialize_packet(self, packet: dict[Atom, Any]) -> AudioPacket | VideoPacket:
         media_type, payload = packet[Atom("payload")]
         if media_type == Atom("audio"):
-            deserialized_payload = self._bytes_to_array(
+            deserialized_payload = self._audio_bytes_to_array(
                 payload[Atom("data")], payload[Atom("sample_format")]
             )
 
@@ -430,7 +431,7 @@ class VideoPacket:
     """A Boombox packet containing raw video.
 
     Objects of this class are used when writing/reading raw video data to/from
-    Boombox.
+    Boombox through the usage of :py:class:`.RawData` endpoint.
 
     Attributes
     ----------
@@ -450,7 +451,7 @@ class AudioPacket:
     """A Boombox packet containing raw audio.
 
     Objects of this class are used when writing/reading raw audio data to/from
-    Boombox.
+    Boombox through the usage of :py:class:`.RawData` endpoint.
 
     Attributes
     ----------
@@ -458,10 +459,10 @@ class AudioPacket:
         Raw data of an audio chunk of the video stream. The array is
         one-dimentional.
     timestamp : int
-        Timestamp of the chunk in milliseconds.
-    sample_rate : int, optional
+        Timestamp of the first sample in the chunk in milliseconds.
+    sample_rate : int
         Number of audio samples per second.
-    channels : int, optional
+    channels : int
         Number of channels interleaved in the stream.
     """
 

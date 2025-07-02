@@ -13,7 +13,7 @@ from .endpoints import (
     RTP,
     RTSP,
     RTMP,
-    Array,
+    RawData,
 )
 
 __all__ = [
@@ -33,5 +33,5 @@ __all__ = [
     "RTP",
     "RTSP",
     "RTMP",
-    "Array",
+    "RawData",
 ]

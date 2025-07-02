@@ -87,10 +87,10 @@ class BoomboxEndpoint(ABC):
             for f in fields(self)
             if f.kw_only and self.__dict__[f.name] is not None
         ]
-        if not keyword_fields:
-            return (self.get_endpoint_name(), *required_field_values)
-        else:
+        if keyword_fields:
             return (self.get_endpoint_name(), *required_field_values, keyword_fields)
+        else:
+            return (self.get_endpoint_name(), *required_field_values)
 
     def get_endpoint_name(self) -> Atom:
         """:meta private:"""
@@ -107,8 +107,9 @@ class BoomboxEndpoint(ABC):
 
 
 @dataclass
-class Array(BoomboxEndpoint):
-    """Endpoint for communication throught numpy arrays.
+class RawData(BoomboxEndpoint):
+    """Endpoint for communication through numpy arrays containing raw media
+    data.
 
     This endpoint defines the behavior of Boombox allowing for interacting
     with Python code directly. For more details refer to
@@ -133,8 +134,8 @@ class Array(BoomboxEndpoint):
     """
 
     _: KW_ONLY
-    audio: bool = False
-    video: bool = False
+    audio: bool
+    video: bool
     audio_rate: int | None = None
     audio_channels: int | None = None
     video_width: int | None = None
@@ -146,7 +147,7 @@ class Array(BoomboxEndpoint):
 
     @override
     def get_atom_fields(self) -> set[str]:
-        return {"audio_format"} & super().get_atom_fields()
+        return {"audio_format"} | super().get_atom_fields()
 
 
 @dataclass
@@ -174,7 +175,7 @@ class StorageEndpoint(BoomboxEndpoint, ABC):
 
     @override
     def get_atom_fields(self) -> set[str]:
-        return {"transport"} & super().get_atom_fields()
+        return {"transport"} | super().get_atom_fields()
 
 
 @dataclass
@@ -392,4 +393,4 @@ class RTP(BoomboxEndpoint):
             "video_encoding",
             "audio_encoding",
             "aac_bitrate_mode",
-        } & super().get_atom_fields()
+        } | super().get_atom_fields()
