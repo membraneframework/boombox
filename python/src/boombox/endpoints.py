@@ -20,9 +20,30 @@ Examples:
 
 from dataclasses import dataclass, KW_ONLY, fields, is_dataclass
 from term import Atom
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 from typing_extensions import override
 from abc import ABC
+
+AudioSampleFormat: TypeAlias = Literal[
+    "s8",
+    "u8",
+    "s16le",
+    "u16le",
+    "s16be",
+    "u16be",
+    "s24le",
+    "u24le",
+    "s24be",
+    "u24be",
+    "s32le",
+    "u32le",
+    "s32be",
+    "u32be",
+    "f32le",
+    "f32be",
+    "f64le",
+    "f64be",
+]
 
 
 @dataclass
@@ -128,6 +149,9 @@ class RawData(BoomboxEndpoint):
         Applicable only when `audio` is set to True and the endpoint defines
         the output. Determines how many channels does the produced stream have.
         The channels are interleaved.
+    audio_format : AudioSampleFormat, optional
+        Applicable only when `audio` is set to True and the endpoint defines
+        the output. Determines the sample format of the produced stream.
     video_width, video_height : int, optional
         Applicable only when `video` is set to True and the endpoint defines
         the output. Determines the dimensions of the produced video stream.
@@ -138,6 +162,7 @@ class RawData(BoomboxEndpoint):
     video: bool
     audio_rate: int | None = None
     audio_channels: int | None = None
+    audio_format: AudioSampleFormat | None = None
     video_width: int | None = None
     video_height: int | None = None
 
