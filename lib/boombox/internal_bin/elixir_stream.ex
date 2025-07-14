@@ -59,7 +59,7 @@ defmodule Boombox.InternalBin.ElixirStream do
               output_stream_format: Membrane.RawAudio
             })
             |> maybe_plug_resampler(options)
-            |> via_in(Pad.ref(:input, :audio))
+            |> via_in(Pad.ref(:input, :audio), toilet_capacity: 500)
             |> get_child(:elixir_stream_sink)
 
           {:video, builder} ->
@@ -72,7 +72,7 @@ defmodule Boombox.InternalBin.ElixirStream do
               output_width: options[:video_width],
               output_height: options[:video_height]
             })
-            |> via_in(Pad.ref(:input, :video))
+            |> via_in(Pad.ref(:input, :video), toilet_capacity: 500)
             |> get_child(:elixir_stream_sink)
         end),
         Enum.map(to_ignore, fn {_track, builder} -> builder |> child(Membrane.Debug.Sink) end)

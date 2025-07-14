@@ -145,15 +145,15 @@ defmodule Boombox.InternalBin.WebRTC do
             output_stream_format: Membrane.Opus,
             transcoding_policy: transcoding_policy
           })
-          |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
-          |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
+          # |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
+          |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio], toilet_capacity: 500)
           |> get_child(:webrtc_output)
 
         {:video, builder} ->
           negotiated_codecs = state.output_webrtc_state.negotiated_video_codecs
 
           builder
-          |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
+          # |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
           |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
             output_stream_format: fn input_format ->
               resolve_output_video_stream_format(
@@ -165,7 +165,7 @@ defmodule Boombox.InternalBin.WebRTC do
             end,
             transcoding_policy: transcoding_policy
           })
-          |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
+          |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video], toilet_capacity: 500)
           |> get_child(:webrtc_output)
       end)
     ]

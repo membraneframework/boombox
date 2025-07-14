@@ -13,33 +13,13 @@ import os
 import sys
 import warnings
 import dataclasses
+import signal
 
 from term import Atom, Pid
-from .endpoints import BoomboxEndpoint
+from .endpoints import BoomboxEndpoint, AudioSampleFormat
 
-from typing import Generator, ClassVar, TypeAlias, Literal, Optional, Any, get_args
+from typing import Generator, ClassVar, Optional, Any, get_args
 from typing_extensions import override
-
-AudioSampleFormat: TypeAlias = Literal[
-    "s8",
-    "u8",
-    "s16le",
-    "u16le",
-    "s16be",
-    "u16be",
-    "s24le",
-    "u24le",
-    "s24be",
-    "u24be",
-    "s32le",
-    "u32le",
-    "s32be",
-    "u32be",
-    "f32le",
-    "f32be",
-    "f64le",
-    "f64be",
-]
 
 
 class Boombox(pyrlang.process.Process):
