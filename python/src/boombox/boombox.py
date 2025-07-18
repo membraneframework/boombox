@@ -49,13 +49,13 @@ class Boombox(pyrlang.process.Process):
 
     When creating an instance of Boombox the input and output are
     specified by providing an appropriate endpoint object for each of them.
-    These objects define the format and it's parameters that are used for
+    These objects define the format and its parameters that are used for
     the input or output, whichever they were provided for.
 
-    For example, if an `RTMP("rtmp://my.stream.source:2137")` endpoint was provided
-    for input and `MP4("path/to/target.mp4")` for output, then Boombox will
-    try to connect to a RTMP server at the provided URL and save the acquired
-    stream to a `.mp4` file at the provided location.
+    For example, if an `RTMP("rtmp://my.stream.source:2137/app/key")` endpoint
+    was provided for input and `MP4("path/to/target.mp4")` for output, then
+    Boombox will become a RTMP server, wait for clients to connect and save
+    the acquired stream to a `.mp4` file at the provided location.
 
     For more information about endpoints and to see supported formats refer to
     :py:mod:`.endpoints`.
@@ -280,30 +280,23 @@ class Boombox(pyrlang.process.Process):
         self._response_received = self.get_node().get_loop().create_future()
         return self.get_node().get_loop().run_until_complete(self._response_received)
 
-    def _dtype_to_sample_format(
-        self, dtype: np.dtype
-    ) -> tuple[AudioSampleFormat, np.dtype]:
-        match dtype.kind:
-            case "i":
-                data_type = "s"
-            case "u":
-                data_type = "u"
-            case "f":
-                data_type = "f"
-            case other:
-                warnings.warn(
-                    f"Arrays of dtype.kind == {other} not allowed, supported kinds are 'i', 'u', 'f', casting to 'f'."
-                )
-                data_type = "f"
+    @staticmethod
+    def _dtype_to_sample_format(dtype: np.dtype) -> tuple[AudioSampleFormat, np.dtype]:
+        type_mapping = {"i": "s", "u": "u", "f": "f"}
+        data_type = type_mapping.get(dtype.kind)
+        if data_type is None:
+            warnings.warn(
+                f"Arrays of dtype.kind == {dtype.kind} not allowed, supported kinds are 'i', 'u', 'f', casting to 'f'."
+            )
+            data_type = "f"
 
-        match dtype.itemsize:
-            case 1 | 2 | 4 | 8:
-                bit_size = str(dtype.itemsize * 8)
-            case other:
-                warnings.warn(
-                    f"Item size {dtype.itemsize} not allowed, supported item sizes are 1, 2, 4 and 8, casting to 4"
-                )
-                bit_size = "32"
+        if dtype.itemsize in [1, 2, 4, 8]:
+            bit_size = str(dtype.itemsize * 8)
+        else:
+            warnings.warn(
+                f"Item size {dtype.itemsize} not allowed, supported item sizes are 1, 2, 4 and 8, casting to 4"
+            )
+            bit_size = "32"
 
         match dtype.byteorder:
             case "<":
@@ -322,11 +315,12 @@ class Boombox(pyrlang.process.Process):
         )
         assert sample_format in audio_sample_formats
 
-        new_dtype = self._sample_format_to_dtype(sample_format)
+        new_dtype = Boombox._sample_format_to_dtype(sample_format)
 
         return sample_format, new_dtype
 
-    def _sample_format_to_dtype(self, sample_format: AudioSampleFormat) -> np.dtype:
+    @staticmethod
+    def _sample_format_to_dtype(sample_format: AudioSampleFormat) -> np.dtype:
         type_mapping = {"s": "i", "u": "u", "f": "f"}
 
         if len(sample_format) == 2:  # Handle 8-bit case (without endian)
@@ -346,10 +340,11 @@ class Boombox(pyrlang.process.Process):
 
         return np.dtype(dtype_str)
 
+    @staticmethod
     def _audio_bytes_to_array(
-        self, data: bytes, sample_format: AudioSampleFormat
+        data: bytes, sample_format: AudioSampleFormat
     ) -> np.ndarray:
-        dtype = self._sample_format_to_dtype(sample_format)
+        dtype = Boombox._sample_format_to_dtype(sample_format)
         if sample_format not in ["s24le", "u24le", "s24be", "u24be"]:
             return np.frombuffer(data, dtype)
         else:
@@ -361,10 +356,11 @@ class Boombox(pyrlang.process.Process):
                 for i in range(0, len(data), 3)
             )
 
-    def _deserialize_packet(self, packet: dict[Atom, Any]) -> AudioPacket | VideoPacket:
+    @staticmethod
+    def _deserialize_packet(packet: dict[Atom, Any]) -> AudioPacket | VideoPacket:
         media_type, payload = packet[Atom("payload")]
         if media_type == Atom("audio"):
-            deserialized_payload = self._audio_bytes_to_array(
+            deserialized_payload = Boombox._audio_bytes_to_array(
                 payload[Atom("data")], payload[Atom("sample_format")]
             )
 
@@ -385,10 +381,11 @@ class Boombox(pyrlang.process.Process):
             ).reshape(shape)
             return VideoPacket(deserialized_payload, packet[Atom("timestamp")])
 
-    def _serialize_packet(self, packet: AudioPacket | VideoPacket) -> dict[Atom, Any]:
+    @staticmethod
+    def _serialize_packet(packet: AudioPacket | VideoPacket) -> dict[Atom, Any]:
         match packet:
             case AudioPacket():
-                sample_format, new_dtype = self._dtype_to_sample_format(
+                sample_format, new_dtype = Boombox._dtype_to_sample_format(
                     packet.payload.dtype
                 )
 
@@ -419,7 +416,8 @@ class Boombox(pyrlang.process.Process):
             Atom("timestamp"): packet.timestamp,
         }
 
-    def _serialize_endpoint(self, endpoint: BoomboxEndpoint | str) -> Any:
+    @staticmethod
+    def _serialize_endpoint(endpoint: BoomboxEndpoint | str) -> Any:
         if isinstance(endpoint, str):
             return endpoint.encode()
         else:
