@@ -78,8 +78,9 @@ class Boombox(pyrlang.process.Process):
     _process_name: Atom
     _erlang_node_name: Atom
     _receiver: tuple[Atom, Atom] | Pid
-    _response_received: Optional[asyncio.Future]
-    _finished: asyncio.Future
+    _response: Optional[asyncio.Future]
+    _terminated: asyncio.Future
+    _finished: bool
     _erlang_process: subprocess.Popen
 
     _python_node_name = f"{uuid.uuid4()}@127.0.0.1"
@@ -105,10 +106,11 @@ class Boombox(pyrlang.process.Process):
 
         super().__init__(True)
         self.get_node().register_name(self, self._process_name)
-        self._finished = self.get_node().get_loop().create_future()
+        self._terminated = self.get_node().get_loop().create_future()
+        self._finished = False
         self._receiver = (self._erlang_node_name, Atom("boombox_server"))
         self._receiver = self._call(Atom("get_pid"))
-        self.get_node().link_nowait(self.pid_, self._receiver)
+        self.get_node().monitor_process(self.pid_, self._receiver)
 
         boombox_arg = [
             (Atom("input"), self._serialize_endpoint(input)),
@@ -150,7 +152,8 @@ class Boombox(pyrlang.process.Process):
         """Write packets to Boombox.
 
         Enabled only if Boombox has been initialized with input defined with an
-        :py:class:`.RawData` endpoint.
+        :py:class:`.RawData` endpoint and if Boombox hasn't already finished
+        accepting packets.
 
         This method provides Boombox with a packet to process and returns once
         Boombox is ready to accept the next packet.
@@ -163,18 +166,24 @@ class Boombox(pyrlang.process.Process):
         Returns
         -------
         finished : bool
-            Informs if Boombox has finished writing to it's output and won't
-            accept any more packets to consume.
+            Informs if Boombox has finished accepting packets and closed its
+            input for any further ones. Once it finishes processing the
+            previously provided packet, it will terminate.
 
         Raises
         ------
         RuntimeError
-            If Boombox's input was not defined with an :py:class:`.RawData` endpoint.
+            If Boombox's input was not defined with an :py:class:`.RawData`
+            endpoint or if Boombox has already finished accepting packets.
         """
+        if self._finished:
+            raise RuntimeError("Boombox has already finished accepting packets.")
+
         serialized_packet = self._serialize_packet(packet)
 
         match self._call((Atom("consume_packet"), serialized_packet)):
             case Atom("finished"):
+                self._finished = True
                 return True
             case Atom("ok"):
                 return False
@@ -222,7 +231,7 @@ class Boombox(pyrlang.process.Process):
 
     def wait(self) -> None:
         """Waits until Boombox finishes it's operation and then returns."""
-        self.get_node().get_loop().run_until_complete(self._finished)
+        self.get_node().get_loop().run_until_complete(self._terminated)
 
     def kill(self) -> None:
         """Forces Boombox to exit without waiting for it to gracefully finish
@@ -238,13 +247,21 @@ class Boombox(pyrlang.process.Process):
     @override
     def handle_one_inbox_message(self, msg: Any) -> None:
         """:meta private:"""
-        if self._response_received is not None:
-            self._response_received.set_result(msg)
+        assert self._response is not None
+        match msg:
+            case (Atom("response"), response):
+                self._response.set_result(response)
+            case (Atom("DOWN"), _, Atom("process"), _, Atom("normal")):
+                self._terminated.set_result(None)
+            case (Atom("DOWN"), _, Atom("process"), _, reason):
+                self._response.set_exception(
+                    RuntimeError(f"Boombox crashed with reason {reason}")
+                )
 
     @override
     def exit(self, reason: Any = None) -> None:
         """:meta private:"""
-        self._finished.set_result(None)
+        self._terminated.set_result(None)
         super().exit(reason)
 
     def _call(self, request: Any) -> Any:
@@ -257,8 +274,8 @@ class Boombox(pyrlang.process.Process):
         self.get_node().send_nowait(
             sender=self, receiver=self._receiver, message=message
         )
-        self._response_received = self.get_node().get_loop().create_future()
-        return self.get_node().get_loop().run_until_complete(self._response_received)
+        self._response = self.get_node().get_loop().create_future()
+        return self.get_node().get_loop().run_until_complete(self._response)
 
     @staticmethod
     def _dtype_to_sample_format(dtype: np.dtype) -> tuple[AudioSampleFormat, np.dtype]:
