@@ -8,36 +8,25 @@ import queue
 import threading
 from src.boombox import Boombox, RawData, AudioPacket, VideoPacket, WebRTC
 import whisper
-import librosa
+from scipy.io.wavfile import write
 
 
-# --- UPGRADE: Threaded Speech-to-Text Worker ---
 def stt_worker(audio_q: queue.Queue, transcript_q: queue.Queue, model: whisper.Whisper):
-    """
-    This function runs in a separate thread, continuously processing audio
-    from the queue to avoid blocking the main video loop.
-    """
     while True:
-        try:
-            # Get audio data from the queue; this will block until data is available
-            audio_np = audio_q.get(block=True)
+        audio_np = audio_q.get(block=True)
 
-            # Transcribe the audio data
-            print(f"queue size {audio_q.qsize()}")
-            print(f"Transcribing audio chunk of length {audio_np.size}")
-            result = model.transcribe(
-                audio_np,
-                fp16=torch.cuda.is_available(),
-            )
-            text = result["text"]
-            print(text)
+        print(f"queue size {audio_q.qsize()}")
+        print(f"Transcribing audio chunk of length {audio_np.size}")
+        result = model.transcribe(
+            audio_np,
+            fp16=torch.cuda.is_available(),
+        )
+        text = result["text"]
+        print(text)
+        # write(f"{text}.wav", 16000, audio_np)
 
-            # Put the transcribed text into the results queue
-            if text:
-                transcript_q.put(text)
-
-        except Exception as e:
-            print(f"STT Worker Error: {e}")
+        if text:
+            transcript_q.put(text)
 
 
 def resize_frame(frame: np.ndarray, scale_factor: float) -> np.ndarray:
@@ -54,26 +43,20 @@ def detect_pose(pose_model: YOLO, frame: np.ndarray) -> tuple[torch.Tensor, bool
     should_blur_face = False
     pose_results = pose_model(frame, verbose=False)
     if pose_results[0].keypoints.shape[1] > 0:
-        for coordinates, confidence in zip(
-            pose_results[0].keypoints.xy, pose_results[0].keypoints.conf
-        ):
+        for coordinates in pose_results[0].keypoints.xy:
             left_wrist_y = coordinates[LEFT_WRIST][1]
-            left_wrist_conf = confidence[LEFT_WRIST]
             right_wrist_y = coordinates[RIGHT_WRIST][1]
-            right_wrist_conf = confidence[RIGHT_WRIST]
 
             left_shoulder_y = coordinates[LEFT_SHOULDER][1]
-            left_shoulder_conf = confidence[LEFT_SHOULDER]
             right_shoulder_y = coordinates[RIGHT_SHOULDER][1]
-            right_shoulder_conf = confidence[RIGHT_SHOULDER]
 
             if (
-                left_wrist_conf > 0.2
-                and left_shoulder_conf > 0.2
+                left_wrist_y > 0
+                and left_shoulder_y > 0
                 and left_wrist_y < left_shoulder_y
             ) or (
-                right_wrist_conf > 0.2
-                and right_shoulder_conf > 0.2
+                right_wrist_y > 0
+                and right_shoulder_y > 0.2
                 and right_wrist_y < right_shoulder_y
             ):
                 should_blur_face = True
@@ -124,23 +107,13 @@ def split_transcription(text: str, frame: np.ndarray) -> list[tuple[str, int]]:
     text = text.strip()
 
     max_line_width = frame.shape[1] - 2 * TEXT_MARGIN
-    # current_line_width = 0
     words = text.split()
-    # lines = [words[0]]
-    # for word in words[1:]:
-    # (current_line_width, _), _ = cv2.getTextSize(
-    # lines[-1] + " " + word, FONT, FONT_SCALE, FONT_THICKNESS
-    # )
-    # if current_line_width <= max_line_width:
-    # lines[-1] += " " + word
-    # else:
-    # lines.append(word)
 
     lines = []
     current_line_text = ""
+    candidate_line_text = current_line_text
     current_line_width = 0
 
-    candidate_line_text = current_line_text
     for word in words:
         sep = "" if current_line_text == "" else " "
         candidate_line_text += sep + word
@@ -149,16 +122,16 @@ def split_transcription(text: str, frame: np.ndarray) -> list[tuple[str, int]]:
         )
         if candidate_line_width >= max_line_width:
             lines.append((current_line_text, current_line_width))
-            current_line_text = ""
-            current_line_width = 0
-            candidate_line_text = current_line_text
-            candidate_line_width = current_line_width
+            current_line_text = word
+            candidate_line_text = word
+            (current_line_width, _), _ = cv2.getTextSize(
+                current_line_text, FONT, FONT_SCALE, FONT_THICKNESS
+            )
         else:
             current_line_text = candidate_line_text
             current_line_width = candidate_line_width
 
-    if current_line_text != "":
-        lines.append((current_line_text, current_line_width))
+    lines.append((current_line_text, current_line_width))
 
     return lines
 
@@ -186,11 +159,11 @@ def render_transcription(lines: list[tuple[str, int]], frame: np.ndarray) -> Non
         )
 
 
-def ring_modulate(audio_chunk, sample_rate, carrier_freq=40.0):
-    """
-    Applies ring modulation to an audio chunk for a robotic effect.
-    This is a very fast, low-latency distortion method.
-    """
+def ring_modulate(
+    audio_chunk: np.ndarray,
+    sample_rate: int,
+    carrier_freq: float = 40.0,
+) -> np.ndarray:
     num_samples = len(audio_chunk)
     time_vector = np.arange(num_samples) / sample_rate
     carrier_wave = np.sin(2 * np.pi * carrier_freq * time_vector)
@@ -235,13 +208,10 @@ def process_stream():
     silence_start_timestamp = None
     MIN_PACKET_READ_TIME = 0.01
 
-    VAD_THRESHOLD = 0.2  # Energy threshold for detecting speech. Adjust this based on your mic sensitivity.
-    PHRASE_CHUNK_TIMEOUT_MS = (
-        250  # How long a pause indicates the end of a phrase (in milliseconds).
-    )
+    VAD_THRESHOLD = 0.05  # Energy threshold for detecting speech. Adjust this based on your mic sensitivity.
+    PHRASE_CHUNK_TIMEOUT_MS = 250
     PHRASE_TIMEOUT_MS = 2000
     silence_time = 0
-    last_silent_chunk = None
 
     boombox1 = Boombox(
         input=WebRTC("ws://localhost:8829"),
@@ -254,12 +224,13 @@ def process_stream():
             audio_format="f32le",
         ),
     )
-    boombox2 = Boombox(
-        input=RawData(video=True, audio=True), output=WebRTC("ws://localhost:8830")
-    )
+    # boombox2 = Boombox
+    # input=RawData(video=True, audio=True), output=WebRTC("ws://localhost:8830")
+    # )
 
     try:
         for packet in boombox1.read():
+            time.sleep(0.2)
             if isinstance(packet, AudioPacket):
                 audio_read_end_time = time.time()
                 if audio_read_start_time is not None:
@@ -267,13 +238,13 @@ def process_stream():
                 # print(f"audio reading: {audio_read_time * 1000:.2f}ms")
                 if should_anonymise or True:
                     rms = np.sqrt(np.mean(packet.payload**2))
-                    print(packet.payload.size)
 
                     if rms > VAD_THRESHOLD:
                         if silence_time > PHRASE_TIMEOUT_MS:
                             audio_buffer.clear()
-                            if last_silent_chunk is not None:
-                                audio_buffer = [last_silent_chunk]
+                        # if last_silent_chunk is not None:
+                        # audio_buffer = [last_silent_chunk]
+                        silence_time = 0
                         is_speaking = True
                         silence_start_timestamp = None
                         audio_buffer.append(packet.payload)
@@ -282,16 +253,19 @@ def process_stream():
                             silence_start_timestamp = packet.timestamp
                         if is_speaking:
                             audio_buffer.append(packet.payload)
-                        else:
-                            last_silent_chunk = packet.payload
+                        # else:
+                        # last_silent_chunk = packet.payload
                         silence_time = packet.timestamp - silence_start_timestamp
                         if is_speaking and silence_time > PHRASE_CHUNK_TIMEOUT_MS:
                             full_audio_np = np.concatenate(audio_buffer, axis=0)
                             audio_queue.put(full_audio_np)
+                            # audio_buffer.clear()
                             is_speaking = False
-                    packet.payload = ring_modulate(packet.payload, packet.sample_rate)
+                    packet.payload = ring_modulate(
+                        packet.payload, packet.sample_rate, carrier_freq=60.0
+                    )
 
-                boombox2.write(packet)
+                # boombox2.write(packet)
                 audio_read_start_time = time.time()
                 # print(
                 # f"audio processing: {(audio_read_start_time - audio_read_end_time) * 1000:.2f}ms"
@@ -335,7 +309,7 @@ def process_stream():
                 processed_packet = VideoPacket(
                     payload=frame, timestamp=packet.timestamp
                 )
-                boombox2.write(processed_packet)
+                # boombox2.write(processed_packet)
                 video_read_start_time = time.time()
                 # print(
                 # f"video processing: {(video_read_start_time - video_read_end_time) * 1000:.2f}ms"
@@ -344,7 +318,7 @@ def process_stream():
     except KeyboardInterrupt:
         print("\nStream processing stopped by user.")
     finally:
-        boombox2.close(kill=True)
+        # boombox2.close(wait=True)
         print("Cleanup complete.")
 
 
