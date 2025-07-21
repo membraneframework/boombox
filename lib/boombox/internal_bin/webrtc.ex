@@ -182,7 +182,7 @@ defmodule Boombox.InternalBin.WebRTC do
             end,
             transcoding_policy: transcoding_policy
           })
-          |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video], toilet_capacity: 500)
+          |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)
       end)
     ]
