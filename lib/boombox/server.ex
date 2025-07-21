@@ -12,8 +12,8 @@ defmodule Boombox.Server do
   #                        way as their respective functions mentioned above.
   #   * Messages - `{:call, sender, {:consume_packet, packet}}`, `{:call, sender, :finish_consuming}`
   #                and `{:call, sender, :produce_packet}` messages will cause the server to handle the
-  #                call specified by the third element of the tuple and send the result to `sender`
-  #                when finished.
+  #                call specified by the third element of the tuple and send a `{:response, response}`
+  #                tuple to the `sender` when finished.
   # The packets that Boombox is consuming and producing are in the form of
   # `t:serialized_boombox_packet/0`
 
@@ -92,7 +92,7 @@ defmodule Boombox.Server do
   Starts the server and links it to the current process, for more information see `GenServer.start_link/3`
   """
   @spec start_link(term()) :: GenServer.on_start()
-  def start_link(_arg) do
+  def start_link(_opts) do
     GenServer.start_link(__MODULE__, nil)
   end
 
@@ -100,7 +100,7 @@ defmodule Boombox.Server do
   Starts the server, for more information see `GenServer.start/3`
   """
   @spec start(term()) :: GenServer.on_start()
-  def start(_arg) do
+  def start(_opts) do
     GenServer.start(__MODULE__, nil)
   end
 
@@ -164,21 +164,21 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def init(_arg) do
+  def init(_opts) do
     Process.register(self(), :boombox_server)
     {:ok, nil}
   end
 
   @impl true
   def handle_call(request, _from, state) do
-    {reply, state} = handle_request(request, state)
-    {:reply, reply, state}
+    {response, state} = handle_request(request, state)
+    {:reply, response, state}
   end
 
   @impl true
   def handle_info({:call, sender, request}, state) do
-    {reply, state} = handle_request(request, state)
-    send(sender, reply)
+    {response, state} = handle_request(request, state)
+    send(sender, {:response, response})
     {:noreply, state}
   end
 
@@ -197,6 +197,22 @@ defmodule Boombox.Server do
   def handle_info(info, state) do
     Logger.warning("Ignoring message #{inspect(info)}")
     {:noreply, state}
+  end
+
+  @impl true
+  def terminate(reason, _state) do
+    pid = self()
+
+    # Stop the application after the process terminates, allowing it to exit with the original
+    # reason, not :shutdown coming from the top.
+    spawn(fn ->
+      Process.monitor(pid)
+
+      receive do
+        {:DOWN, _ref, :process, ^pid, ^reason} ->
+          Application.stop(:boombox)
+      end
+    end)
   end
 
   @spec handle_request({:run, boombox_opts()}, nil) :: {boombox_mode(), State.t()}
@@ -319,11 +335,6 @@ defmodule Boombox.Server do
   @spec handle_request(term(), State.t() | nil) :: {{:error, :invalid_request}, State.t() | nil}
   defp handle_request(_invalid_request, state) do
     {{:error, :invalid_request}, state}
-  end
-
-  @impl true
-  def terminate(_reason, _state) do
-    Application.stop(:boombox)
   end
 
   @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
