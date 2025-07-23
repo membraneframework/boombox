@@ -87,6 +87,7 @@ defmodule Boombox do
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
+          | {:hls, uri :: String.t()}
           | {:stream, in_stream_opts()}
 
   @type output ::

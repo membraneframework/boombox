@@ -5,8 +5,47 @@ defmodule Boombox.InternalBin.HLS do
 
   require Membrane.Pad, as: Pad
   alias Boombox.InternalBin.Ready
-  alias Membrane.H264
-  alias Membrane.Time
+  alias Membrane.{AAC, H264, HTTPAdaptiveStream, RemoteStream, Time, Transcoder}
+
+  @spec create_input(URI.t()) :: Wait.t()
+  def create_input(uri) do
+    spec =
+      child(:hls_source, %HTTPAdaptiveStream.Source{
+        uri: uri,
+        # todo: maybe add an option to specify variant selection policy
+        variant_selection_policy: :highest_resolution
+      })
+
+    %Wait{actions: [spec: spec]}
+  end
+
+  @spec handle_input_tracks([{:audio_output | :video_output, struct()}]) :: Ready.t()
+  def handle_input_tracks(tracks) do
+    track_builders =
+      tracks
+      |> Map.new(fn
+        {:audio_output, %RemoteStream{content_format: AAC}} ->
+          spec =
+            get_child(:hls_source)
+            |> via_out(:audio_output)
+            |> child(:hls_source_audio_transcoder, %Transcoder{
+              assumed_input_stream_format: %AAC{encapsulation: :ADTS},
+              output_stream_format: AAC
+            })
+
+          {:audio, spec}
+
+        {:audio_output, %AAC{}} ->
+          spec = get_child(:hls_source) |> via_out(:audio_output)
+          {:audio, spec}
+
+        {:video_output, _video_format} ->
+          spec = get_child(:hls_source) |> via_out(:video_output)
+          {:video, spec}
+      end)
+
+    %Ready{track_builders: track_builders}
+  end
 
   @spec link_output(
           Path.t(),
@@ -32,22 +71,22 @@ defmodule Boombox.InternalBin.HLS do
         spec_builder,
         child(
           :hls_sink_bin,
-          %Membrane.HTTPAdaptiveStream.SinkBin{
+          %HTTPAdaptiveStream.SinkBin{
             manifest_name: manifest_name,
-            manifest_module: Membrane.HTTPAdaptiveStream.HLS,
-            storage: %Membrane.HTTPAdaptiveStream.Storages.FileStorage{
+            manifest_module: HTTPAdaptiveStream.HLS,
+            storage: %HTTPAdaptiveStream.Storages.FileStorage{
               directory: directory
             },
             hls_mode: hls_mode,
             mp4_parameters_in_band?: true,
-            target_window_duration: Membrane.Time.seconds(20)
+            target_window_duration: Time.seconds(20)
           }
         ),
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:hls_audio_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.AAC,
+            |> child(:hls_audio_transcoder, %Transcoder{
+              output_stream_format: AAC,
               transcoding_policy: transcoding_policy
             })
             |> via_in(Pad.ref(:input, :audio),
@@ -57,7 +96,7 @@ defmodule Boombox.InternalBin.HLS do
 
           {:video, builder} ->
             builder
-            |> child(:hls_video_transcoder, %Membrane.Transcoder{
+            |> child(:hls_video_transcoder, %Transcoder{
               output_stream_format: %H264{alignment: :au, stream_structure: :avc3},
               transcoding_policy: transcoding_policy
             })

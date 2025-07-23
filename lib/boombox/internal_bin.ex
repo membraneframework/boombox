@@ -233,6 +233,12 @@ defmodule Boombox.InternalBin do
   end
 
   @impl true
+  def handle_child_notification({:new_tracks, tracks}, :hls_source, ctx, state) do
+    Boombox.InternalBin.HLS.handle_input_tracks(tracks)
+    |> proceed_result(ctx, state)
+  end
+
+  @impl true
   def handle_child_notification({:negotiated_video_codecs, codecs}, :webrtc_output, ctx, state) do
     {result, state} =
       Boombox.InternalBin.WebRTC.handle_output_video_codecs_negotiated(codecs, state)
@@ -466,6 +472,10 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.RTP.create_input(opts)
   end
 
+  defp create_input({:hls, uri}, _ctx, _state) do
+    Boombox.InternalBin.HLS.create_input(uri)
+  end
+
   defp create_input(:membrane_pad, ctx, _state) do
     Boombox.InternalBin.Pad.create_input(ctx)
   end
@@ -675,6 +685,9 @@ defmodule Boombox.InternalBin do
       {"rtsp", _ext, :input} ->
         {:rtsp, value}
 
+      {"https", ".m3u8", :input} ->
+        {:hls, value}
+
       {nil, ".m3u8", :output} ->
         {:hls, value, opts}
 
@@ -741,6 +754,9 @@ defmodule Boombox.InternalBin do
         if Keyword.keyword?(opts), do: {:webrtc, {:whip, uri, whip_opts}, webrtc_opts}
 
       {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
+        value
+
+      {:hls, uri} when direction == :input and is_binary(uri) ->
         value
 
       {:hls, location} when direction == :output and is_binary(location) ->
