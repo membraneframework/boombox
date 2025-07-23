@@ -76,10 +76,7 @@ defmodule BoomboxTest do
       end)
       |> Task.await_many()
 
-      compare_opts = [
-        {:tmp_dir, tmp_dir}
-        | unquote(compare_opts)
-      ]
+      compare_opts = [tmp_dir: tmp_dir] ++ unquote(compare_opts)
 
       List.last(endpoints)
       |> Compare.compare(

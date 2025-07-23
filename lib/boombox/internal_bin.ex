@@ -472,8 +472,8 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.RTP.create_input(opts)
   end
 
-  defp create_input({:hls, uri}, _ctx, _state) do
-    Boombox.InternalBin.HLS.create_input(uri)
+  defp create_input({:hls, url}, _ctx, _state) do
+    Boombox.InternalBin.HLS.create_input(url)
   end
 
   defp create_input(:membrane_pad, ctx, _state) do

@@ -4,14 +4,14 @@ defmodule Boombox.InternalBin.HLS do
   import Membrane.ChildrenSpec
 
   require Membrane.Pad, as: Pad
-  alias Boombox.InternalBin.Ready
+  alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.{AAC, H264, HTTPAdaptiveStream, RemoteStream, Time, Transcoder}
 
-  @spec create_input(URI.t()) :: Wait.t()
-  def create_input(uri) do
+  @spec create_input(String.t()) :: Wait.t()
+  def create_input(url) do
     spec =
       child(:hls_source, %HTTPAdaptiveStream.Source{
-        uri: uri,
+        url: url,
         # todo: maybe add an option to specify variant selection policy
         variant_selection_policy: :highest_resolution
       })
