@@ -9,6 +9,7 @@ defmodule Boombox do
   require Membrane.Time
   require Membrane.Transcoder.{Audio, Video}
 
+  alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
@@ -87,7 +88,9 @@ defmodule Boombox do
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
-          | {:hls, uri :: String.t()}
+          | {:hls, url :: String.t()}
+          | {:hls, url :: String.t(),
+             variant_selection_policy: HTTPAdaptiveStream.Source.variant_selection_policy()}
           | {:stream, in_stream_opts()}
 
   @type output ::

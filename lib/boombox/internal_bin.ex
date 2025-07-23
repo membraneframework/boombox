@@ -472,8 +472,8 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.RTP.create_input(opts)
   end
 
-  defp create_input({:hls, url}, _ctx, _state) do
-    Boombox.InternalBin.HLS.create_input(url)
+  defp create_input({:hls, url, opts}, _ctx, _state) do
+    Boombox.InternalBin.HLS.create_input(url, opts)
   end
 
   defp create_input(:membrane_pad, ctx, _state) do
@@ -686,7 +686,7 @@ defmodule Boombox.InternalBin do
         {:rtsp, value}
 
       {"https", ".m3u8", :input} ->
-        {:hls, value}
+        {:hls, value, opts}
 
       {nil, ".m3u8", :output} ->
         {:hls, value, opts}
@@ -756,7 +756,10 @@ defmodule Boombox.InternalBin do
       {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
         value
 
-      {:hls, uri} when direction == :input and is_binary(uri) ->
+      {:hls, url} when direction == :input and is_binary(uri) ->
+        {:hls, url, []}
+
+      {:hls, url, opts} when direction == :input and is_binary(url) and is_list(opts) ->
         value
 
       {:hls, location} when direction == :output and is_binary(location) ->

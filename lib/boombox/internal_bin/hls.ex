@@ -7,13 +7,16 @@ defmodule Boombox.InternalBin.HLS do
   alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.{AAC, H264, HTTPAdaptiveStream, RemoteStream, Time, Transcoder}
 
-  @spec create_input(String.t()) :: Wait.t()
-  def create_input(url) do
+  @spec create_input(String.t(),
+          variant_selection_policy: HTTPAdaptiveStream.Source.variant_selection_policy()
+        ) :: Wait.t()
+  def create_input(url, opts) do
+    variant_selection_policy = Keyword.get(opts, :variant_selection_policy, :highest_resolution)
+
     spec =
       child(:hls_source, %HTTPAdaptiveStream.Source{
         url: url,
-        # todo: maybe add an option to specify variant selection policy
-        variant_selection_policy: :highest_resolution
+        variant_selection_policy: variant_selection_policy
       })
 
     %Wait{actions: [spec: spec]}
