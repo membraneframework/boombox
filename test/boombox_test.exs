@@ -16,8 +16,8 @@ defmodule BoomboxTest do
   @bbb_mp4_a "test/fixtures/bun10s_a.mp4"
   @bbb_mp4_v "test/fixtures/bun10s_v.mp4"
   @bbb_mp4_h265 "test/fixtures/bun10s_h265.mp4"
-
-  @bbb_hls_url "https://raw.githubusercontent.com/membraneframework-labs/ex_hls/refs/heads/plug-demuxing-engine-into-client/fixture/output.m3u8"
+  # @bbb_hls_url "https://raw.githubusercontent.com/membraneframework/boombox/refs/heads/master/test/fixtures/ref_bun10s_aac_hls/index.m3u8"
+  @bbb_hls_url "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s_hls_fmp4/index.m3u8"
 
   @moduletag :tmp_dir
 
