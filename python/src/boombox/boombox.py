@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from cv2 import ellipse2Poly
 import numpy as np
 import asyncio
 import pyrlang.process
@@ -270,13 +271,16 @@ class Boombox(pyrlang.process.Process):
         assert self._response is not None
         match msg:
             case (Atom("response"), response):
-                self._response.set_result(response)
+                if not self._response.done():
+                    self._response.set_result(response)
             case (Atom("DOWN"), _, Atom("process"), _, Atom("normal")):
-                self._terminated.set_result(None)
+                self._terminated.set_result(Atom("normal"))
             case (Atom("DOWN"), _, Atom("process"), _, reason):
-                self._response.set_exception(
-                    RuntimeError(f"Boombox crashed with reason {reason}")
-                )
+                self._terminated.set_result(reason)
+                if not self._response.done():
+                    self._response.set_exception(
+                        RuntimeError(f"Boombox crashed with reason {reason}")
+                    )
 
     @override
     def exit(self, reason: Any = None) -> None:
@@ -291,11 +295,21 @@ class Boombox(pyrlang.process.Process):
             request,
         )
 
+        self._handle_termination()
         self.get_node().send_nowait(
             sender=self, receiver=self._receiver, message=message
         )
         self._response = self.get_node().get_loop().create_future()
-        return self.get_node().get_loop().run_until_complete(self._response)
+
+        response = self.get_node().get_loop().run_until_complete(self._response)
+        self._handle_termination()
+        return response
+
+    def _handle_termination(self) -> None:
+        if self._terminated.done():
+            reason = self._terminated.result()
+            if reason != Atom("normal"):
+                raise RuntimeError(f"Boombox crashed with reason {reason}")
 
     @staticmethod
     def _dtype_to_sample_format(dtype: np.dtype) -> tuple[AudioSampleFormat, np.dtype]:
