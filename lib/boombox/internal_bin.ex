@@ -756,7 +756,7 @@ defmodule Boombox.InternalBin do
       {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
         value
 
-      {:hls, url} when direction == :input and is_binary(uri) ->
+      {:hls, url} when direction == :input and is_binary(url) ->
         {:hls, url, []}
 
       {:hls, url, opts} when direction == :input and is_binary(url) and is_list(opts) ->
@@ -830,12 +830,25 @@ defmodule Boombox.InternalBin do
       """)
     end
 
+    if webrtc?(output) and not stream?(input) and not webrtc?(input) and
+         webrtc_output_transcoding_policy(output) != :always do
+      Membrane.Logger.warning("""
+      Boombox output protocol is WebRTC, but Boombox input might provide a video stream encoded in \
+      H264 format with B-frames, which are not supported in WebRTC. Sending such a stream might be \
+      visible in the browser as a flickering video. You can solve this by setting `:transcoding_policy` \
+      output option to `:always`, but be aware that it will increase Boombox CPU usage.
+      """)
+    end
+
     :ok
   end
 
   defp webrtc?({:webrtc, _signaling}), do: true
   defp webrtc?({:webrtc, _signaling, _opts}), do: true
   defp webrtc?(_endpoint), do: false
+
+  defp stream?({:stream, _pid, _opts}), do: true
+  defp stream?(_endpoint), do: false
 
   defp handles_keyframe_requests?({:stream, _pid, _opts}), do: true
   defp handles_keyframe_requests?(endpoint), do: webrtc?(endpoint)
