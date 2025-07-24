@@ -17,6 +17,8 @@ defmodule BoomboxTest do
   @bbb_mp4_v "test/fixtures/bun10s_v.mp4"
   @bbb_mp4_h265 "test/fixtures/bun10s_h265.mp4"
 
+  @bbb_hls_url "https://raw.githubusercontent.com/membraneframework-labs/ex_hls/refs/heads/plug-demuxing-engine-into-client/fixture/output.m3u8"
+
   @moduletag :tmp_dir
 
   [
@@ -56,7 +58,11 @@ defmodule BoomboxTest do
          {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
          {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
          "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", []}
+       ], "ref_bun10s_opus_aac.mp4", []},
+    hls_mp4: {[@bbb_hls_url, "output.mp4"], "bun_hls.mp4", []},
+    hls_webrtc:
+      {[@bbb_hls_url, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}, "output.mp4"],
+       "bun_hls_webrtc.mp4", []}
   ]
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag

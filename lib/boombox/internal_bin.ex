@@ -850,8 +850,9 @@ defmodule Boombox.InternalBin do
   defp stream?({:stream, _pid, _opts}), do: true
   defp stream?(_endpoint), do: false
 
-  defp handles_keyframe_requests?({:stream, _pid, _opts}), do: true
-  defp handles_keyframe_requests?(endpoint), do: webrtc?(endpoint)
+  defp handles_keyframe_requests?(input) do
+    stream?(input) or webrtc?(input)
+  end
 
   defp webrtc_output_transcoding_policy({:webrtc, _singaling, opts}),
     do: Keyword.get(opts, :transcoding_policy, :if_needed)

@@ -173,8 +173,8 @@ defmodule Support.Compare do
 
       :hls ->
         [
-          child(:sub_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: subject}),
-          child(:ref_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: reference})
+          child(:sub_demuxer, %Boombox.Support.HTTPAdaptiveStream.Source{directory: subject}),
+          child(:ref_demuxer, %Boombox.Support.HTTPAdaptiveStream.Source{directory: reference})
         ]
     end
   end
