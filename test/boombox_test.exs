@@ -16,8 +16,8 @@ defmodule BoomboxTest do
   @bbb_mp4_a "test/fixtures/bun10s_a.mp4"
   @bbb_mp4_v "test/fixtures/bun10s_v.mp4"
   @bbb_mp4_h265 "test/fixtures/bun10s_h265.mp4"
-  # @bbb_hls_url "https://raw.githubusercontent.com/membraneframework/boombox/refs/heads/master/test/fixtures/ref_bun10s_aac_hls/index.m3u8"
-  @bbb_hls_url "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s_hls_fmp4/index.m3u8"
+  @bbb_hls_fmp4_url "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun10s_hls_fmp4/index.m3u8"
+  @bbb_hls_mpegts_url "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples/big-buck-bunny/bun15s_hls_mpegts/index.m3u8"
 
   @moduletag :tmp_dir
 
@@ -59,10 +59,11 @@ defmodule BoomboxTest do
          {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
          "output.mp4"
        ], "ref_bun10s_opus_aac.mp4", []},
-    hls_mp4: {[@bbb_hls_url, "output.mp4"], "bun_hls.mp4", []},
-    hls_webrtc:
-      {[@bbb_hls_url, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}, "output.mp4"],
-       "bun_hls_webrtc.mp4", []}
+    hls_fmp4_mp4: {[@bbb_hls_fmp4_url, "output.mp4"], "bun_hls.mp4", []},
+    hls_fmp4_webrtc:
+      {[@bbb_hls_fmp4_url, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}, "output.mp4"],
+       "bun_hls_webrtc.mp4", []},
+    hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls.mp4", []}
   ]
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
@@ -84,11 +85,13 @@ defmodule BoomboxTest do
 
       compare_opts = [tmp_dir: tmp_dir] ++ unquote(compare_opts)
 
-      List.last(endpoints)
-      |> Compare.compare(
-        "test/fixtures/#{unquote(fixture)}",
-        compare_opts
-      )
+      if List.first(endpoints) != @bbb_hls_mpegts_url do
+        List.last(endpoints)
+        |> Compare.compare(
+          "test/fixtures/#{unquote(fixture)}",
+          compare_opts
+        )
+      end
     end
   end)
 

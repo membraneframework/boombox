@@ -1,0 +1,2 @@
+elixir -e 'Logger.configure(level: :info);Mix.install([{:boombox, path: "."}]);Boombox.run_cli()' $@
+

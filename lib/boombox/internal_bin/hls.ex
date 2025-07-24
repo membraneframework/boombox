@@ -31,10 +31,7 @@ defmodule Boombox.InternalBin.HLS do
           spec =
             get_child(:hls_source)
             |> via_out(:audio_output)
-            |> child(:hls_source_audio_transcoder, %Transcoder{
-              assumed_input_stream_format: %AAC{encapsulation: :ADTS},
-              output_stream_format: AAC
-            })
+            |> child(:hls_source_aac_parser, %AAC.Parser{out_encapsulation: :ADTS})
 
           {:audio, spec}
 
