@@ -1,7 +1,7 @@
 defmodule Boombox.Mixfile do
   use Mix.Project
 
-  @version "0.2.1"
+  @version "0.2.2"
   @github_url "https://github.com/membraneframework/boombox"
 
   def project do
@@ -69,6 +69,7 @@ defmodule Boombox.Mixfile do
       {:membrane_stream_plugin, "~> 0.4.0"},
       {:membrane_simple_rtsp_server, "~> 0.1.4", only: :test},
       {:image, "~> 0.54.0"},
+      {:async_test, github: "software-mansion-labs/elixir_async_test", only: :test},
       # {:playwright, "~> 1.49.1-alpha.1", only: :test},
       {:playwright,
        github: "membraneframework-labs/playwright-elixir",
