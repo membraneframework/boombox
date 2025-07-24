@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from cv2 import ellipse2Poly
 import numpy as np
 import asyncio
 import pyrlang.process

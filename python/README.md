@@ -1,6 +1,8 @@
 ![boombox_transparent](https://github.com/user-attachments/assets/1c5f25a2-cc27-4349-ae72-91315d43d6a1)
 
-## Usage
+This package is a Python API of Boombox - a high-level tool for audio & video streaming tool based on the [Membrane Framework](https://membrane.stream).
+
+## Example usage
 The following example will read the MP4 file from the provided URL, flip the video and save it to
 `output.mp4`
 
