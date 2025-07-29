@@ -109,8 +109,8 @@ defmodule Support.Compare do
     Testing.Pipeline.execute_actions(p, spec: [ref_spec, sub_spec])
 
     if :video in kinds do
-      assert_pipeline_notified(p, :ref_video_bufs, {:buffers, ref_video_bufs}, 10_000)
-      assert_pipeline_notified(p, :sub_video_bufs, {:buffers, sub_video_bufs}, 10_000)
+      assert_pipeline_notified(p, :ref_video_bufs, {:buffers, ref_video_bufs})
+      assert_pipeline_notified(p, :sub_video_bufs, {:buffers, sub_video_bufs})
 
       ref_video_bufs =
         if subject_terminated_early do
