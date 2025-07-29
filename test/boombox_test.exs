@@ -61,9 +61,12 @@ defmodule BoomboxTest do
        ], "ref_bun10s_opus_aac.mp4", []},
     hls_fmp4_mp4: {[@bbb_hls_fmp4_url, "output.mp4"], "bun_hls.mp4", []},
     hls_fmp4_webrtc:
-      {[@bbb_hls_fmp4_url, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}, "output.mp4"],
-       "bun_hls_webrtc.mp4", []},
-    hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls.mp4", []}
+      {[
+         @bbb_hls_fmp4_url,
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
+         "output.mp4"
+       ], "bun_hls_webrtc.mp4", []},
+    hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls_mpegts.mp4", []}
   ]
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
@@ -85,13 +88,11 @@ defmodule BoomboxTest do
 
       compare_opts = [tmp_dir: tmp_dir] ++ unquote(compare_opts)
 
-      if List.first(endpoints) != @bbb_hls_mpegts_url do
-        List.last(endpoints)
-        |> Compare.compare(
-          "test/fixtures/#{unquote(fixture)}",
-          compare_opts
-        )
-      end
+      List.last(endpoints)
+      |> Compare.compare(
+        "test/fixtures/#{unquote(fixture)}",
+        compare_opts
+      )
     end
   end)
 
