@@ -79,13 +79,12 @@ defmodule Boombox.Server do
     @moduledoc false
     @type t :: %__MODULE__{
             boombox_pid: pid(),
-            boombox_mode: Boombox.Server.boombox_mode(),
-            last_produced_packet: Boombox.Server.serialized_boombox_packet() | nil
+            boombox_mode: Boombox.Server.boombox_mode()
           }
 
     @enforce_keys [:boombox_pid, :boombox_mode]
 
-    defstruct @enforce_keys ++ [last_produced_packet: nil]
+    defstruct @enforce_keys
   end
 
   @doc """
@@ -180,21 +179,6 @@ defmodule Boombox.Server do
     {response, state} = handle_request(request, state)
     send(sender, {:response, response})
     {:noreply, state}
-  end
-
-  # @impl true
-  # def handle_info({:packet_consumed, boombox_pid}, %State{boombox_pid: boombox_pid} = state) do
-  # IO.inspect("dirty consume")
-  # {:noreply, state}
-  # end
-
-  @impl true
-  def handle_info(
-        {:packet_produced, packet, boombox_pid},
-        %State{boombox_pid: boombox_pid, last_produced_packet: nil} = state
-      ) do
-    IO.inspect("dirty produce")
-    {:noreply, %{state | last_produced_packet: packet}}
   end
 
   @impl true
@@ -302,25 +286,13 @@ defmodule Boombox.Server do
        ) do
     send(boombox_pid, :produce_packet)
 
-    last_produced_packet =
-      case state.last_produced_packet do
-        nil ->
-          receive do
-            {:packet_produced, packet, ^boombox_pid} -> packet
-          end
-
-        packet ->
-          packet
-      end
-
-    {production_phase, state} =
+    {response_atom, packet} =
       receive do
-        {:packet_produced, packet, ^boombox_pid} -> {:ok, %{state | last_produced_packet: packet}}
-        {:finished, ^boombox_pid} -> {:finished, state}
+        {:packet_produced, packet, ^boombox_pid} -> {:ok, packet}
+        {:finished, packet, ^boombox_pid} -> {:finished, packet}
       end
 
-    serialized_packet = serialize_packet(last_produced_packet)
-    {{production_phase, serialized_packet}, state}
+    {{response_atom, serialize_packet(packet)}, state}
   end
 
   defp handle_request(:produce_packet, %State{boombox_mode: _other_mode} = state) do
@@ -381,16 +353,21 @@ defmodule Boombox.Server do
 
   @spec producing_boombox_run(boombox_opts(), pid()) :: :ok
   defp producing_boombox_run(boombox_opts, server_pid) do
-    Boombox.run(boombox_opts)
-    |> Enum.each(fn packet ->
-      send(server_pid, {:packet_produced, packet, self()})
+    last_packet =
+      Boombox.run(boombox_opts)
+      |> Enum.reduce(nil, fn new_packet, last_produced_packet ->
+        if last_produced_packet != nil do
+          send(server_pid, {:packet_produced, last_produced_packet, self()})
+        end
 
-      receive do
-        :produce_packet -> :ok
-      end
-    end)
+        receive do
+          :produce_packet -> :ok
+        end
 
-    send(server_pid, {:finished, self()})
+        new_packet
+      end)
+
+    send(server_pid, {:finished, last_packet, self()})
   end
 
   @spec standalone_boombox_run(boombox_opts()) :: :ok
