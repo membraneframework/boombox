@@ -203,6 +203,7 @@ def main():
     pose_model = ultralytics.YOLO("yolov11n-pose.pt").to(yolo_device)
     face_model = ultralytics.YOLO("yolov11n-face.pt").to(yolo_device)
     stt_model = whisper.load_model("base.en", device=whisper_device)
+    print("Models loaded.")
 
     audio_queue = queue.Queue()
     transcript_queue = queue.Queue()
@@ -225,7 +226,6 @@ def main():
     silence_start_timestamp = None
     silence_time = 0
 
-    print("before bb1")
     input_boombox = Boombox(
         input=WebRTC("ws://localhost:8829"),
         output=RawData(
@@ -236,13 +236,12 @@ def main():
             audio_format="f32le",
         ),
     )
-    print("after bb1, before bb2")
+    print("Input boombox initialized.")
+
     output_boombox = Boombox(
         input=RawData(video=True, audio=True), output=WebRTC("ws://localhost:8830")
     )
-    print("after bb2")
-    time.sleep(3)
-    print("bbbb")
+    print("Output boombox initialized.")
 
     for packet in input_boombox.read():
         if isinstance(packet, AudioPacket):
