@@ -83,9 +83,9 @@ defmodule Boombox.Server do
             last_produced_packet: Boombox.Server.serialized_boombox_packet() | nil
           }
 
-    @enforce_keys [:boombox_pid, :boombox_mode, :last_produced_packet]
+    @enforce_keys [:boombox_pid, :boombox_mode]
 
-    defstruct @enforce_keys
+    defstruct @enforce_keys ++ [last_produced_packet: nil]
   end
 
   @doc """
@@ -183,6 +183,21 @@ defmodule Boombox.Server do
   end
 
   @impl true
+  def handle_info({:packet_consumed, boombox_pid}, %State{boombox_pid: boombox_pid} = state) do
+    IO.inspect("dirty consume")
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(
+        {:packet_produced, packet, boombox_pid},
+        %State{boombox_pid: boombox_pid, last_produced_packet: nil} = state
+      ) do
+    IO.inspect("dirty produce")
+    {:noreply, %{state | last_produced_packet: packet}}
+  end
+
+  @impl true
   def handle_info({:DOWN, _ref, :process, pid, reason}, %State{boombox_pid: pid} = state) do
     reason =
       case reason do
@@ -230,27 +245,27 @@ defmodule Boombox.Server do
     boombox_pid = spawn(boombox_process_fun)
     Process.monitor(boombox_pid)
 
-    last_produced_packet =
-      case boombox_mode do
-        :consuming ->
-          receive do
-            {:packet_consumed, ^boombox_pid} -> nil
-          end
+    # last_produced_packet =
+    # case boombox_mode do
+    # :consuming ->
+    # receive do
+    # {:packet_consumed, ^boombox_pid} -> nil
+    # end
 
-        :producing ->
-          receive do
-            {:packet_produced, packet, ^boombox_pid} -> packet
-          end
+    # :producing ->
+    # receive do
+    # {:packet_produced, packet, ^boombox_pid} -> packet
+    # end
 
-        :standalone ->
-          nil
-      end
+    # :standalone ->
+    # nil
+    # end
 
     {boombox_mode,
      %State{
        boombox_pid: boombox_pid,
-       boombox_mode: boombox_mode,
-       last_produced_packet: last_produced_packet
+       boombox_mode: boombox_mode
+       # last_produced_packet: last_produced_packet
      }}
   end
 
@@ -308,7 +323,16 @@ defmodule Boombox.Server do
        ) do
     send(boombox_pid, :produce_packet)
 
-    last_produced_packet = state.last_produced_packet
+    last_produced_packet =
+      case state.last_produced_packet do
+        nil ->
+          receive do
+            {:packet_produced, packet, ^boombox_pid} -> packet
+          end
+
+        packet ->
+          packet
+      end
 
     {production_phase, state} =
       receive do
