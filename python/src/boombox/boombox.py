@@ -13,7 +13,6 @@ import os
 import sys
 import warnings
 import dataclasses
-import signal
 
 from term import Atom, Pid
 from .endpoints import BoomboxEndpoint, AudioSampleFormat
