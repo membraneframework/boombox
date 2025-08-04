@@ -182,11 +182,11 @@ defmodule Boombox.Server do
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info({:packet_consumed, boombox_pid}, %State{boombox_pid: boombox_pid} = state) do
-    IO.inspect("dirty consume")
-    {:noreply, state}
-  end
+  # @impl true
+  # def handle_info({:packet_consumed, boombox_pid}, %State{boombox_pid: boombox_pid} = state) do
+  # IO.inspect("dirty consume")
+  # {:noreply, state}
+  # end
 
   @impl true
   def handle_info(
@@ -245,28 +245,7 @@ defmodule Boombox.Server do
     boombox_pid = spawn(boombox_process_fun)
     Process.monitor(boombox_pid)
 
-    # last_produced_packet =
-    # case boombox_mode do
-    # :consuming ->
-    # receive do
-    # {:packet_consumed, ^boombox_pid} -> nil
-    # end
-
-    # :producing ->
-    # receive do
-    # {:packet_produced, packet, ^boombox_pid} -> packet
-    # end
-
-    # :standalone ->
-    # nil
-    # end
-
-    {boombox_mode,
-     %State{
-       boombox_pid: boombox_pid,
-       boombox_mode: boombox_mode
-       # last_produced_packet: last_produced_packet
-     }}
+    {boombox_mode, %State{boombox_pid: boombox_pid, boombox_mode: boombox_mode}}
   end
 
   @spec handle_request(:get_pid, State.t() | nil) :: {pid(), State.t() | nil}
@@ -381,19 +360,21 @@ defmodule Boombox.Server do
   @spec consuming_boombox_run(boombox_opts(), pid()) :: :ok
   defp consuming_boombox_run(boombox_opts, server_pid) do
     Stream.resource(
-      fn -> nil end,
-      fn nil ->
-        send(server_pid, {:packet_consumed, self()})
+      fn -> true end,
+      fn is_first_iteration ->
+        if not is_first_iteration do
+          send(server_pid, {:packet_consumed, self()})
+        end
 
         receive do
           {:consume_packet, packet} ->
-            {[packet], nil}
+            {[packet], false}
 
           :finish_consuming ->
-            {:halt, nil}
+            {:halt, false}
         end
       end,
-      fn nil -> send(server_pid, {:finished, self()}) end
+      fn _is_first_iteration -> send(server_pid, {:finished, self()}) end
     )
     |> Boombox.run(boombox_opts)
   end

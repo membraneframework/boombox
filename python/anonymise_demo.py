@@ -63,7 +63,7 @@ def detect_pose(
                 and left_wrist_y < left_shoulder_y
             ) or (
                 right_wrist_y > 0
-                and right_shoulder_y > 0.2
+                and right_shoulder_y > 0
                 and right_wrist_y < right_shoulder_y
             ):
                 should_blur_face = True
@@ -247,6 +247,8 @@ def main():
         input=RawData(video=True, audio=True), output=WebRTC("ws://localhost:8830")
     )
     print("after bb2")
+    time.sleep(3)
+    print("bbbb")
 
     for packet in input_boombox.read():
         if isinstance(packet, AudioPacket):
