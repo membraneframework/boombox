@@ -41,13 +41,10 @@ def resize_frame(frame: np.ndarray, scale_factor: float) -> np.ndarray:
     return cv2.resize(frame, (target_w, target_h))
 
 
-def detect_pose(
-    pose_model: ultralytics.YOLO, frame: np.ndarray
-) -> tuple[torch.Tensor, bool]:
+def is_arm_raised(pose_model: ultralytics.YOLO, frame: np.ndarray) -> bool:
     LEFT_SHOULDER, RIGHT_SHOULDER = 5, 6
     LEFT_WRIST, RIGHT_WRIST = 9, 10
 
-    should_blur_face = False
     pose_results = pose_model(frame, verbose=False)
     if pose_results[0].keypoints.shape[1] > 0:
         for coordinates in pose_results[0].keypoints.xy:
@@ -66,11 +63,9 @@ def detect_pose(
                 and right_shoulder_y > 0
                 and right_wrist_y < right_shoulder_y
             ):
-                should_blur_face = True
+                return True
 
-        return (pose_results[0].keypoints.xy, should_blur_face)
-    else:
-        return (torch.empty((0, 17, 2)), False)
+    return False
 
 
 def draw_joints(coordinates: torch.Tensor, frame: np.ndarray) -> None:
@@ -93,10 +88,10 @@ def detect_face(face_model: ultralytics.YOLO, frame: np.ndarray) -> torch.Tensor
 
 def blur_face(boxes: torch.Tensor, frame: np.ndarray) -> None:
     for x1, y1, x2, y2 in boxes:
-        face_roi = frame[y1:y2, x1:x2]
+        face = frame[y1:y2, x1:x2]
 
-        if face_roi.size > 0:
-            blurred_face = cv2.GaussianBlur(face_roi, (99, 99), 30)
+        if face.size > 0:
+            blurred_face = cv2.GaussianBlur(face, (31, 31), 30)
             frame[y1:y2, x1:x2] = blurred_face
 
 
@@ -224,7 +219,6 @@ def main():
     video_read_start_time = None
     video_read_time = 10000
 
-    scaled_keypoints = torch.empty((0, 17, 2))
     scaled_boxes = torch.empty((0, 4))
     should_anonymise = False
     is_speaking = False
@@ -285,18 +279,6 @@ def main():
                 video_read_time = video_read_end_time - video_read_start_time
 
             frame = packet.payload.astype(np.uint8)
-            if video_read_time > MIN_PACKET_READ_TIME_MS:
-                resized_frame = resize_frame(frame, SCALE_FACTOR)
-
-                scaled_keypoints, should_anonymise = detect_pose(
-                    pose_model, resized_frame
-                )
-                if should_anonymise:
-                    scaled_boxes = detect_face(face_model, resized_frame)
-
-            draw_joints((scaled_keypoints / SCALE_FACTOR).int(), frame)
-            if should_anonymise:
-                blur_face((scaled_boxes / SCALE_FACTOR).int(), frame)
 
             try:
                 transcription = transcript_queue.get(block=False)
@@ -304,11 +286,19 @@ def main():
             except queue.Empty:
                 pass
 
-            if len(transcription_lines) > 0 and should_anonymise:
+            if video_read_time > MIN_PACKET_READ_TIME_MS:
+                resized_frame = resize_frame(frame, SCALE_FACTOR)
+
+                should_anonymise = is_arm_raised(pose_model, resized_frame)
+                if should_anonymise:
+                    scaled_boxes = detect_face(face_model, resized_frame)
+
+            if should_anonymise:
+                blur_face((scaled_boxes / SCALE_FACTOR).int(), frame)
                 render_transcription(transcription_lines, frame)
 
-            processed_packet = VideoPacket(payload=frame, timestamp=packet.timestamp)
-            output_boombox.write(processed_packet)
+            packet.payload = frame
+            output_boombox.write(packet)
             video_read_start_time = time.time() * 1000
 
     output_boombox.close(wait=True)
