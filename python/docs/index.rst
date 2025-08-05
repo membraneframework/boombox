@@ -6,9 +6,49 @@
 Boombox
 =====================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+This package is a Python API of Boombox - a high-level tool for audio & video streaming tool based
+on the `Membrane Framework <https://membrane.stream>`_. Boombox allows for transforming one stream
+format into another using a simple declarative interface. It also allows for interacting with the
+media directly in the code, for example modifying video streams with AI.
+
+To transform a stream started simply create a :py:class:`.Boombox` object with desired input and
+output, which are defined through :py:mod:`.endpoints`. For example::
+
+    from boombox import Boombox
+    from endpoints import MP4, RTMP
+
+    boombox = Boombox(
+        input=RTMP("rtmp://my.stream.source:2137/app/key"),
+        output=MP4("path/to/target.mp4")
+    )
+    boombox.wait()
+
+When this code is run, Boombox will become a RTMP server, wait for clients to connect and save
+the acquired stream to a ``.mp4`` file at the provided location.
+
+To interact with the media in the code the :py:class:`.RawData` endpoint can be used. Boombox will
+then procude or accept packets of raw media data. These packets are :py:class:`.AudioPacket` and
+:py:class:`.VideoPacket` objects.
+
+You can define a :py:class:`.RawData` output and read the stream through a generator::
+
+    boombox = Boombox(
+        input=any_input_endpoint
+        output=RawData(video=True, audio=True)
+    )
+
+    for packet in boombox.read():
+        process_packet(packet)
+
+Or define a :py:class:`.RawData` output and write packets to Boombox with :py:meth:`.Boombox.write`::
+
+    with Boombox(
+        input=RawData(video=True, audio=True)
+        output=any_output_endpoint
+    ) as boombox:
+        for packet in some_packet_generator():
+            boombox.write(packet)
+
 
 
 .. toctree::

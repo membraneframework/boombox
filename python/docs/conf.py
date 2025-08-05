@@ -6,14 +6,19 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath("../src/"))
+# sys.path.insert(0, os.path.abspath("../src/"))
+print(os.path.abspath(__file__))
+print(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "boombox"
-copyright = "2025, Author"
-author = "Author"
+copyright = "2025, Software Mansion"
+author = "Membrane Framework Team"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
