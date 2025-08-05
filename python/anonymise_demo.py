@@ -1,3 +1,20 @@
+"""
+This demo is a simple app that is an example usage of Boombox in python.
+The app receives a WebRTC stream from a webcam from one browser, conditionally
+transforms it, and streams it to another browser.
+
+While a person in front of the webcam raises their hand, then the stream is
+"anonymised":
+  - Their face is blurred.
+  - Their voice is distorted.
+  - Their speech is transcribed to text, which is then displayed.
+
+Detection of a hand being raised and the region of a face is done with
+[YOLO models](https://docs.ultralytics.com). Speech to text transcription is
+done with [Whisper model](https://openai.com/index/whisper).
+"""
+
+import os
 import numpy as np
 import cv2
 import ultralytics
@@ -28,9 +45,15 @@ def stt_worker(
 
 
 def run_server(address: str, port: int) -> None:
-    httpd = http.server.HTTPServer(
-        (address, port), http.server.SimpleHTTPRequestHandler
-    )
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            directory = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "examples_data"
+            )
+
+            super().__init__(*args, **kwargs, directory=directory)
+
+    httpd = http.server.HTTPServer((address, port), Handler)
     httpd.serve_forever()
 
 
@@ -54,6 +77,7 @@ def is_arm_raised(pose_model: ultralytics.YOLO, frame: np.ndarray) -> bool:
             left_shoulder_y = coordinates[LEFT_SHOULDER][1]
             right_shoulder_y = coordinates[RIGHT_SHOULDER][1]
 
+            # coordinates equal to 0 should be ignored
             if (
                 left_wrist_y > 0
                 and left_shoulder_y > 0
@@ -160,7 +184,7 @@ def render_transcription(lines: list[tuple[str, int]], frame: np.ndarray) -> Non
         )
 
 
-def ring_modulate(
+def distort_audio(
     audio_chunk: np.ndarray,
     sample_rate: int,
     carrier_freq: float = 40.0,
@@ -182,10 +206,10 @@ def main():
     MIN_PACKET_READ_TIME_MS = 10
     # Minimum time of silence to transcribe buffered speech and update the
     # displayed transcription.
-    PHRASE_CHUNK_TIMEOUT_MS = 250
-    # Minimum time of silence to erase the current transcription and start
+    PHRASE_TIMEOUT_MS = 250
+    # Minimum time of silence to clear the current transcription and start
     # a new one.
-    PHRASE_TIMEOUT_MS = 2000
+    CLEAR_TRANSCRIPTION_TIMEOUT_MS = 2000
     # Address and port where the pages will be available at.
     SERVER_ADDRESS = "localhost"
     SERVER_PORT = 8000
@@ -220,11 +244,11 @@ def main():
     video_read_start_time = None
     video_read_time = 10000
 
-    scaled_boxes = torch.empty((0, 4))
+    face_boxes = torch.empty((0, 4))
     should_anonymise = False
     is_speaking = False
-    silence_start_timestamp = None
-    silence_time = 0
+    last_speech_timestamp = 0
+    silence_duration = 0
 
     input_boombox = Boombox(
         input=WebRTC("ws://localhost:8829"),
@@ -248,25 +272,22 @@ def main():
             rms = np.sqrt(np.mean(packet.payload**2))
 
             if rms > VAD_THRESHOLD:
-                if silence_time > PHRASE_TIMEOUT_MS:
+                if silence_duration > CLEAR_TRANSCRIPTION_TIMEOUT_MS:
                     audio_chunks.clear()
-                silence_time = 0
+                last_speech_timestamp = packet.timestamp
                 is_speaking = True
-                silence_start_timestamp = None
+
+            silence_duration = packet.timestamp - last_speech_timestamp
+
+            if is_speaking:
                 audio_chunks.append(packet.payload)
-            else:
-                if silence_start_timestamp is None:
-                    silence_start_timestamp = packet.timestamp
-                if is_speaking:
-                    audio_chunks.append(packet.payload)
-                silence_time = packet.timestamp - silence_start_timestamp
-                if is_speaking and silence_time > PHRASE_CHUNK_TIMEOUT_MS:
-                    full_audio_np = np.concatenate(audio_chunks, axis=0)
-                    audio_queue.put(full_audio_np)
+                if silence_duration > PHRASE_TIMEOUT_MS:
+                    speech_audio = np.concatenate(audio_chunks, axis=0)
+                    audio_queue.put(speech_audio)
                     is_speaking = False
 
             if should_anonymise:
-                packet.payload = ring_modulate(
+                packet.payload = distort_audio(
                     packet.payload, packet.sample_rate, carrier_freq=120.0
                 )
 
@@ -285,20 +306,27 @@ def main():
             except queue.Empty:
                 pass
 
+            # If we have waited at least MIN_PACKET_READ_TIME_MS until getting
+            # the next video packet we assume that there were no packets
+            # buffered and we are up-to-date with the stream, therefore we can
+            # run the models, which tend to run for longer than a single frame
+            # should last.
             if video_read_time > MIN_PACKET_READ_TIME_MS:
+                # resize the frame for better performance of the models
                 resized_frame = resize_frame(frame, SCALE_FACTOR)
 
                 should_anonymise = is_arm_raised(pose_model, resized_frame)
                 if should_anonymise:
-                    scaled_boxes = detect_face(face_model, resized_frame)
+                    face_boxes = detect_face(face_model, resized_frame)
 
             if should_anonymise:
-                blur_face((scaled_boxes / SCALE_FACTOR).int(), frame)
+                blur_face((face_boxes / SCALE_FACTOR).int(), frame)
                 render_transcription(transcription_lines, frame)
 
             packet.payload = frame
             output_boombox.write(packet)
             video_read_start_time = time.time() * 1000
+            print(f"{video_read_start_time - video_read_end_time:2f}ms")
 
     output_boombox.close(wait=True)
 
