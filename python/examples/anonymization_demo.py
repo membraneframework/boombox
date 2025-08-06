@@ -14,17 +14,18 @@ Detection of a hand being raised and the region of a face is done with
 done with [Whisper model](https://openai.com/index/whisper).
 """
 
-import os
+from boombox import Boombox, RawData, AudioPacket, VideoPacket, WebRTC
+import torch
 import numpy as np
 import cv2
 import ultralytics
-import torch
-import time
+import whisper
+
+import os
+import http.server
 import queue
 import threading
-import whisper
-import http.server
-from src.boombox import Boombox, RawData, AudioPacket, VideoPacket, WebRTC
+import time
 from typing import NoReturn
 
 
@@ -223,8 +224,7 @@ def main():
     else:
         yolo_device = "cpu"
         whisper_device = "cpu"
-
-    pose_model = ultralytics.YOLO("yolov11n-pose.pt").to(yolo_device)
+    pose_model = ultralytics.YOLO("yolo11n-pose.pt").to(yolo_device)
     face_model = ultralytics.YOLO("yolov11n-face.pt").to(yolo_device)
     stt_model = whisper.load_model("base.en", device=whisper_device)
     print("Models loaded.")
