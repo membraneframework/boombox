@@ -16,7 +16,7 @@ sys.path.insert(
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "boombox"
+project = "Boombox"
 copyright = "2025, Software Mansion"
 author = "Membrane Framework Team"
 

@@ -49,6 +49,12 @@ Or define a :py:class:`.RawData` output and write packets to Boombox with :py:me
         for packet in some_packet_generator():
             boombox.write(packet)
 
+These operations can also be combined - read from boombox, process the stream and write it to
+another boombox. A demo showing an example of this can be found
+`here <https://https://github.com/membraneframework/boombox/tree/master/python/examples/anonymise_demo.py>`_.
+It utilizes AI tools to make a WebRTC stream "anonymous" - it utilizes multiple AI models to blur
+the users face, distorts their voice and transcribes their speech. More details inside the demo.
+
 
 
 .. toctree::
