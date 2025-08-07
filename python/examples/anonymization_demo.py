@@ -4,7 +4,7 @@ The app receives a WebRTC stream from a webcam from one browser, conditionally
 transforms it, and streams it to another browser.
 
 While a person in front of the webcam raises their hand, then the stream is
-"anonymised":
+"anonymized":
   - Their face is blurred.
   - Their voice is distorted.
   - Their speech is transcribed to text, which is then displayed.
@@ -49,7 +49,7 @@ def run_server(address: str, port: int) -> None:
     class Handler(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             directory = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "examples_data"
+                os.path.dirname(os.path.abspath(__file__)), "assets"
             )
 
             super().__init__(*args, **kwargs, directory=directory)
@@ -136,20 +136,18 @@ def split_transcription(text: str, frame: np.ndarray) -> list[tuple[str, int]]:
     words = text.split()
 
     lines = []
-    current_line_text = ""
-    candidate_line_text = current_line_text
+    candidate_line_text = current_line_text = ""
     current_line_width = 0
 
     for word in words:
         sep = "" if current_line_text == "" else " "
-        candidate_line_text += sep + word
+        candidate_line_text = current_line_text + sep + word
         (candidate_line_width, _), _ = cv2.getTextSize(
             candidate_line_text, FONT, FONT_SCALE, FONT_THICKNESS
         )
         if candidate_line_width >= max_line_width:
             lines.append((current_line_text, current_line_width))
-            current_line_text = word
-            candidate_line_text = word
+            candidate_line_text = current_line_text = word
             (current_line_width, _), _ = cv2.getTextSize(
                 current_line_text, FONT, FONT_SCALE, FONT_THICKNESS
             )
@@ -188,7 +186,7 @@ def render_transcription(lines: list[tuple[str, int]], frame: np.ndarray) -> Non
 def distort_audio(
     audio_chunk: np.ndarray,
     sample_rate: int,
-    carrier_freq: float = 40.0,
+    carrier_freq: float = 120.0,
 ) -> np.ndarray:
     num_samples = len(audio_chunk)
     time_vector = np.arange(num_samples) / sample_rate
@@ -215,6 +213,10 @@ def main():
     SERVER_ADDRESS = "localhost"
     SERVER_PORT = 8000
 
+    threading.Thread(
+        target=run_server, args=(SERVER_ADDRESS, SERVER_PORT), daemon=True
+    ).start()
+
     if torch.cuda.is_available():
         yolo_device = "cuda"
         whisper_device = "cuda"
@@ -225,7 +227,9 @@ def main():
         yolo_device = "cpu"
         whisper_device = "cpu"
     pose_model = ultralytics.YOLO("yolo11n-pose.pt").to(yolo_device)
-    face_model = ultralytics.YOLO("yolov11n-face.pt").to(yolo_device)
+    face_model = ultralytics.YOLO(
+        "https://github.com/akanametov/yolo-face/releases/download/v0.0.0/yolov11n-face.pt"
+    ).to(yolo_device)
     stt_model = whisper.load_model("base.en", device=whisper_device)
     print("Models loaded.")
 
@@ -233,9 +237,6 @@ def main():
     transcript_queue = queue.Queue()
     threading.Thread(
         target=stt_worker, args=(stt_model, audio_queue, transcript_queue), daemon=True
-    ).start()
-    threading.Thread(
-        target=run_server, args=(SERVER_ADDRESS, SERVER_PORT), daemon=True
     ).start()
 
     audio_chunks = []
@@ -245,7 +246,7 @@ def main():
     video_read_time = 10000
 
     face_boxes = torch.empty((0, 4))
-    should_anonymise = False
+    should_anonymize = False
     is_speaking = False
     last_speech_timestamp = 0
     silence_duration = 0
@@ -286,10 +287,8 @@ def main():
                     audio_queue.put(speech_audio)
                     is_speaking = False
 
-            if should_anonymise:
-                packet.payload = distort_audio(
-                    packet.payload, packet.sample_rate, carrier_freq=120.0
-                )
+            if should_anonymize:
+                packet.payload = distort_audio(packet.payload, packet.sample_rate)
 
             output_boombox.write(packet)
 
@@ -315,11 +314,11 @@ def main():
                 # resize the frame for better performance of the models
                 resized_frame = resize_frame(frame, SCALE_FACTOR)
 
-                should_anonymise = is_arm_raised(pose_model, resized_frame)
-                if should_anonymise:
+                should_anonymize = is_arm_raised(pose_model, resized_frame)
+                if should_anonymize:
                     face_boxes = detect_face(face_model, resized_frame)
 
-            if should_anonymise:
+            if should_anonymize:
                 blur_face((face_boxes / SCALE_FACTOR).int(), frame)
                 render_transcription(transcription_lines, frame)
 

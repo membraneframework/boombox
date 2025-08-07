@@ -243,8 +243,7 @@ defmodule Boombox.Server do
          {:consume_packet, packet},
          %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
        ) do
-    packet = deserialize_packet(packet)
-    send(boombox_pid, {:consume_packet, packet})
+    send(boombox_pid, {:consume_packet, deserialize_packet(packet)})
 
     receive do
       {:packet_consumed, ^boombox_pid} ->
@@ -286,13 +285,10 @@ defmodule Boombox.Server do
        ) do
     send(boombox_pid, :produce_packet)
 
-    {response_atom, packet} =
-      receive do
-        {:packet_produced, packet, ^boombox_pid} -> {:ok, packet}
-        {:finished, packet, ^boombox_pid} -> {:finished, packet}
-      end
-
-    {{response_atom, serialize_packet(packet)}, state}
+    receive do
+      {:packet_produced, packet, ^boombox_pid} -> {{:ok, serialize_packet(packet)}, state}
+      {:finished, packet, ^boombox_pid} -> {{:finished, serialize_packet(packet)}, state}
+    end
   end
 
   defp handle_request(:produce_packet, %State{boombox_mode: _other_mode} = state) do
