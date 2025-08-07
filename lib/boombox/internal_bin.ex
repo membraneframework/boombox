@@ -2,8 +2,8 @@ defmodule Boombox.InternalBin do
   @moduledoc false
   use Membrane.Bin
 
-  require Membrane.Logger
   require Boombox.InternalBin.StorageEndpoints, as: StorageEndpoints
+  require Logger
   require Membrane.Transcoder.Audio
   require Membrane.Transcoder.Video
 
@@ -289,7 +289,7 @@ defmodule Boombox.InternalBin do
   @impl true
   def handle_child_notification(notification, child, _ctx, state) do
     Membrane.Logger.debug_verbose(
-      "Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
+      "[Boombox] Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
     )
 
     {[], state}
@@ -822,7 +822,7 @@ defmodule Boombox.InternalBin do
   defp maybe_log_transcoding_related_warning(input, output) do
     if webrtc?(output) and not handles_keyframe_requests?(input) and
          webrtc_output_transcoding_policy(output) != :always do
-      Membrane.Logger.warning("""
+      Logger.warning("""
       Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
       might lead to issues with the output video if the output stream isn't sent only by localhost. You \
       can solve this by setting `:transcoding_policy` output option to `:always`, but be aware that it \
@@ -832,7 +832,7 @@ defmodule Boombox.InternalBin do
 
     if webrtc?(output) and not stream?(input) and not webrtc?(input) and
          webrtc_output_transcoding_policy(output) != :always do
-      Membrane.Logger.warning("""
+      Logger.info("""
       Boombox output protocol is WebRTC, but Boombox input might provide a video stream encoded in \
       H264 format with B-frames, which are not supported in WebRTC. Sending such a stream might be \
       visible in the browser as a flickering video. You can solve this by setting `:transcoding_policy` \
@@ -859,8 +859,8 @@ defmodule Boombox.InternalBin do
 
   defp maybe_warn_about_dropped_tracks(track_builders, dropped_track, output_type) do
     if track_builders[dropped_track] do
-      Membrane.Logger.info(
-        "Dropping #{dropped_track} track from input, as output #{output_type} does not support #{dropped_track}"
+      Logger.info(
+        "[Boombox] Dropping #{dropped_track} track from input, as output #{output_type} does not support #{dropped_track}"
       )
     end
   end
