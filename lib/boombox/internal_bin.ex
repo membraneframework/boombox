@@ -23,6 +23,7 @@ defmodule Boombox.InternalBin do
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
         }
+
   @type storage_type :: :file | :http
 
   defmodule Ready do
@@ -822,7 +823,7 @@ defmodule Boombox.InternalBin do
   defp maybe_log_transcoding_related_warning(input, output) do
     if webrtc?(output) and not handles_keyframe_requests?(input) and
          webrtc_output_transcoding_policy(output) != :always do
-      Logger.warning("""
+      Logger.info("""
       Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
       might lead to issues with the output video if the output stream isn't sent only by localhost. You \
       can solve this by setting `:transcoding_policy` output option to `:always`, but be aware that it \
