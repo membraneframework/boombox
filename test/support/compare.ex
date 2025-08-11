@@ -109,8 +109,8 @@ defmodule Support.Compare do
     Testing.Pipeline.execute_actions(p, spec: [ref_spec, sub_spec])
 
     if :video in kinds do
-      assert_pipeline_notified(p, :sub_video_bufs, {:buffers, sub_video_bufs})
       assert_pipeline_notified(p, :ref_video_bufs, {:buffers, ref_video_bufs})
+      assert_pipeline_notified(p, :sub_video_bufs, {:buffers, sub_video_bufs})
 
       ref_video_bufs =
         if subject_terminated_early do
@@ -173,8 +173,8 @@ defmodule Support.Compare do
 
       :hls ->
         [
-          child(:sub_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: subject}),
-          child(:ref_demuxer, %Membrane.HTTPAdaptiveStream.Source{directory: reference})
+          child(:sub_demuxer, %Boombox.Support.HTTPAdaptiveStream.Source{directory: subject}),
+          child(:ref_demuxer, %Boombox.Support.HTTPAdaptiveStream.Source{directory: reference})
         ]
     end
   end

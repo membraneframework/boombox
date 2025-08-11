@@ -15,7 +15,7 @@ defmodule Boombox.InternalBin.Pad do
           | :sent
           | :never_sent
 
-  # The lifecycle of the new_tracks_notification_status and executing Boombox.InternalBin.link_output function
+  # The lifecycle of the new_tracks_notification_status and the execution of Boombox.InternalBin.link_output function
   #
   # BEGIN: InternalBin handle_playing
   #   |
@@ -40,7 +40,7 @@ defmodule Boombox.InternalBin.Pad do
   #   |       |-----------------------------------------------------------|
   #   |       |                                                           |
   #   \/      \/         not all required pads are linked                 |
-  # handle_pad_added  --------------------------------------> wait on next handle_pad_added
+  # handle_pad_added  --------------------------------------> wait on the next handle_pad_added
   #   |
   #   | all tracks from {:new_tracks, tracks}
   #   |    have their related pad linked

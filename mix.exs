@@ -46,12 +46,25 @@ defmodule Boombox.Mixfile do
 
   defp deps do
     [
-      {:membrane_core, "~> 1.2"},
-      {:membrane_transcoder_plugin, "~> 0.3.0"},
+      # {:membrane_core, "~> 1.2"},
+      {:membrane_core,
+       github: "membraneframework/membrane_core",
+       branch: "handle-eos-in-debug-elements",
+       override: true},
+      {:membrane_transcoder_plugin, "~> 0.3.2"},
       {:membrane_webrtc_plugin, "~> 0.25.0"},
       {:membrane_mp4_plugin, "~> 0.35.2"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
-      {:membrane_http_adaptive_stream_plugin, "~> 0.18.5"},
+      # {:membrane_http_adaptive_stream_plugin, "~> 0.18.5"},
+      {:membrane_http_adaptive_stream_plugin,
+       github: "membraneframework/membrane_http_adaptive_stream_plugin",
+       ref: "d324bc3d6ecb2da2e73c302815490ba4cdacd768"},
+      # remember to delete the dependency below after
+      # releasing membrane_http_adaptive_stream_plugin
+      {:ex_hls,
+       github: "membraneframework-labs/ex_hls",
+       ref: "58a7ee0e14154d913bd49b22639854d7e74e49ef",
+       override: true},
       {:membrane_rtmp_plugin, "~> 0.27.2"},
       {:membrane_rtsp_plugin, "~> 0.6.1"},
       {:membrane_rtp_plugin, "~> 0.30.0"},

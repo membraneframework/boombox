@@ -2,8 +2,8 @@ defmodule Boombox.InternalBin do
   @moduledoc false
   use Membrane.Bin
 
-  require Membrane.Logger
   require Boombox.InternalBin.StorageEndpoints, as: StorageEndpoints
+  require Logger
   require Membrane.Transcoder.Audio
   require Membrane.Transcoder.Video
 
@@ -23,6 +23,7 @@ defmodule Boombox.InternalBin do
           optional(:audio) => Membrane.ChildrenSpec.t(),
           optional(:video) => Membrane.ChildrenSpec.t()
         }
+
   @type storage_type :: :file | :http
 
   defmodule Ready do
@@ -233,6 +234,12 @@ defmodule Boombox.InternalBin do
   end
 
   @impl true
+  def handle_child_notification({:new_tracks, tracks}, :hls_source, ctx, state) do
+    Boombox.InternalBin.HLS.handle_input_tracks(tracks)
+    |> proceed_result(ctx, state)
+  end
+
+  @impl true
   def handle_child_notification({:negotiated_video_codecs, codecs}, :webrtc_output, ctx, state) do
     {result, state} =
       Boombox.InternalBin.WebRTC.handle_output_video_codecs_negotiated(codecs, state)
@@ -283,7 +290,7 @@ defmodule Boombox.InternalBin do
   @impl true
   def handle_child_notification(notification, child, _ctx, state) do
     Membrane.Logger.debug_verbose(
-      "Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
+      "[Boombox] Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
     )
 
     {[], state}
@@ -464,6 +471,10 @@ defmodule Boombox.InternalBin do
 
   defp create_input({:rtp, opts}, _ctx, _state) do
     Boombox.InternalBin.RTP.create_input(opts)
+  end
+
+  defp create_input({:hls, url, opts}, _ctx, _state) do
+    Boombox.InternalBin.HLS.create_input(url, opts)
   end
 
   defp create_input(:membrane_pad, ctx, _state) do
@@ -675,6 +686,9 @@ defmodule Boombox.InternalBin do
       {"rtsp", _ext, :input} ->
         {:rtsp, value}
 
+      {"https", ".m3u8", :input} ->
+        {:hls, value, opts}
+
       {nil, ".m3u8", :output} ->
         {:hls, value, opts}
 
@@ -743,6 +757,12 @@ defmodule Boombox.InternalBin do
       {:rtmp, arg} when direction == :input and (is_binary(arg) or is_pid(arg)) ->
         value
 
+      {:hls, url} when direction == :input and is_binary(url) ->
+        {:hls, url, []}
+
+      {:hls, url, opts} when direction == :input and is_binary(url) and is_list(opts) ->
+        value
+
       {:hls, location} when direction == :output and is_binary(location) ->
         {:hls, location, []}
 
@@ -803,11 +823,21 @@ defmodule Boombox.InternalBin do
   defp maybe_log_transcoding_related_warning(input, output) do
     if webrtc?(output) and not handles_keyframe_requests?(input) and
          webrtc_output_transcoding_policy(output) != :always do
-      Membrane.Logger.warning("""
+      Logger.info("""
       Boombox output protocol is WebRTC, while Boombox input doesn't support keyframe requests. This \
       might lead to issues with the output video if the output stream isn't sent only by localhost. You \
       can solve this by setting `:transcoding_policy` output option to `:always`, but be aware that it \
       will increase Boombox CPU usage.
+      """)
+    end
+
+    if webrtc?(output) and not stream?(input) and not webrtc?(input) and
+         webrtc_output_transcoding_policy(output) != :always do
+      Logger.info("""
+      Boombox output protocol is WebRTC, but Boombox input might provide a video stream encoded in \
+      H264 format with B-frames, which are not supported in WebRTC. Sending such a stream might be \
+      visible in the browser as a flickering video. You can solve this by setting `:transcoding_policy` \
+      output option to `:always`, but be aware that it will increase Boombox CPU usage.
       """)
     end
 
@@ -818,16 +848,20 @@ defmodule Boombox.InternalBin do
   defp webrtc?({:webrtc, _signaling, _opts}), do: true
   defp webrtc?(_endpoint), do: false
 
-  defp handles_keyframe_requests?({:stream, _pid, _opts}), do: true
-  defp handles_keyframe_requests?(endpoint), do: webrtc?(endpoint)
+  defp stream?({:stream, _pid, _opts}), do: true
+  defp stream?(_endpoint), do: false
+
+  defp handles_keyframe_requests?(input) do
+    stream?(input) or webrtc?(input)
+  end
 
   defp webrtc_output_transcoding_policy({:webrtc, _singaling, opts}),
     do: Keyword.get(opts, :transcoding_policy, :if_needed)
 
   defp maybe_warn_about_dropped_tracks(track_builders, dropped_track, output_type) do
     if track_builders[dropped_track] do
-      Membrane.Logger.info(
-        "Dropping #{dropped_track} track from input, as output #{output_type} does not support #{dropped_track}"
+      Logger.info(
+        "[Boombox] Dropping #{dropped_track} track from input, as output #{output_type} does not support #{dropped_track}"
       )
     end
   end

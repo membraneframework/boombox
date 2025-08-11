@@ -1,3 +1,5 @@
+# System.schedulers_online() * 2 is the default value of max_cases
+
 max_cases =
   if System.get_env("CIRCLECI") == "true",
     do: 1,

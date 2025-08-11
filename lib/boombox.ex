@@ -9,9 +9,12 @@ defmodule Boombox do
   require Membrane.Time
   require Membrane.Transcoder.{Audio, Video}
 
+  alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
+  @type hls_variant_selection_policy_opt ::
+          {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
   @type in_stream_opts :: [
@@ -75,6 +78,7 @@ defmodule Boombox do
 
   @type input ::
           (path_or_uri :: String.t())
+          | {path_or_uri :: String.t(), [hls_variant_selection_policy_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
              transport: :file | :http}
@@ -87,6 +91,8 @@ defmodule Boombox do
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
+          | {:hls, url :: String.t()}
+          | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
           | {:stream, in_stream_opts()}
 
   @type output ::

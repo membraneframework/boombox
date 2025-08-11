@@ -1,4 +1,4 @@
-defmodule Membrane.HTTPAdaptiveStream.Source do
+defmodule Boombox.Support.HTTPAdaptiveStream.Source do
   @moduledoc false
 
   use Membrane.Source
