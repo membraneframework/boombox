@@ -133,6 +133,6 @@ button:disabled {
   object-fit: cover;
 }
 
-video {
+#preview {
   transform: scaleX(-1)
 }

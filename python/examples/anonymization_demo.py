@@ -351,7 +351,7 @@ def main():
             if video_read_start_time is not None:
                 video_read_time = video_read_end_time - video_read_start_time
 
-            frame = packet.payload.astype(np.uint8)
+            frame = np.flip(packet.payload, axis=1).astype(np.uint8)
 
             try:
                 transcription = transcript_queue.get(block=False)
