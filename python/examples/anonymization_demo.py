@@ -68,27 +68,35 @@ def resize_frame(frame: np.ndarray, scale_factor: float) -> np.ndarray:
 def is_arm_raised(pose_model: ultralytics.YOLO, frame: np.ndarray) -> bool:
     LEFT_SHOULDER, RIGHT_SHOULDER = 5, 6
     LEFT_WRIST, RIGHT_WRIST = 9, 10
+    NOSE = 1
 
     pose_results = pose_model(frame, verbose=False)
     if pose_results[0].keypoints.shape[1] > 0:
         for coordinates in pose_results[0].keypoints.xy:
             left_wrist_y = coordinates[LEFT_WRIST][1]
             right_wrist_y = coordinates[RIGHT_WRIST][1]
+            nose_y = coordinates[NOSE][1]
 
-            left_shoulder_y = coordinates[LEFT_SHOULDER][1]
-            right_shoulder_y = coordinates[RIGHT_SHOULDER][1]
+            if nose_y > 0:
+                if left_wrist_y > 0 and left_wrist_y < nose_y:
+                    return True
+                if right_wrist_y > 0 and right_wrist_y < nose_y:
+                    return True
 
-            # coordinates equal to 0 should be ignored
-            if (
-                left_wrist_y > 0
-                and left_shoulder_y > 0
-                and left_wrist_y < left_shoulder_y
-            ) or (
-                right_wrist_y > 0
-                and right_shoulder_y > 0
-                and right_wrist_y < right_shoulder_y
-            ):
-                return True
+            # left_shoulder_y = coordinates[LEFT_SHOULDER][1]
+            # right_shoulder_y = coordinates[RIGHT_SHOULDER][1]
+
+            # # coordinates equal to 0 should be ignored
+            # if (
+            # left_wrist_y > 0
+            # and left_shoulder_y > 0
+            # and left_wrist_y < left_shoulder_y
+            # ) or (
+            # right_wrist_y > 0
+            # and right_shoulder_y > 0
+            # and right_wrist_y < right_shoulder_y
+            # ):
+            # return True
 
     return False
 
@@ -112,12 +120,58 @@ def detect_face(face_model: ultralytics.YOLO, frame: np.ndarray) -> torch.Tensor
 
 
 def blur_face(boxes: torch.Tensor, frame: np.ndarray) -> None:
-    for x1, y1, x2, y2 in boxes:
-        face = frame[y1:y2, x1:x2]
+    blur_kernel = (31, 31)
 
-        if face.size > 0:
-            blurred_face = cv2.GaussianBlur(face, (31, 31), 30)
-            frame[y1:y2, x1:x2] = blurred_face
+    frame_h, frame_w = frame.shape[:2]
+
+    for x1, y1, x2, y2 in boxes:
+        if x1 == x2 or y1 == y2:
+            continue
+        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        face_w, face_h = x2 - x1, y2 - y1
+
+        # makes sure the kernel size is odd.
+        smoothing_border_width = max(int(max(face_w, face_h) * 0.1) * 2 + 1, 3)
+        half_border = smoothing_border_width // 2
+        smoothing_kernel = (smoothing_border_width, smoothing_border_width)
+
+        working_x1 = max(0, x1 - smoothing_border_width)
+        working_y1 = max(0, y1 - smoothing_border_width)
+        working_x2 = min(frame_w, x2 + smoothing_border_width)
+        working_y2 = min(frame_h, y2 + smoothing_border_width)
+
+        working_roi = frame[working_y1:working_y2, working_x1:working_x2]
+
+        blurred_work_roi = cv2.GaussianBlur(working_roi, blur_kernel, 30)
+
+        working_h, working_w = working_roi.shape[:2]
+        mask = np.zeros((working_h, working_w), dtype=np.uint8)
+
+        face_x_in_work = x1 - working_x1
+        face_y_in_work = y1 - working_y1
+
+        cv2.rectangle(
+            mask,
+            (face_x_in_work - half_border, face_y_in_work - half_border),
+            (
+                face_x_in_work + face_w + half_border,
+                face_y_in_work + face_h + half_border,
+            ),
+            (255, 255, 255),
+            -1,
+        )
+
+        soft_mask = cv2.GaussianBlur(mask, smoothing_kernel, 0)
+
+        alpha = soft_mask / 255.0
+        alpha = alpha[:, :, np.newaxis]
+
+        blended_roi = (
+            working_roi.astype(float) * (1.0 - alpha)
+            + blurred_work_roi.astype(float) * alpha
+        ).astype(np.uint8)
+
+        frame[working_y1:working_y2, working_x1:working_x2] = blended_roi
 
 
 FONT = cv2.FONT_HERSHEY_DUPLEX
@@ -325,7 +379,6 @@ def main():
             packet.payload = frame
             output_boombox.write(packet)
             video_read_start_time = time.time() * 1000
-            print(f"{video_read_start_time - video_read_end_time:2f}ms")
 
     output_boombox.close(wait=True)
 
