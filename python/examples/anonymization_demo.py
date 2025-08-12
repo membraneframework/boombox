@@ -260,9 +260,15 @@ def main():
     # Minimum time of silence to transcribe buffered speech and update the
     # displayed transcription.
     PHRASE_TIMEOUT_MS = 250
-    # Minimum time of silence to clear the current transcription and start
-    # a new one.
-    CLEAR_TRANSCRIPTION_TIMEOUT_MS = 2000
+    # Time of silence required to clear the current accumulated audio and start
+    # accumulating from the start. This will clear the old transcription.
+    CLEAR_BUFFERED_AUDIO_TIMEOUT_MS = 2000
+    # Time of silence after which the current transcription will be cleared.
+    CLEAR_TRANSCRIPTION_TIMEOUT_MS = 4000
+    # Time of continous speech after which a transcription will be generated.
+    FORCE_TRANSCRIPTION_TIMEOUT_MS = 2000
+    # Maximum amount of transcription lines that will be displayed at a time.
+    MAX_TRANSCRIPTION_LINES = 4
     # Address and port where the pages will be available at.
     SERVER_ADDRESS = "localhost"
     SERVER_PORT = 8000
@@ -303,6 +309,7 @@ def main():
     should_anonymize = False
     is_speaking = False
     last_speech_timestamp = 0
+    last_silence_timestamp = 0
     silence_duration = 0
 
     input_boombox = Boombox(
@@ -327,12 +334,17 @@ def main():
             rms = np.sqrt(np.mean(packet.payload**2))
 
             if rms > VAD_THRESHOLD:
-                if silence_duration > CLEAR_TRANSCRIPTION_TIMEOUT_MS:
+                if silence_duration > CLEAR_BUFFERED_AUDIO_TIMEOUT_MS:
                     audio_chunks.clear()
                 last_speech_timestamp = packet.timestamp
                 is_speaking = True
+            elif not is_speaking:
+                last_silence_timestamp = packet.timestamp
+                if silence_duration > CLEAR_TRANSCRIPTION_TIMEOUT_MS:
+                    transcription_lines.clear()
 
             silence_duration = packet.timestamp - last_speech_timestamp
+            speech_duration = packet.timestamp - last_silence_timestamp
 
             if is_speaking:
                 audio_chunks.append(packet.payload)
@@ -340,6 +352,10 @@ def main():
                     speech_audio = np.concatenate(audio_chunks, axis=0)
                     audio_queue.put(speech_audio)
                     is_speaking = False
+                if speech_duration > FORCE_TRANSCRIPTION_TIMEOUT_MS:
+                    speech_audio = np.concatenate(audio_chunks, axis=0)
+                    audio_queue.put(speech_audio)
+                    last_silence_timestamp = packet.timestamp
 
             if should_anonymize:
                 packet.payload = distort_audio(packet.payload, packet.sample_rate)
@@ -355,7 +371,9 @@ def main():
 
             try:
                 transcription = transcript_queue.get(block=False)
-                transcription_lines = split_transcription(transcription, frame)
+                transcription_lines = split_transcription(transcription, frame)[
+                    -MAX_TRANSCRIPTION_LINES:
+                ]
             except queue.Empty:
                 pass
 
