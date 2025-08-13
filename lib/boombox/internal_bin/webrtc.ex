@@ -100,7 +100,7 @@ defmodule Boombox.InternalBin.WebRTC do
   end
 
   @spec link_output(
-          [Boombox.transcoding_policy_opt()],
+          Boombox.out_webrtc_opts(),
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
@@ -116,7 +116,7 @@ defmodule Boombox.InternalBin.WebRTC do
   end
 
   @spec handle_output_tracks_negotiated(
-          [Boombox.transcoding_policy_opt()],
+          Boombox.out_webrtc_opts(),
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
@@ -133,7 +133,8 @@ defmodule Boombox.InternalBin.WebRTC do
   end
 
   defp do_link_output(opts, track_builders, spec_builder, tracks, state) do
-    transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
+    transcoding_policy = Keyword.get(opts, :transcoding_policy, :if_needed)
+    ignore_timestamps = Keyword.get(opts, :ignore_timestamps, false)
     tracks = Map.new(tracks, &{&1.kind, &1.id})
 
     spec = [
@@ -145,7 +146,11 @@ defmodule Boombox.InternalBin.WebRTC do
             output_stream_format: Membrane.Opus,
             transcoding_policy: transcoding_policy
           })
-          |> child(:webrtc_out_audio_realtimer, Membrane.Realtimer)
+          |> then(
+            &if ignore_timestamps,
+              do: &1,
+              else: child(&1, :webrtc_out_audio_realtimer, Membrane.Realtimer)
+          )
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
           |> get_child(:webrtc_output)
 
@@ -153,7 +158,11 @@ defmodule Boombox.InternalBin.WebRTC do
           negotiated_codecs = state.output_webrtc_state.negotiated_video_codecs
 
           builder
-          |> child(:webrtc_out_video_realtimer, Membrane.Realtimer)
+          |> then(
+            &if ignore_timestamps,
+              do: &1,
+              else: child(&1, :webrtc_out_video_realtimer, Membrane.Realtimer)
+          )
           |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
             output_stream_format: fn input_format ->
               resolve_output_video_stream_format(

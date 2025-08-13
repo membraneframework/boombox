@@ -83,7 +83,7 @@ defmodule Boombox.Bin do
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
              [Boombox.transcoding_policy_opt()]}
           | {:webrtc, Boombox.webrtc_signaling()}
-          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy_opt()]}
+          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.out_webrtc_opts()]}
           | {:whip, uri :: String.t(),
              [
                {:token, String.t()}

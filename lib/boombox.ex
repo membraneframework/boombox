@@ -13,6 +13,7 @@ defmodule Boombox do
   alias Membrane.RTP
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
+  @type ignore_timestamps_opt :: {:ignore_timestamps, boolean()}
   @type hls_variant_selection_policy_opt ::
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
@@ -74,6 +75,12 @@ defmodule Boombox do
           | {:port, :inet.port_number()}
           | {:target, String.t()}
           | transcoding_policy_opt()
+          | ignore_timestamps_opt()
+        ]
+
+  @type out_webrtc_opts :: [
+          transcoding_policy_opt()
+          | ignore_timestamps_opt()
         ]
 
   @type input ::
@@ -102,7 +109,7 @@ defmodule Boombox do
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
              [transcoding_policy_opt()]}
           | {:webrtc, webrtc_signaling()}
-          | {:webrtc, webrtc_signaling(), [transcoding_policy_opt()]}
+          | {:webrtc, webrtc_signaling(), out_webrtc_opts()}
           | {:whip, uri :: String.t(),
              [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
           | {:hls, location :: String.t()}
