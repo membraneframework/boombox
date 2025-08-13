@@ -26,6 +26,7 @@ defmodule Boombox.Utils.CLI do
     whip: {:string, :string},
     token: {:string, :string},
     transcoding_policy: {:string, :atom},
+    ignore_timestamps: {:boolean, :boolean},
     variant_selection_policy: {:string, :atom}
   ]
 
