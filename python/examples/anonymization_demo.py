@@ -58,6 +58,14 @@ def run_server(address: str, port: int) -> None:
     httpd.serve_forever()
 
 
+def read_packets(boombox: Boombox, packet_queue: queue.Queue) -> None:
+    MAX_QUEUE_SIZE = 15
+    for packet in boombox.read():
+        packet_queue.put(packet)
+        if packet_queue.qsize() > MAX_QUEUE_SIZE:
+            packet_queue.get()
+
+
 def resize_frame(frame: np.ndarray, scale_factor: float) -> np.ndarray:
     original_h, original_w = frame.shape[:2]
     target_w = int(original_w * scale_factor)
@@ -66,7 +74,6 @@ def resize_frame(frame: np.ndarray, scale_factor: float) -> np.ndarray:
 
 
 def is_arm_raised(pose_model: ultralytics.YOLO, frame: np.ndarray) -> bool:
-    LEFT_SHOULDER, RIGHT_SHOULDER = 5, 6
     LEFT_WRIST, RIGHT_WRIST = 9, 10
     NOSE = 1
 
@@ -82,21 +89,6 @@ def is_arm_raised(pose_model: ultralytics.YOLO, frame: np.ndarray) -> bool:
                     return True
                 if right_wrist_y > 0 and right_wrist_y < nose_y:
                     return True
-
-            # left_shoulder_y = coordinates[LEFT_SHOULDER][1]
-            # right_shoulder_y = coordinates[RIGHT_SHOULDER][1]
-
-            # # coordinates equal to 0 should be ignored
-            # if (
-            # left_wrist_y > 0
-            # and left_shoulder_y > 0
-            # and left_wrist_y < left_shoulder_y
-            # ) or (
-            # right_wrist_y > 0
-            # and right_shoulder_y > 0
-            # and right_wrist_y < right_shoulder_y
-            # ):
-            # return True
 
     return False
 
@@ -322,6 +314,13 @@ def main():
             audio_format="f32le",
         ),
     )
+    packet_queue = queue.Queue()
+    reading_thread = threading.Thread(
+        target=read_packets,
+        args=(input_boombox, packet_queue),
+        daemon=True,
+    )
+    reading_thread.start()
     print("Input boombox initialized.")
 
     output_boombox = Boombox(
@@ -329,7 +328,8 @@ def main():
     )
     print("Output boombox initialized.")
 
-    for packet in input_boombox.read():
+    while reading_thread.is_alive() or not packet_queue.empty():
+        packet = packet_queue.get()
         if isinstance(packet, AudioPacket):
             rms = np.sqrt(np.mean(packet.payload**2))
 
@@ -398,7 +398,7 @@ def main():
             output_boombox.write(packet)
             video_read_start_time = time.time() * 1000
 
-    output_boombox.close(wait=True)
+    output_boombox.close()
 
 
 if __name__ == "__main__":
