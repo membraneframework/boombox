@@ -4,7 +4,7 @@
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/boombox)
 [![CircleCI](https://circleci.com/gh/membraneframework/boombox.svg?style=svg)](https://circleci.com/gh/membraneframework/boombox)
 
-Boombox is a high-level tool for audio & video streaming tool based on the [Membrane Framework](https://membrane.stream).
+Boombox is a high-level tool for audio & video streaming based on the [Membrane Framework](https://membrane.stream).
 
 See [examples.livemd](examples.livemd) for examples.
 
