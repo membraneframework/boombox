@@ -13,7 +13,11 @@ defmodule Boombox do
   alias Membrane.RTP
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
-  @type ignore_timestamps_opt :: {:ignore_timestamps, boolean()}
+  @typedoc """
+  Determines if the streams will be sent to the output as fast as possible, or if they will be
+  paced and sent according to their timestamps.
+  """
+  @type pacing_opt :: {:pacing, :as_fast_as_possible | :timestamp_based}
   @type hls_variant_selection_policy_opt ::
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
@@ -75,12 +79,12 @@ defmodule Boombox do
           | {:port, :inet.port_number()}
           | {:target, String.t()}
           | transcoding_policy_opt()
-          | ignore_timestamps_opt()
+          | pacing_opt()
         ]
 
   @type out_webrtc_opts :: [
           transcoding_policy_opt()
-          | ignore_timestamps_opt()
+          | pacing_opt()
         ]
 
   @type common_input ::
@@ -111,7 +115,7 @@ defmodule Boombox do
 
   @type common_output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [transcoding_policy_opt() | ignore_timestamps_opt()]}
+          | {path_or_uri :: String.t(), [transcoding_policy_opt() | pacing_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
              [transcoding_policy_opt()]}
@@ -123,7 +127,7 @@ defmodule Boombox do
           | {:hls, location :: String.t(),
              [
                transcoding_policy_opt()
-               | ignore_timestamps_opt()
+               | pacing_opt()
              ]}
           | {:rtp, out_rtp_opts()}
 

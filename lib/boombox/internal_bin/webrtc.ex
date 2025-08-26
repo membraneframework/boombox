@@ -134,7 +134,7 @@ defmodule Boombox.InternalBin.WebRTC do
 
   defp do_link_output(opts, track_builders, spec_builder, tracks, state) do
     transcoding_policy = Keyword.get(opts, :transcoding_policy, :if_needed)
-    ignore_timestamps = Keyword.get(opts, :ignore_timestamps, false)
+    pacing = Keyword.get(opts, :pacing, :timestamp_based)
     tracks = Map.new(tracks, &{&1.kind, &1.id})
 
     spec = [
@@ -147,9 +147,10 @@ defmodule Boombox.InternalBin.WebRTC do
             transcoding_policy: transcoding_policy
           })
           |> then(
-            &if ignore_timestamps,
-              do: &1,
-              else: child(&1, :webrtc_audio_realtimer, Membrane.Realtimer)
+            &case opts.pacing do
+              :as_fast_as_possible -> &1
+              :timestamp_based -> child(&1, :webrtc_audio_realtimer, Membrane.Realtimer)
+            end
           )
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
           |> get_child(:webrtc_output)
@@ -159,9 +160,10 @@ defmodule Boombox.InternalBin.WebRTC do
 
           builder
           |> then(
-            &if ignore_timestamps,
-              do: &1,
-              else: child(&1, :webrtc_video_realtimer, Membrane.Realtimer)
+            &case pacing do
+              :as_fast_as_possible -> &1
+              :timestamp_based -> child(&1, :webrtc_video_realtimer, Membrane.Realtimer)
+            end
           )
           |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
             output_stream_format: fn input_format ->

@@ -64,7 +64,7 @@ defmodule Boombox.InternalBin.RTP do
             optional(:video) => parsed_output_track_config()
           },
           transcoding_policy: :always | :if_needed | :never,
-          ignore_timestamps: boolean()
+          pacing: :as_fast_as_possible | :timestamp_based
         }
 
   @type parsed_track_config :: parsed_input_track_config() | parsed_output_track_config()
@@ -172,9 +172,10 @@ defmodule Boombox.InternalBin.RTP do
         |> child({:rtp_out_parser, media_type}, parser)
         |> child({:rtp_payloader, media_type}, payloader)
         |> then(
-          &if opts.ignore_timestamps,
-            do: &1,
-            else: child(&1, {:realtimer, media_type}, Membrane.Realtimer)
+          &case opts.pacing do
+            :as_fast_as_possible -> &1
+            :timestamp_based -> child(&1, {:realtimer, media_type}, Membrane.Realtimer)
+          end
         )
         |> via_in(:input,
           options: [
@@ -229,7 +230,7 @@ defmodule Boombox.InternalBin.RTP do
       :output ->
         parsed_opts
         |> Map.put(:transcoding_policy, Keyword.get(opts, :transcoding_policy, :if_needed))
-        |> Map.put(:ignore_timestamps, Keyword.get(opts, :ignore_timestamps, false))
+        |> Map.put(:pacing, Keyword.get(opts, :pacing, :timestamp_based))
     end
   end
 

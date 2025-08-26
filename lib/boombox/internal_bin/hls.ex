@@ -47,13 +47,13 @@ defmodule Boombox.InternalBin.HLS do
 
   @spec link_output(
           Path.t(),
-          [Boombox.transcoding_policy_opt() | Boombox.ignore_timestamps_opt()],
+          [Boombox.transcoding_policy_opt() | Boombox.pacing_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(location, opts, track_builders, spec_builder) do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
-    ignore_timestamps = opts |> Keyword.get(:ignore_timestamps, false)
+    pacing = opts |> Keyword.get(:pacing, :timestamp_based)
 
     {directory, manifest_name} =
       if Path.extname(location) == ".m3u8" do
@@ -89,9 +89,10 @@ defmodule Boombox.InternalBin.HLS do
               transcoding_policy: transcoding_policy
             })
             |> then(
-              &if ignore_timestamps,
-                do: &1,
-                else: child(&1, :hls_audio_realtimer, Membrane.Realtimer)
+              &case pacing do
+                :as_fast_as_possible -> &1
+                :timestamp_based -> child(&1, :hls_audio_realtimer, Membrane.Realtimer)
+              end
             )
             |> via_in(Pad.ref(:input, :audio),
               options: [encoding: :AAC, segment_duration: Time.milliseconds(2000)]
@@ -105,9 +106,10 @@ defmodule Boombox.InternalBin.HLS do
               transcoding_policy: transcoding_policy
             })
             |> then(
-              &if ignore_timestamps,
-                do: &1,
-                else: child(&1, :hls_video_realtimer, Membrane.Realtimer)
+              &case pacing do
+                :as_fast_as_possible -> &1
+                :timestamp_based -> child(&1, :hls_video_realtimer, Membrane.Realtimer)
+              end
             )
             |> via_in(Pad.ref(:input, :video),
               options: [encoding: :H264, segment_duration: Time.milliseconds(2000)]
