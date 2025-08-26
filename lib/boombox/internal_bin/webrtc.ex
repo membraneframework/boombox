@@ -149,7 +149,7 @@ defmodule Boombox.InternalBin.WebRTC do
           |> then(
             &if ignore_timestamps,
               do: &1,
-              else: child(&1, :webrtc_out_audio_realtimer, Membrane.Realtimer)
+              else: child(&1, :webrtc_audio_realtimer, Membrane.Realtimer)
           )
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
           |> get_child(:webrtc_output)
@@ -161,7 +161,7 @@ defmodule Boombox.InternalBin.WebRTC do
           |> then(
             &if ignore_timestamps,
               do: &1,
-              else: child(&1, :webrtc_out_video_realtimer, Membrane.Realtimer)
+              else: child(&1, :webrtc_video_realtimer, Membrane.Realtimer)
           )
           |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
             output_stream_format: fn input_format ->

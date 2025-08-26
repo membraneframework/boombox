@@ -699,7 +699,7 @@ defmodule Boombox.InternalBin do
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_endpoint_opt!(direction, value) when is_tuple(value) or is_atom(:value) do
+  defp parse_endpoint_opt!(direction, value) when is_tuple(value) or is_atom(value) do
     case value do
       {endpoint_type, location}
       when is_binary(location) and direction == :input and

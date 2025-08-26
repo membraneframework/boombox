@@ -83,9 +83,13 @@ defmodule Boombox do
           | ignore_timestamps_opt()
         ]
 
-  @type input ::
+  @type common_input ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [hls_variant_selection_policy_opt()]}
+          | {path_or_uri :: String.t(),
+             [
+               hls_variant_selection_policy_opt()
+               | {:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}
+             ]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
              transport: :file | :http}
@@ -100,11 +104,14 @@ defmodule Boombox do
           | {:rtp, in_rtp_opts()}
           | {:hls, url :: String.t()}
           | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
+
+  @type input ::
+          common_input()
           | {:stream, in_stream_opts()}
 
-  @type output ::
+  @type common_output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [transcoding_policy_opt()]}
+          | {path_or_uri :: String.t(), [transcoding_policy_opt() | ignore_timestamps_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
              [transcoding_policy_opt()]}
@@ -113,8 +120,15 @@ defmodule Boombox do
           | {:whip, uri :: String.t(),
              [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [transcoding_policy_opt()]}
+          | {:hls, location :: String.t(),
+             [
+               transcoding_policy_opt()
+               | ignore_timestamps_opt()
+             ]}
           | {:rtp, out_rtp_opts()}
+
+  @type output ::
+          common_output()
           | {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
