@@ -48,24 +48,6 @@ defmodule Boombox.Bin do
   }
 
   @typedoc """
-  Value passed via `:input` option.
-
-  Specifies the input endpoint of `#{inspect(__MODULE__)}`.
-
-  Similar to `t:Boombox.input/0`, but without `:stream` option.
-  """
-  @type input :: Boombox.common_input()
-
-  @typedoc """
-  Value passed via `:output` option.
-
-  Specifies the output endpoint of `#{inspect(__MODULE__)}`.
-
-  Similar to `t:Boombox.output/0`, but without `:stream` option.
-  """
-  @type output :: Boombox.common_output()
-
-  @typedoc """
   Type of notification sent to the parent of Boombox.Bin when new tracks arrive.
 
   It is sent only when Boombox.Bin is used as a source (the `:input` option is set).
@@ -166,11 +148,11 @@ defmodule Boombox.Bin do
     ]
 
   def_options input: [
-                spec: input() | nil,
+                spec: Boombox.input() | nil,
                 default: nil
               ],
               output: [
-                spec: output() | nil,
+                spec: Boombox.output() | nil,
                 default: nil
               ]
 

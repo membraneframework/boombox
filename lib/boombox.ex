@@ -15,7 +15,7 @@ defmodule Boombox do
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
   @typedoc """
   Determines whether the incoming streams should be passed to the output according to their
-  timestamps or as fast as possible.
+  timestamps or as fast as possible. True by default.
   """
   @type pace_control_opt :: {:pace_control, boolean()}
   @type hls_variant_selection_policy_opt ::
@@ -82,12 +82,7 @@ defmodule Boombox do
           | pace_control_opt()
         ]
 
-  @type out_webrtc_opts :: [
-          transcoding_policy_opt()
-          | pace_control_opt()
-        ]
-
-  @type common_input ::
+  @type input ::
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(),
              [
@@ -109,18 +104,20 @@ defmodule Boombox do
           | {:hls, url :: String.t()}
           | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
 
-  @type input ::
-          common_input()
-          | {:stream, in_stream_opts()}
+  @type stream_input :: {:stream, in_stream_opts()}
 
-  @type common_output ::
+  @type output ::
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(), [transcoding_policy_opt() | pace_control_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
              [transcoding_policy_opt()]}
           | {:webrtc, webrtc_signaling()}
-          | {:webrtc, webrtc_signaling(), out_webrtc_opts()}
+          | {:webrtc, webrtc_signaling(),
+             [
+               transcoding_policy_opt()
+               | pace_control_opt()
+             ]}
           | {:whip, uri :: String.t(),
              [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
           | {:hls, location :: String.t()}
@@ -131,9 +128,7 @@ defmodule Boombox do
              ]}
           | {:rtp, out_rtp_opts()}
 
-  @type output ::
-          common_output()
-          | {:stream, out_stream_opts()}
+  @type stream_output :: {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
@@ -151,8 +146,8 @@ defmodule Boombox do
   Boombox.run(input: "rtmp://localhost:5432", output: "index.m3u8")
   ```
 
-  See `t:input/0` and `t:output/0` for available outputs and [examples.livemd](examples.livemd)
-  for examples.
+  See `t:input/0` and `t:output/0` for available inputs and outputs and
+  [examples.livemd](examples.livemd) for examples.
 
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
@@ -164,8 +159,8 @@ defmodule Boombox do
   ```
   """
   @spec run(Enumerable.t() | nil,
-          input: input(),
-          output: output()
+          input: input() | stream_input(),
+          output: output() | stream_output()
         ) :: :ok | Enumerable.t()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
