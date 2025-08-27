@@ -26,7 +26,7 @@ defmodule Boombox.Utils.CLI do
     whip: {:string, :string},
     token: {:string, :string},
     transcoding_policy: {:string, :atom},
-    pacing: {:string, :atom},
+    pace_control: {:boolean, :boolean},
     variant_selection_policy: {:string, :atom}
   ]
 

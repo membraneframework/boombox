@@ -17,7 +17,7 @@ defmodule Boombox do
   Determines if the streams will be sent to the output as fast as possible, or if they will be
   paced and sent according to their timestamps.
   """
-  @type pacing_opt :: {:pacing, :as_fast_as_possible | :timestamp_based}
+  @type pace_control_opt :: {:pace_control, boolean()}
   @type hls_variant_selection_policy_opt ::
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
@@ -79,12 +79,12 @@ defmodule Boombox do
           | {:port, :inet.port_number()}
           | {:target, String.t()}
           | transcoding_policy_opt()
-          | pacing_opt()
+          | pace_control_opt()
         ]
 
   @type out_webrtc_opts :: [
           transcoding_policy_opt()
-          | pacing_opt()
+          | pace_control_opt()
         ]
 
   @type common_input ::
@@ -115,7 +115,7 @@ defmodule Boombox do
 
   @type common_output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [transcoding_policy_opt() | pacing_opt()]}
+          | {path_or_uri :: String.t(), [transcoding_policy_opt() | pace_control_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
              [transcoding_policy_opt()]}
@@ -127,7 +127,7 @@ defmodule Boombox do
           | {:hls, location :: String.t(),
              [
                transcoding_policy_opt()
-               | pacing_opt()
+               | pace_control_opt()
              ]}
           | {:rtp, out_rtp_opts()}
 
