@@ -10,12 +10,12 @@ defmodule Boombox.InternalBin do
   alias Membrane.Transcoder
 
   @type input ::
-          Boombox.Bin.input()
+          Boombox.input()
           | {:stream, pid(), Boombox.in_stream_opts()}
           | :membrane_pad
 
   @type output ::
-          Boombox.Bin.output()
+          Boombox.output()
           | {:stream, pid(), Boombox.out_stream_opts()}
           | :membrane_pad
 

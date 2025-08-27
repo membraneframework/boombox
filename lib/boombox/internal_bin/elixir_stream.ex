@@ -107,7 +107,7 @@ defmodule Boombox.InternalBin.ElixirStream do
     options =
       options
       |> Keyword.validate!(
-        [:video, :audio, :video_width, :video_height, :pace_control] ++ audio_keys
+        [:video, :audio, :video_width, :video_height, :pace_control, :realtime] ++ audio_keys
       )
       |> Map.new()
 

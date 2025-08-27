@@ -135,8 +135,8 @@ defmodule Boombox do
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
-           input: input(),
-           output: output(),
+           input: input() | stream_input(),
+           output: output() | stream_output(),
            parent: pid()
          }
 
