@@ -57,7 +57,7 @@ class BoomboxEndpoint(ABC):
 
     Attributes
     ----------
-    transcoding_policy : {None, "if_needed", "always", "never"}
+    transcoding_policy : {"if_needed", "always", "never"}
         Allowed only for output. The default transcoding behavior is "if_needed",
         which means that if the format of the media is the same for input and
         output, then the stream is not decoded and encoded. This approach saves
@@ -68,7 +68,7 @@ class BoomboxEndpoint(ABC):
     """
 
     _: KW_ONLY
-    transcoding_policy: Literal["if_needed", "always", "never"] | None = None
+    transcoding_policy: Literal["if_needed", "always", "never"] = "if_needed"
 
     def get_atom_fields(self) -> set[str]:
         """:meta private:"""
@@ -212,12 +212,13 @@ class H264(StorageEndpoint):
 
     Attributes
     ----------
-    framerate : tuple[int, int], optional
-        Framerate of the stream, if not provided 30 FPS will be assumed.
+    framerate : tuple[int, int], default=(30, 1)
+        Framerate of the stream, where the tuple defines the numerator and
+        denominator of it. If not provided 30 FPS will be assumed.
     """
 
     _: KW_ONLY
-    framerate: tuple[int, int] | None = None
+    framerate: tuple[int, int] = (30, 1)
 
 
 @dataclass
@@ -230,12 +231,13 @@ class H265(StorageEndpoint):
 
     Attributes
     ----------
-    framerate : tuple[int, int], optional
-        Framerate of the stream, if not provided 30 FPS will be assumed.
+    framerate : tuple[int, int], default=(30, 1)
+        Framerate of the stream, where the tuple defines the numerator and
+        denominator of it. If not provided 30 FPS will be assumed.
     """
 
     _: KW_ONLY
-    framerate: tuple[int, int] | None = None
+    framerate: tuple[int, int] = (30, 1)
 
 
 @dataclass
@@ -289,9 +291,15 @@ class WebRTC(BoomboxEndpoint):
     signaling : str
         URL of the WebSocket that is the signaling channel of the WebRTC
         connection.
+    pace_control : bool, default=True
+        Allowed only for output. Determines whether the incoming streams should
+        be passed to the output according to their timestamps or as fast as
+        possible.
     """
 
     signaling: str
+    _: KW_ONLY
+    pace_control: bool = True
 
 
 @dataclass
@@ -325,9 +333,15 @@ class HLS(BoomboxEndpoint):
         other files will be created there. If it's a path to ".m3u8" file,
         the file will be created in provided location and all the other
         files will be created in the same directory.
+    pace_control : bool, default=true
+        allowed only for output. determines whether the incoming streams should
+        be passed to the output according to their timestamps or as fast as
+        possible.
     """
 
     location: str
+    _: KW_ONLY
+    pace_control: bool = True
 
 
 @dataclass
@@ -395,6 +409,10 @@ class RTP(BoomboxEndpoint):
         Applicable only for H264 and H265 payloads. Parameter sets, could be
         obtained from a side channel. They contain information about the
         encoded stream.
+    pace_control : bool, default=true
+        allowed only for output. determines whether the incoming streams should
+        be passed to the output according to their timestamps or as fast as
+        possible.
     """
 
     _: KW_ONLY
@@ -411,6 +429,7 @@ class RTP(BoomboxEndpoint):
     vps: bytes | None = None
     pps: bytes | None = None
     sps: bytes | None = None
+    pace_control: bool = True
 
     @override
     def get_atom_fields(self) -> set[str]:

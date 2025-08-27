@@ -12,14 +12,11 @@ The resulting stream is then passed to another Boombox, which then streams it to
 
 ### Prerequisites
 
-To run the demo you'll need to install the required python dependencies and Erlang on your system.
-For dependencies just install packages from `requirements.txt`:
+To run the demo you'll need to install the required dependencies from `requirements.txt`:
 
 ```bash
 pip install -r requirements.txt
 ```
-
-For Erlang we recommend following these [instructions](https://elixir-lang.org/install.html#installing-erlang).
 
 You'll also need a webcam and a microphone.
 
