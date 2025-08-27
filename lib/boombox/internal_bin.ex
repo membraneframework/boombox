@@ -9,7 +9,7 @@ defmodule Boombox.InternalBin do
 
   alias Membrane.Transcoder
 
-  @type input() ::
+  @type input ::
           Boombox.Bin.input()
           | {:stream, pid(), Boombox.in_stream_opts()}
           | :membrane_pad
@@ -257,12 +257,14 @@ defmodule Boombox.InternalBin do
     end
 
     {:webrtc, _signaling, webrtc_opts} = state.output
+    is_input_realtime = input_realtime?(state.input)
 
     Boombox.InternalBin.WebRTC.handle_output_tracks_negotiated(
       webrtc_opts,
       state.track_builders,
       state.spec_builder,
       tracks,
+      is_input_realtime,
       state
     )
     |> proceed_result(ctx, state)
@@ -505,8 +507,17 @@ defmodule Boombox.InternalBin do
       %{kind: :video, id: :video_tracks}
     ]
 
+    is_input_realtime = input_realtime?(state.input)
+
     result =
-      Boombox.InternalBin.WebRTC.link_output(opts, track_builders, spec_builder, tracks, state)
+      Boombox.InternalBin.WebRTC.link_output(
+        opts,
+        track_builders,
+        spec_builder,
+        tracks,
+        is_input_realtime,
+        state
+      )
 
     {result, state}
   end
@@ -622,26 +633,39 @@ defmodule Boombox.InternalBin do
   end
 
   defp link_output({:hls, location, opts}, track_builders, spec_builder, _ctx, state) do
+    is_input_realtime = input_realtime?(state.input)
+
     result =
-      Boombox.InternalBin.HLS.link_output(location, opts, track_builders, spec_builder)
+      Boombox.InternalBin.HLS.link_output(
+        location,
+        opts,
+        track_builders,
+        spec_builder,
+        is_input_realtime
+      )
 
     {result, state}
   end
 
   defp link_output({:rtp, opts}, track_builders, spec_builder, _ctx, state) do
+    is_input_realtime = input_realtime?(state.input)
+
     result =
-      Boombox.InternalBin.RTP.link_output(opts, track_builders, spec_builder)
+      Boombox.InternalBin.RTP.link_output(opts, track_builders, spec_builder, is_input_realtime)
 
     {result, state}
   end
 
   defp link_output({:stream, stream_process, params}, track_builders, spec_builder, _ctx, state) do
+    is_input_realtime = input_realtime?(state.input)
+
     result =
       Boombox.InternalBin.ElixirStream.link_output(
         stream_process,
         params,
         track_builders,
-        spec_builder
+        spec_builder,
+        is_input_realtime
       )
 
     {result, state}
@@ -844,13 +868,36 @@ defmodule Boombox.InternalBin do
     :ok
   end
 
+  @spec input_realtime?(input()) :: boolean()
+  defp input_realtime?(input) do
+    case input do
+      {endpoint_type, _parameter} when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp] ->
+        true
+
+      {endpoint_type, _parameter, _opts} when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp] ->
+        true
+
+      {:stream, opts} ->
+        Keyword.get(opts, :realtime, false)
+
+      {:hls, _location, opts} ->
+        Keyword.get(opts, :mode) == :live
+
+      _other ->
+        false
+    end
+  end
+
+  @spec webrtc?(input() | output()) :: boolean()
   defp webrtc?({:webrtc, _signaling}), do: true
   defp webrtc?({:webrtc, _signaling, _opts}), do: true
   defp webrtc?(_endpoint), do: false
 
+  @spec stream?(input() | output()) :: boolean()
   defp stream?({:stream, _pid, _opts}), do: true
   defp stream?(_endpoint), do: false
 
+  @spec handles_keyframe_requests?(input()) :: boolean()
   defp handles_keyframe_requests?(input) do
     stream?(input) or webrtc?(input)
   end

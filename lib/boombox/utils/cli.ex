@@ -27,7 +27,9 @@ defmodule Boombox.Utils.CLI do
     token: {:string, :string},
     transcoding_policy: {:string, :atom},
     pace_control: {:boolean, :boolean},
-    variant_selection_policy: {:string, :atom}
+    realtime: {:boolean, :boolean},
+    variant_selection_policy: {:string, :atom},
+    mode: {:string, :atom}
   ]
 
   @spec parse_argv([String.t()]) ::

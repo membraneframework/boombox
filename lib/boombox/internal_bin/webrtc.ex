@@ -104,11 +104,12 @@ defmodule Boombox.InternalBin.WebRTC do
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
+          boolean(),
           State.t()
         ) :: Ready.t() | Wait.t()
-  def link_output(opts, track_builders, spec_builder, tracks, state) do
+  def link_output(opts, track_builders, spec_builder, tracks, is_input_realtime, state) do
     if has_webrtc_input(state) do
-      do_link_output(opts, track_builders, spec_builder, tracks, state)
+      do_link_output(opts, track_builders, spec_builder, tracks, is_input_realtime, state)
     else
       tracks = Bunch.KVEnum.keys(track_builders)
       %Wait{actions: [notify_child: {:webrtc_output, {:add_tracks, tracks}}]}
@@ -120,21 +121,28 @@ defmodule Boombox.InternalBin.WebRTC do
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
+          boolean(),
           State.t()
         ) :: Ready.t() | no_return()
-  def handle_output_tracks_negotiated(opts, track_builders, spec_builder, tracks, state) do
+  def handle_output_tracks_negotiated(
+        opts,
+        track_builders,
+        spec_builder,
+        tracks,
+        is_input_realtime,
+        state
+      ) do
     if has_webrtc_input(state) do
       raise """
       Currently ICE restart is not supported in Boombox instances having WebRTC input and output.
       """
     end
 
-    do_link_output(opts, track_builders, spec_builder, tracks, state)
+    do_link_output(opts, track_builders, spec_builder, tracks, is_input_realtime, state)
   end
 
-  defp do_link_output(opts, track_builders, spec_builder, tracks, state) do
+  defp do_link_output(opts, track_builders, spec_builder, tracks, is_input_realtime, state) do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
-    pace_control = opts |> Keyword.get(:pace_control, true)
     tracks = Map.new(tracks, &{&1.kind, &1.id})
 
     spec = [
@@ -147,9 +155,9 @@ defmodule Boombox.InternalBin.WebRTC do
             transcoding_policy: transcoding_policy
           })
           |> then(
-            &if pace_control,
-              do: child(&1, :webrtc_audio_realtimer, Membrane.Realtimer),
-              else: &1
+            &if is_input_realtime,
+              do: &1,
+              else: child(&1, :webrtc_audio_realtimer, Membrane.Realtimer)
           )
           |> via_in(Pad.ref(:input, tracks.audio), options: [kind: :audio])
           |> get_child(:webrtc_output)
@@ -159,9 +167,9 @@ defmodule Boombox.InternalBin.WebRTC do
 
           builder
           |> then(
-            &if pace_control,
-              do: child(&1, :webrtc_video_realtimer, Membrane.Realtimer),
-              else: &1
+            &if is_input_realtime,
+              do: &1,
+              else: child(&1, :webrtc_video_realtimer, Membrane.Realtimer)
           )
           |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
             output_stream_format: fn input_format ->

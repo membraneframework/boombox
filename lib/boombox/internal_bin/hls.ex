@@ -47,13 +47,14 @@ defmodule Boombox.InternalBin.HLS do
 
   @spec link_output(
           Path.t(),
-          [Boombox.transcoding_policy_opt() | Boombox.pace_control_opt()],
+          [Boombox.transcoding_policy_opt() | Boombox.hls_mode_opt()],
           Boombox.InternalBin.track_builders(),
-          Membrane.ChildrenSpec.t()
+          Membrane.ChildrenSpec.t(),
+          boolean()
         ) :: Ready.t()
-  def link_output(location, opts, track_builders, spec_builder) do
+  def link_output(location, opts, track_builders, spec_builder, is_input_realtime) do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
-    pace_control = opts |> Keyword.get(:pace_control, true)
+    mode = opts |> Keyword.get(:mode, :vod)
 
     {directory, manifest_name} =
       if Path.extname(location) == ".m3u8" do
@@ -77,6 +78,7 @@ defmodule Boombox.InternalBin.HLS do
               directory: directory
             },
             hls_mode: hls_mode,
+            mode: mode,
             mp4_parameters_in_band?: true,
             target_window_duration: Time.seconds(20)
           }
@@ -89,7 +91,7 @@ defmodule Boombox.InternalBin.HLS do
               transcoding_policy: transcoding_policy
             })
             |> then(
-              &if pace_control,
+              &if mode == :live and not is_input_realtime,
                 do: child(&1, :hls_audio_realtimer, Membrane.Realtimer),
                 else: &1
             )
@@ -105,7 +107,7 @@ defmodule Boombox.InternalBin.HLS do
               transcoding_policy: transcoding_policy
             })
             |> then(
-              &if pace_control,
+              &if mode == :live and not is_input_realtime,
                 do: child(&1, :hls_video_realtimer, Membrane.Realtimer),
                 else: &1
             )

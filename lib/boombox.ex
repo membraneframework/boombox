@@ -14,10 +14,11 @@ defmodule Boombox do
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
   @typedoc """
-  Determines whether the incoming streams should be passed to the output according to their
-  timestamps or as fast as possible. True by default.
+  If true the incoming streams will be passed to the output according to their
+  timestamps, if not they will be passed as fast as possible. True by default.
   """
   @type pace_control_opt :: {:pace_control, boolean()}
+  @type hls_mode_opt :: {:mode, :live | :vod}
   @type hls_variant_selection_policy_opt ::
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
@@ -25,6 +26,7 @@ defmodule Boombox do
   @type in_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
+          | {:realtime, boolean()}
         ]
   @type out_stream_opts :: [
           {:audio, :binary | boolean()}
@@ -34,6 +36,7 @@ defmodule Boombox do
           | {:audio_channels, Membrane.RawAudio.channels_t()}
           | {:video_width, non_neg_integer()}
           | {:video_height, non_neg_integer()}
+          | pace_control_opt()
         ]
 
   @typedoc """
@@ -79,7 +82,6 @@ defmodule Boombox do
           | {:port, :inet.port_number()}
           | {:target, String.t()}
           | transcoding_policy_opt()
-          | pace_control_opt()
         ]
 
   @type input ::
@@ -87,6 +89,7 @@ defmodule Boombox do
           | {path_or_uri :: String.t(),
              [
                hls_variant_selection_policy_opt()
+               | hls_mode_opt()
                | {:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}
              ]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
@@ -102,29 +105,29 @@ defmodule Boombox do
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
           | {:hls, url :: String.t()}
-          | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
+          | {:hls, url :: String.t(),
+             [
+               hls_mode_opt()
+               | hls_variant_selection_policy_opt()
+             ]}
 
   @type stream_input :: {:stream, in_stream_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [transcoding_policy_opt() | pace_control_opt()]}
+          | {path_or_uri :: String.t(), [transcoding_policy_opt() | hls_mode_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
              [transcoding_policy_opt()]}
           | {:webrtc, webrtc_signaling()}
-          | {:webrtc, webrtc_signaling(),
-             [
-               transcoding_policy_opt()
-               | pace_control_opt()
-             ]}
+          | {:webrtc, webrtc_signaling(), [transcoding_policy_opt()]}
           | {:whip, uri :: String.t(),
              [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
           | {:hls, location :: String.t()}
           | {:hls, location :: String.t(),
              [
-               transcoding_policy_opt()
-               | pace_control_opt()
+               hls_mode_opt()
+               | transcoding_policy_opt()
              ]}
           | {:rtp, out_rtp_opts()}
 
