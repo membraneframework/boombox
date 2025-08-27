@@ -57,7 +57,7 @@ class BoomboxEndpoint(ABC):
 
     Attributes
     ----------
-    transcoding_policy : {"if_needed", "always", "never"}
+    transcoding_policy : {None, "if_needed", "always", "never"}, optional
         Allowed only for output. The default transcoding behavior is "if_needed",
         which means that if the format of the media is the same for input and
         output, then the stream is not decoded and encoded. This approach saves
@@ -68,7 +68,7 @@ class BoomboxEndpoint(ABC):
     """
 
     _: KW_ONLY
-    transcoding_policy: Literal["if_needed", "always", "never"] = "if_needed"
+    transcoding_policy: Literal["if_needed", "always", "never"] | None = None
 
     def get_atom_fields(self) -> set[str]:
         """:meta private:"""
@@ -155,6 +155,14 @@ class RawData(BoomboxEndpoint):
     video_width, video_height : int, optional
         Applicable only when `video` is set to True and the endpoint defines
         the output. Determines the dimensions of the produced video stream.
+    pace_control : bool, optional
+        Allowed only for output. If true the incoming streams will be passed to
+        the output according to their timestamps, if not they will be passed as
+        fast as possible. True by default.
+    realtime : bool, optional
+        Allowed only for input. If true then Boombox will assume that packets
+        will be provided in realtime and won't control their pace when passing
+        them to the output. False by default.
     """
 
     _: KW_ONLY
@@ -165,6 +173,7 @@ class RawData(BoomboxEndpoint):
     audio_format: AudioSampleFormat | None = None
     video_width: int | None = None
     video_height: int | None = None
+    pace_control: bool | None = None
 
     @override
     def get_endpoint_name(self) -> Atom:
@@ -187,7 +196,7 @@ class StorageEndpoint(BoomboxEndpoint, ABC):
     location : str
         A path to a file or an HTTP URL, location where the media should be
         read from or written to.
-    transport : {None, "file", "http"}:
+    transport : {None, "file", "http"}, optional:
         An optional attribute that explicitly states whether a file or HTTP
         storage should be assumed. If not provided transport will be determined
         from `location` - paths will resolve to "file" location,
@@ -291,15 +300,10 @@ class WebRTC(BoomboxEndpoint):
     signaling : str
         URL of the WebSocket that is the signaling channel of the WebRTC
         connection.
-    pace_control : bool, default=True
-        Allowed only for output. Determines whether the incoming streams should
-        be passed to the output according to their timestamps or as fast as
-        possible.
     """
 
     signaling: str
     _: KW_ONLY
-    pace_control: bool = True
 
 
 @dataclass
@@ -321,27 +325,28 @@ class WHIP(BoomboxEndpoint):
 
 @dataclass
 class HLS(BoomboxEndpoint):
-    """Endpoint for HTTP Live Streaming.
-
-    Currently Boombox supports only HLS output - creating playlists.
+    """Endpoint for HTTP Live Streaming. Boombox supports fetching HLS streams
+    as input and creating HLS playlists as output.
 
     Attributes
     ----------
     location : str
-        Path to the location where the HLS playlist will be created. If the
-        path is to a directory, then an "index.m3u8" manifest file and the
-        other files will be created there. If it's a path to ".m3u8" file,
-        the file will be created in provided location and all the other
-        files will be created in the same directory.
-    pace_control : bool, default=true
-        allowed only for output. determines whether the incoming streams should
-        be passed to the output according to their timestamps or as fast as
-        possible.
+        If set for input it should be an URL to location from which to fetch
+        the HLS stream. If set for output it's a path to the location where
+        the HLS playlist will be created. If the path is to a directory, then
+        an "index.m3u8" manifest file and the other files will be created
+        there. If it's a path to ".m3u8" file, the file will be created in
+        provided location and all the other files will be created in the
+        same directory.
+    mode : {"vod", "live"}, optional
+        If set for output then it determines if the session is live or a VOD
+        type of broadcast. It can influence type of metadata inserted into the
+        playlist's manifest.
     """
 
     location: str
     _: KW_ONLY
-    pace_control: bool = True
+    mode: Literal["vod", "live"] = "vod"
 
 
 @dataclass
@@ -409,10 +414,6 @@ class RTP(BoomboxEndpoint):
         Applicable only for H264 and H265 payloads. Parameter sets, could be
         obtained from a side channel. They contain information about the
         encoded stream.
-    pace_control : bool, default=true
-        allowed only for output. determines whether the incoming streams should
-        be passed to the output according to their timestamps or as fast as
-        possible.
     """
 
     _: KW_ONLY
@@ -429,7 +430,6 @@ class RTP(BoomboxEndpoint):
     vps: bytes | None = None
     pps: bytes | None = None
     sps: bytes | None = None
-    pace_control: bool = True
 
     @override
     def get_atom_fields(self) -> set[str]:

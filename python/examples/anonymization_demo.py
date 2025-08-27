@@ -55,6 +55,8 @@ def run_server(address: str, port: int) -> None:
             super().__init__(*args, **kwargs, directory=directory)
 
     httpd = http.server.HTTPServer((address, port), Handler)
+    print(f"Sender page available at http://{address}:{port}/sender.html")
+    print(f"Receiver page available at http://{address}:{port}/receiver.html")
     httpd.serve_forever()
 
 
