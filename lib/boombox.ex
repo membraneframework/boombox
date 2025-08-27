@@ -14,8 +14,8 @@ defmodule Boombox do
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
   @typedoc """
-  Determines if the streams will be sent to the output as fast as possible, or if they will be
-  paced and sent according to their timestamps.
+  Determines whether the incoming streams should be passed to the output according to their
+  timestamps or as fast as possible.
   """
   @type pace_control_opt :: {:pace_control, boolean()}
   @type hls_variant_selection_policy_opt ::
