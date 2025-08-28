@@ -28,7 +28,7 @@ defmodule Boombox.InternalBin.SRT do
     {%Wait{actions: [notify_parent: :external_resource_ready]}, state}
   end
 
-  @spec handle_connection(pid()) :: Ready.t()
+  @spec handle_connection(pid()) :: Wait.t()
   def handle_connection(server_awaiting_accept) do
     spec = [
       child(:srt_source, %SRT.Source{server_awaiting_accept: server_awaiting_accept})
