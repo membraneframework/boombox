@@ -68,7 +68,7 @@ defmodule Boombox.Bin do
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
           | {:rtp, Boombox.in_rtp_opts()}
-          | {:srt, port :: non_neg_integer()}
+          | {:srt, url :: String.t()}
 
   @typedoc """
   Value passed via `:output` option.

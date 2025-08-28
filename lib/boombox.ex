@@ -94,7 +94,7 @@ defmodule Boombox do
           | {:hls, url :: String.t()}
           | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
           | {:stream, in_stream_opts()}
-          | {:srt, port: non_neg_integer()}
+          | {:srt, url: String.t()}
 
   @type output ::
           (path_or_uri :: String.t())

@@ -500,8 +500,8 @@ defmodule Boombox.InternalBin do
     {Boombox.InternalBin.Pad.create_input(ctx), state}
   end
 
-  defp create_input({:srt, port}, _ctx, state) do
-    Boombox.InternalBin.SRT.create_input(port, state)
+  defp create_input({:srt, url}, _ctx, state) do
+    Boombox.InternalBin.SRT.create_input(url, state)
   end
 
   @spec create_output(output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
