@@ -169,6 +169,21 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
+  @tag :srt
+  async_test "srt -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    ip = "127.0.0.1"
+    port = get_free_port()
+    stream_id = "some_key"
+    url = "srt://#{ip}:#{port}/#{stream_id}"
+    t = Boombox.async(input: url, output: output)
+
+    p = send_srt(ip, port, stream_id)
+    Task.await(t, 30_000)
+    Testing.Pipeline.terminate(p)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
@@ -404,6 +419,45 @@ defmodule BoomboxTest do
         |> via_in(Pad.ref(:audio, 0))
         |> get_child(:rtmp_sink),
         child(:rtmp_sink, %Membrane.RTMP.Sink{rtmp_url: url})
+      ]
+    )
+
+    p
+  end
+
+  defp send_srt(ip, port, stream_id) do
+    p =
+      Testing.Pipeline.start_link_supervised!(
+        spec:
+          child(%Membrane.File.Source{location: @bbb_mp4, seekable?: true})
+          |> child(:demuxer, %Membrane.MP4.Demuxer.ISOM{optimize_for_non_fast_start?: true})
+      )
+
+    assert_pipeline_notified(p, :demuxer, {:new_tracks, tracks})
+
+    [{audio_id, %Membrane.AAC{}}, {video_id, %Membrane.H264{}}] =
+      Enum.sort_by(tracks, fn {_id, %format{}} -> format end)
+
+    Testing.Pipeline.execute_actions(p,
+      spec: [
+        get_child(:demuxer)
+        |> via_out(Pad.ref(:output, video_id))
+        |> child(Membrane.Realtimer)
+        |> child(:video_parser, %Membrane.H264.Parser{
+          output_stream_structure: :annexb
+        })
+        |> via_in(:video_input)
+        |> get_child(:mpeg_ts_muxer),
+        get_child(:demuxer)
+        |> via_out(Pad.ref(:output, audio_id))
+        |> child(Membrane.Realtimer)
+        |> child(:audio_parser, %Membrane.AAC.Parser{
+          out_encapsulation: :ADTS
+        })
+        |> via_in(:audio_input)
+        |> get_child(:mpeg_ts_muxer),
+        child(:mpeg_ts_muxer, Membrane.MPEGTS.Muxer)
+        |> child(:srt_sink, %Membrane.SRT.Sink{ip: ip, port: port, stream_id: stream_id})
       ]
     )
 
