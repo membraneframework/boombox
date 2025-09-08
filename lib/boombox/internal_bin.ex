@@ -818,6 +818,9 @@ defmodule Boombox.InternalBin do
       {:srt, url} when direction == :input and is_binary(url) ->
         value
 
+      {:srt, server} when direction == :input and is_pid(server) ->
+        value
+
       {:srt, url} when direction == :output and is_binary(url) ->
         value
 

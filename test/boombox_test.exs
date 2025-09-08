@@ -184,6 +184,22 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
+  @tag :srt_external_server
+  async_test "srt with external server -> mp4", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    ip = "127.0.0.1"
+    port = get_free_port()
+    stream_id = "some_key"
+    {:ok, server} = ExLibSRT.Server.start_link(ip, port)
+    p = send_srt(ip, port, stream_id)
+
+    assert_receive {:srt_server_connect_request, _address, _stream_id}
+    t = Boombox.async(input: {:srt, server}, output: output)
+    Task.await(t, 30_000)
+    Testing.Pipeline.terminate(p)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
   @tag :rtmp_webrtc
   async_test "rtmp -> webrtc -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")

@@ -12,9 +12,11 @@ defmodule Boombox.InternalBin.SRT do
           stream_id: String.t()
         }
 
-  @spec create_input(String.t() | pid(), State.t()) :: Wait.t()
+  @spec create_input(String.t() | pid(), State.t()) :: {Wait.t(), State.t()}
   def create_input(server_awaiting_accept, state) when is_pid(server_awaiting_accept) do
     result = handle_connection(server_awaiting_accept)
+
+    result = update_in(result.actions, &(&1 ++ [notify_parent: :external_resource_ready]))
     {result, state}
   end
 
