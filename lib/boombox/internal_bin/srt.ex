@@ -21,8 +21,8 @@ defmodule Boombox.InternalBin.SRT do
   end
 
   def create_input(url, state) do
-    {ip, port, stream_id} = parse_srt_url(url)
-    {:ok, server} = ExLibSRT.Server.start(ip, port)
+    {ip, port, stream_id, password} = parse_srt_url(url)
+    {:ok, server} = ExLibSRT.Server.start(ip, port, password)
     srt_state = %{server: server, stream_id: stream_id}
 
     state = %{state | srt_state: srt_state}
@@ -67,14 +67,19 @@ defmodule Boombox.InternalBin.SRT do
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
   def link_output(url, track_builders, spec_builder) do
-    {ip, port, stream_id} = parse_srt_url(url)
+    {ip, port, stream_id, password} = parse_srt_url(url)
 
     spec =
       [
         spec_builder,
         child(:srt_mpeg_ts_muxer, Membrane.MPEGTS.Muxer)
         |> child(:srt_realtimer, Membrane.Realtimer)
-        |> child(:srt_sink, %SRT.Sink{ip: ip, port: port, stream_id: stream_id}),
+        |> child(:srt_sink, %SRT.Sink{
+          ip: ip,
+          port: port,
+          stream_id: stream_id,
+          password: password
+        }),
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
@@ -102,12 +107,20 @@ defmodule Boombox.InternalBin.SRT do
     ip = parsed_url.host
     port = parsed_url.port
 
-    stream_id =
-      case parsed_url.path do
+    params_string =
+      case parsed_url.query do
         nil -> ""
-        path -> String.trim_leading(path, "/")
+        path -> path
       end
 
-    {ip, port, stream_id}
+    params =
+      String.split(params_string, "&")
+      |> Enum.map(fn key_value_pair ->
+        [key, value] = String.split(key_value_pair, "=")
+        {key, value}
+      end)
+      |> Enum.into(%{})
+
+    {ip, port, params["streamid"] || "", params["password"] || ""}
   end
 end

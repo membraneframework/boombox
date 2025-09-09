@@ -175,11 +175,12 @@ defmodule BoomboxTest do
     output = Path.join(tmp, "output.mp4")
     ip = "127.0.0.1"
     port = get_free_port()
-    stream_id = "some_key"
-    url = "srt://#{ip}:#{port}/#{stream_id}"
+    stream_id = "some_stream_id"
+    password = "some_password"
+    url = "srt://#{ip}:#{port}?streamid=#{stream_id}&password=#{password}"
     t = Boombox.async(input: url, output: output)
 
-    p = send_srt(ip, port, stream_id, input)
+    p = send_srt(ip, port, stream_id, password, input)
     Task.await(t, 30_000)
     Testing.Pipeline.terminate(p)
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:audio])
@@ -191,9 +192,10 @@ defmodule BoomboxTest do
     output = Path.join(tmp, "output.mp4")
     ip = "127.0.0.1"
     port = get_free_port()
-    stream_id = "some_key"
-    {:ok, server} = ExLibSRT.Server.start_link(ip, port)
-    p = send_srt(ip, port, stream_id, input)
+    stream_id = "some_stream_id"
+    password = "some_password"
+    {:ok, server} = ExLibSRT.Server.start_link(ip, port, password)
+    p = send_srt(ip, port, stream_id, password, input)
 
     assert_receive {:srt_server_connect_request, _address, ^stream_id}
     t = Boombox.async(input: {:srt, server}, output: output)
@@ -208,9 +210,10 @@ defmodule BoomboxTest do
     output = Path.join(tmp, "output.mp4")
     ip = "127.0.0.1"
     port = get_free_port()
-    stream_id = "some_key"
-    url = "srt://#{ip}:#{port}/#{stream_id}"
-    t = Task.async(fn -> receive_srt(ip, port, stream_id, output) end)
+    stream_id = "some_stream_id"
+    password = "some_password"
+    url = "srt://#{ip}:#{port}?streamid=#{stream_id}&password=#{password}"
+    t = Task.async(fn -> receive_srt(ip, port, stream_id, password, output) end)
     Boombox.run(input: input, output: url)
     Task.await(t)
     Compare.compare(output, input)
@@ -457,7 +460,7 @@ defmodule BoomboxTest do
     p
   end
 
-  defp send_srt(ip, port, stream_id, input_path) do
+  defp send_srt(ip, port, stream_id, password, input_path) do
     p =
       Testing.Pipeline.start_link_supervised!(
         spec:
@@ -491,21 +494,31 @@ defmodule BoomboxTest do
       end) ++
         [
           child(:mpeg_ts_muxer, Membrane.MPEGTS.Muxer)
-          |> child(:srt_sink, %Membrane.SRT.Sink{ip: ip, port: port, stream_id: stream_id})
+          |> child(:srt_sink, %Membrane.SRT.Sink{
+            ip: ip,
+            port: port,
+            stream_id: stream_id,
+            password: password
+          })
         ]
 
     Testing.Pipeline.execute_actions(p, spec: spec)
     p
   end
 
-  defp receive_srt(ip, port, stream_id, output_path) do
+  defp receive_srt(ip, port, stream_id, password, output_path) do
     spec =
-      child(:srt_source, %Membrane.SRT.Source{ip: ip, port: port, stream_id: stream_id})
+      child(:srt_source, %Membrane.SRT.Source{
+        ip: ip,
+        port: port,
+        stream_id: stream_id,
+        password: password
+      })
       |> child(:demuxer, Membrane.MPEG.TS.Demuxer)
 
     {:ok, _sup, p} = Testing.Pipeline.start_link(spec: spec)
 
-    assert_pipeline_notified(p, :demuxer, {:mpeg_ts_pmt, pmt})
+    assert_pipeline_notified(p, :demuxer, {:mpeg_ts_pmt, pmt}, 5000)
 
     streams_spec =
       Enum.map(pmt.streams, fn {id, %{stream_type: type}} ->
