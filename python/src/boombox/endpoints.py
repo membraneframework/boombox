@@ -174,6 +174,7 @@ class RawData(BoomboxEndpoint):
     video_width: int | None = None
     video_height: int | None = None
     pace_control: bool | None = None
+    realtime: bool | None = None
 
     @override
     def get_endpoint_name(self) -> Atom:

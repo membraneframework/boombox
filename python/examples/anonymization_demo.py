@@ -326,7 +326,8 @@ def main():
     print("Input boombox initialized.")
 
     output_boombox = Boombox(
-        input=RawData(video=True, audio=True), output=WebRTC("ws://localhost:8830")
+        input=RawData(video=True, audio=True, realtime=True),
+        output=WebRTC("ws://localhost:8830"),
     )
     print("Output boombox initialized.")
 
