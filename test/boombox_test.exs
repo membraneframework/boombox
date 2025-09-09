@@ -169,7 +169,7 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  @tag :input_srt
+  @tag :srt_input
   async_test "srt -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     ip = "127.0.0.1"
@@ -184,7 +184,7 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  @tag :input_srt_external_server
+  @tag :srt_external_server_input
   async_test "srt with external server -> mp4", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     ip = "127.0.0.1"
@@ -200,7 +200,7 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  @tag :output_srt
+  @tag :srt_output
   async_test "mp4 -> srt", %{tmp_dir: tmp} do
     input = "test/fixtures/ref_bun10s_aac.mp4"
     output = Path.join(tmp, "output.mp4")
@@ -501,7 +501,7 @@ defmodule BoomboxTest do
 
     {:ok, _sup, p} = Testing.Pipeline.start_link(spec: spec)
 
-    assert_pipeline_notified(p, :demuxer, {:mpeg_ts_pmt, pmt}, 5000)
+    assert_pipeline_notified(p, :demuxer, {:mpeg_ts_pmt, pmt})
 
     streams_spec =
       Enum.map(pmt.streams, fn {id, %{stream_type: type}} ->
