@@ -171,7 +171,7 @@ defmodule BoomboxTest do
 
   @tag :srt_input
   async_test "srt -> mp4", %{tmp_dir: tmp} do
-    input = @bbb_mp4_a
+    input = @bbb_mp4_v
     output = Path.join(tmp, "output.mp4")
     ip = "127.0.0.1"
     port = get_free_port()
@@ -213,7 +213,50 @@ defmodule BoomboxTest do
     stream_id = "some_stream_id"
     password = "some_password"
     url = "srt://#{ip}:#{port}?streamid=#{stream_id}&password=#{password}"
-    t = Task.async(fn -> receive_srt(ip, port, stream_id, password, output) end)
+
+    t =
+      Task.async(fn ->
+        spec =
+          child(:srt_source, %Membrane.SRT.Source{
+            ip: ip,
+            port: port,
+            stream_id: stream_id,
+            password: password
+          })
+          |> child(:demuxer, Membrane.MPEG.TS.Demuxer)
+
+        {:ok, _sup, p} = Testing.Pipeline.start_link(spec: spec)
+
+        assert_pipeline_notified(p, :demuxer, {:mpeg_ts_pmt, pmt})
+
+        streams_spec =
+          Enum.map(pmt.streams, fn {id, %{stream_type: type}} ->
+            get_child(:demuxer)
+            |> via_out(Pad.ref(:output, {:stream_id, id}))
+            |> then(
+              &case type do
+                :H264 ->
+                  child(&1, %Membrane.H264.Parser{output_stream_structure: :avc1})
+
+                :AAC ->
+                  &1
+                  |> child(%Membrane.AAC.Parser{out_encapsulation: :none, output_config: :esds})
+              end
+            )
+            |> get_child(:mp4)
+          end)
+
+        spec =
+          [
+            child(:mp4, Membrane.MP4.Muxer.ISOM)
+            |> child(:file_sink, %Membrane.File.Sink{location: output})
+          ] ++ streams_spec
+
+        Testing.Pipeline.execute_actions(p, spec: spec)
+        assert_end_of_stream(p, :file_sink, :input, 12_000)
+        Testing.Pipeline.terminate(p)
+      end)
+
     Boombox.run(input: input, output: url)
     Task.await(t)
     Compare.compare(output, input)
@@ -504,46 +547,5 @@ defmodule BoomboxTest do
 
     Testing.Pipeline.execute_actions(p, spec: spec)
     p
-  end
-
-  defp receive_srt(ip, port, stream_id, password, output_path) do
-    spec =
-      child(:srt_source, %Membrane.SRT.Source{
-        ip: ip,
-        port: port,
-        stream_id: stream_id,
-        password: password
-      })
-      |> child(:demuxer, Membrane.MPEG.TS.Demuxer)
-
-    {:ok, _sup, p} = Testing.Pipeline.start_link(spec: spec)
-
-    assert_pipeline_notified(p, :demuxer, {:mpeg_ts_pmt, pmt}, 5000)
-
-    streams_spec =
-      Enum.map(pmt.streams, fn {id, %{stream_type: type}} ->
-        get_child(:demuxer)
-        |> via_out(Pad.ref(:output, {:stream_id, id}))
-        |> then(
-          &case type do
-            :H264 ->
-              child(&1, %Membrane.H264.Parser{output_stream_structure: :avc1})
-
-            :AAC ->
-              &1 |> child(%Membrane.AAC.Parser{out_encapsulation: :none, output_config: :esds})
-          end
-        )
-        |> get_child(:mp4)
-      end)
-
-    spec =
-      [
-        child(:mp4, Membrane.MP4.Muxer.ISOM)
-        |> child(:file_sink, %Membrane.File.Sink{location: output_path})
-      ] ++ streams_spec
-
-    Testing.Pipeline.execute_actions(p, spec: spec)
-    assert_end_of_stream(p, :file_sink, :input, 12_000)
-    Testing.Pipeline.terminate(p)
   end
 end
