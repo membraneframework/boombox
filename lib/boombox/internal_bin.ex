@@ -327,9 +327,13 @@ defmodule Boombox.InternalBin do
   end
 
   @impl true
-  def handle_info({:srt_server_connect_request, _address, _stream_id}, ctx, state) do
-    Boombox.InternalBin.SRT.handle_connection(state.srt_state.server)
-    |> proceed_result(ctx, state)
+  def handle_info({:srt_server_connect_request, _address, stream_id}, ctx, state) do
+    if stream_id == state.srt_state.stream_id do
+      Boombox.InternalBin.SRT.handle_connection(state.srt_state.server)
+      |> proceed_result(ctx, state)
+    else
+      {[], state}
+    end
   end
 
   @impl true
