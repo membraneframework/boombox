@@ -62,7 +62,7 @@ defmodule Boombox.InternalBin.SRT do
   end
 
   @spec link_output(
-          Boombox.out_rtp_opts(),
+          String.t(),
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
@@ -73,6 +73,7 @@ defmodule Boombox.InternalBin.SRT do
       [
         spec_builder,
         child(:srt_mpeg_ts_muxer, Membrane.MPEGTS.Muxer)
+        |> child(:srt_realtimer, Membrane.Realtimer)
         |> child(:srt_sink, %SRT.Sink{ip: ip, port: port, stream_id: stream_id}),
         Enum.map(track_builders, fn
           {:audio, builder} ->
@@ -81,12 +82,12 @@ defmodule Boombox.InternalBin.SRT do
               output_stream_format: AAC
             })
             |> via_in(:audio_input)
-            |> get_child(:mpeg_ts_muxer)
+            |> get_child(:srt_mpeg_ts_muxer)
 
           {:video, builder} ->
             builder
             |> child(:srt_mpeg_ts_video_transcoder, %Transcoder{
-              output_stream_format: %H264{alignment: :annexb}
+              output_stream_format: %H264{stream_structure: :annexb}
             })
             |> via_in(:video_input)
             |> get_child(:srt_mpeg_ts_muxer)
