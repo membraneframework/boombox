@@ -207,6 +207,7 @@ defmodule BoomboxTest do
   @tag :srt_output
   async_test "mp4 -> srt", %{tmp_dir: tmp} do
     input = "test/fixtures/bun10s.mp4"
+    input_duration_ms = 10_000
     output = Path.join(tmp, "output.mp4")
     ip = "127.0.0.1"
     port = get_free_port()
@@ -253,7 +254,7 @@ defmodule BoomboxTest do
           ] ++ streams_spec
 
         Testing.Pipeline.execute_actions(p, spec: spec)
-        assert_end_of_stream(p, :file_sink, :input, 12_000)
+        assert_end_of_stream(p, :file_sink, :input, round(1.1 * input_duration_ms))
         Testing.Pipeline.terminate(p)
       end)
 
