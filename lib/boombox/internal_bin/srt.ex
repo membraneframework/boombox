@@ -4,7 +4,7 @@ defmodule Boombox.InternalBin.SRT do
 
   require Membrane.Pad, as: Pad
 
-  alias Boombox.InternalBin.{Ready, State, Wait}
+  alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.{AAC, H264, SRT, Transcoder}
 
   @type state :: %{
@@ -12,22 +12,20 @@ defmodule Boombox.InternalBin.SRT do
           stream_id: String.t()
         }
 
-  @spec create_input(String.t() | pid(), State.t()) :: {Wait.t(), State.t()}
-  def create_input(server_awaiting_accept, state) when is_pid(server_awaiting_accept) do
-    result = handle_connection(server_awaiting_accept)
-
-    result = update_in(result.actions, &(&1 ++ [notify_parent: :external_resource_ready]))
-    {result, state}
+  @spec create_input(String.t() | pid()) :: Wait.t()
+  def create_input(server_awaiting_accept) when is_pid(server_awaiting_accept) do
+    handle_connection(server_awaiting_accept)
   end
 
-  def create_input(url, state) do
+  def create_input(url) do
     {ip, port, stream_id, password} = parse_srt_url(url)
-    {:ok, server} = ExLibSRT.Server.start(ip, port, password)
-    srt_state = %{server: server, stream_id: stream_id}
 
-    state = %{state | srt_state: srt_state}
+    spec = [
+      child(:srt_source, %SRT.Source{ip: ip, port: port, stream_id: stream_id, password: password})
+      |> child(:srt_mpeg_ts_demuxer, Membrane.MPEG.TS.Demuxer)
+    ]
 
-    {%Wait{actions: [notify_parent: :external_resource_ready]}, state}
+    %Wait{actions: [spec: spec]}
   end
 
   @spec handle_connection(pid()) :: Wait.t()
@@ -115,6 +113,7 @@ defmodule Boombox.InternalBin.SRT do
 
     params =
       String.split(params_string, "&")
+      |> Enum.reject(&(&1 == ""))
       |> Enum.map(fn key_value_pair ->
         [key, value] = String.split(key_value_pair, "=")
         {key, value}

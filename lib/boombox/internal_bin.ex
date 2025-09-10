@@ -311,7 +311,7 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_child_setup_completed(child, _ctx, state)
-      when child in [:udp_source, :rtsp_source] do
+      when child in [:udp_source, :rtsp_source, :srt_source] do
     {[notify_parent: :external_resource_ready], state}
   end
 
@@ -504,8 +504,8 @@ defmodule Boombox.InternalBin do
     {Boombox.InternalBin.Pad.create_input(ctx), state}
   end
 
-  defp create_input({:srt, url}, _ctx, state) do
-    Boombox.InternalBin.SRT.create_input(url, state)
+  defp create_input({:srt, opts}, _ctx, state) do
+    {Boombox.InternalBin.SRT.create_input(opts), state}
   end
 
   @spec create_output(output(), Membrane.Bin.CallbackContext.t(), State.t()) ::

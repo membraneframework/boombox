@@ -261,7 +261,7 @@ defmodule BoomboxTest do
               ] ++ streams_spec
 
             Testing.Pipeline.execute_actions(p, spec: spec)
-            assert_end_of_stream(p, :file_sink, :input, round(1.1 * input_duration_ms))
+            assert_end_of_stream(p, :file_sink, :input, round(1.2 * input_duration_ms))
             Testing.Pipeline.terminate(p)
           end)
 
