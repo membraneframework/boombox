@@ -46,11 +46,7 @@ defmodule Boombox.Mixfile do
 
   defp deps do
     [
-      # {:membrane_core, "~> 1.2"},
-      {:membrane_core,
-       github: "membraneframework/membrane_core",
-       branch: "handle-eos-in-debug-elements",
-       override: true},
+      {:membrane_core, "~> 1.2"},
       {:membrane_transcoder_plugin, "~> 0.3.2"},
       {:membrane_webrtc_plugin, "~> 0.25.0"},
       {:membrane_mp4_plugin, "~> 0.35.2"},
