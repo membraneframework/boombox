@@ -181,8 +181,13 @@ defmodule BoomboxTest do
         port = get_free_port()
         stream_id = "some_stream_id"
         password = "some_password"
-        url = "srt://#{ip}:#{port}?streamid=#{stream_id}&password=#{password}"
-        t = Boombox.async(input: url, output: output)
+        url = "srt://#{ip}:#{port}"
+
+        t =
+          Boombox.async(
+            input: {:srt, url, stream_id: stream_id, password: password},
+            output: output
+          )
 
         p = send_srt(ip, port, stream_id, password, input)
         Task.await(t, 30_000)
@@ -217,7 +222,7 @@ defmodule BoomboxTest do
         port = get_free_port()
         stream_id = "some_stream_id"
         password = "some_password"
-        url = "srt://#{ip}:#{port}?streamid=#{stream_id}&password=#{password}"
+        url = "srt://#{ip}:#{port}"
 
         t =
           Task.async(fn ->
@@ -265,7 +270,7 @@ defmodule BoomboxTest do
             Testing.Pipeline.terminate(p)
           end)
 
-        Boombox.run(input: input, output: url)
+        Boombox.run(input: input, output: {:srt, url, stream_id: stream_id, password: password})
         Task.await(t)
         Compare.compare(output, input, kinds: get_kinds(input))
       end

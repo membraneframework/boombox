@@ -504,8 +504,13 @@ defmodule Boombox.InternalBin do
     {Boombox.InternalBin.Pad.create_input(ctx), state}
   end
 
-  defp create_input({:srt, opts}, _ctx, state) do
-    {Boombox.InternalBin.SRT.create_input(opts), state}
+  defp create_input({:srt, server_awaiting_accept}, _ctx, state)
+       when is_pid(server_awaiting_accept) do
+    {Boombox.InternalBin.SRT.create_input(server_awaiting_accept), state}
+  end
+
+  defp create_input({:srt, url, opts}, _ctx, state) when is_binary(url) do
+    {Boombox.InternalBin.SRT.create_input(url, opts), state}
   end
 
   @spec create_output(output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
@@ -662,9 +667,9 @@ defmodule Boombox.InternalBin do
     {result, state}
   end
 
-  defp link_output({:srt, url}, track_builders, spec_builder, _ctx, state) do
+  defp link_output({:srt, url, opts}, track_builders, spec_builder, _ctx, state) do
     result =
-      Boombox.InternalBin.SRT.link_output(url, track_builders, spec_builder)
+      Boombox.InternalBin.SRT.link_output(url, opts, track_builders, spec_builder)
 
     {result, state}
   end
@@ -727,10 +732,10 @@ defmodule Boombox.InternalBin do
         {:hls, value, opts}
 
       {"srt", _ext, :input} ->
-        {:srt, value}
+        {:srt, value, opts}
 
       {"srt", _ext, :output} ->
-        {:srt, value}
+        {:srt, value, opts}
 
       _other ->
         raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
@@ -819,14 +824,21 @@ defmodule Boombox.InternalBin do
       {:stream, stream_process, opts} when is_pid(stream_process) ->
         if Keyword.keyword?(opts), do: value
 
-      {:srt, url} when direction == :input and is_binary(url) ->
-        value
+      {:srt, server_awaiting_accept}
+      when direction == :input and is_pid(server_awaiting_accept) ->
+        {:srt, server_awaiting_accept}
 
-      {:srt, server} when direction == :input and is_pid(server) ->
-        value
+      {:srt, url} when direction == :input and is_binary(url) ->
+        {:srt, url, []}
+
+      {:srt, url, opts} when direction == :input and is_binary(url) ->
+        {:srt, url, opts}
 
       {:srt, url} when direction == :output and is_binary(url) ->
-        value
+        {:srt, url, []}
+
+      {:srt, url, opts} when direction == :output and is_binary(url) ->
+        {:srt, url, opts}
 
       :membrane_pad ->
         :membrane_pad

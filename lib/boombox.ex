@@ -17,6 +17,7 @@ defmodule Boombox do
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
+  @type srt_auth_opts :: [stream_id: String.t(), password: String.t()]
   @type in_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
@@ -94,7 +95,8 @@ defmodule Boombox do
           | {:hls, url :: String.t()}
           | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
           | {:stream, in_stream_opts()}
-          | {:srt, url: String.t()}
+          | {:srt, url :: String.t()}
+          | {:srt, url :: String.t(), srt_auth_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
@@ -111,6 +113,7 @@ defmodule Boombox do
           | {:rtp, out_rtp_opts()}
           | {:stream, out_stream_opts()}
           | {:srt, url :: String.t()}
+          | {:srt, url :: String.t(), srt_auth_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{

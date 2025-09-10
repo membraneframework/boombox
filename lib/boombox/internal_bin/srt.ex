@@ -12,13 +12,19 @@ defmodule Boombox.InternalBin.SRT do
           stream_id: String.t()
         }
 
-  @spec create_input(String.t() | pid()) :: Wait.t()
+  @type srt_auth_opts :: [stream_id: String.t(), password: String.t()]
+
+  @spec create_input(pid()) :: Wait.t()
   def create_input(server_awaiting_accept) when is_pid(server_awaiting_accept) do
     handle_connection(server_awaiting_accept)
   end
 
-  def create_input(url) do
-    {ip, port, stream_id, password} = parse_srt_url(url)
+  @spec create_input(String.t(), srt_auth_opts()) :: Wait.t()
+  def create_input(url, opts) do
+    {ip, port} = parse_srt_url(url)
+
+    stream_id = opts[:stream_id] || ""
+    password = opts[:password] || ""
 
     spec = [
       child(:srt_source, %SRT.Source{ip: ip, port: port, stream_id: stream_id, password: password})
@@ -61,11 +67,15 @@ defmodule Boombox.InternalBin.SRT do
 
   @spec link_output(
           String.t(),
+          srt_auth_opts(),
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()
-  def link_output(url, track_builders, spec_builder) do
-    {ip, port, stream_id, password} = parse_srt_url(url)
+  def link_output(url, opts, track_builders, spec_builder) do
+    {ip, port} = parse_srt_url(url)
+
+    stream_id = opts[:stream_id] || ""
+    password = opts[:password] || ""
 
     spec =
       [
@@ -105,21 +115,6 @@ defmodule Boombox.InternalBin.SRT do
     ip = parsed_url.host
     port = parsed_url.port
 
-    params_string =
-      case parsed_url.query do
-        nil -> ""
-        path -> path
-      end
-
-    params =
-      String.split(params_string, "&")
-      |> Enum.reject(&(&1 == ""))
-      |> Enum.map(fn key_value_pair ->
-        [key, value] = String.split(key_value_pair, "=")
-        {key, value}
-      end)
-      |> Enum.into(%{})
-
-    {ip, port, params["streamid"] || "", params["password"] || ""}
+    {ip, port}
   end
 end
