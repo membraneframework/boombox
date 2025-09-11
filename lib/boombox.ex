@@ -26,7 +26,7 @@ defmodule Boombox do
   @type in_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
-          | {:realtime, boolean()}
+          | {:is_live, boolean()}
         ]
   @type out_stream_opts :: [
           {:audio, :binary | boolean()}

@@ -27,7 +27,7 @@ defmodule Boombox.Utils.CLI do
     token: {:string, :string},
     transcoding_policy: {:string, :atom},
     pace_control: {:boolean, :boolean},
-    realtime: {:boolean, :boolean},
+    is_live: {:boolean, :boolean},
     variant_selection_policy: {:string, :atom},
     mode: {:string, :atom}
   ]
