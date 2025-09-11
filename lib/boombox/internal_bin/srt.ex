@@ -7,11 +7,6 @@ defmodule Boombox.InternalBin.SRT do
   alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.{AAC, H264, SRT, Transcoder}
 
-  @type state :: %{
-          server: pid(),
-          stream_id: String.t()
-        }
-
   @type srt_auth_opts :: [stream_id: String.t(), password: String.t()]
 
   @spec create_input(pid()) :: Wait.t()

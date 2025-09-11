@@ -60,7 +60,6 @@ defmodule Boombox.InternalBin do
                   last_result: nil,
                   eos_info: nil,
                   rtsp_state: nil,
-                  srt_state: nil,
                   pending_new_tracks: %{input: [], output: []},
                   output_webrtc_state: nil,
                   new_tracks_notification_status: :not_resolved
@@ -93,7 +92,6 @@ defmodule Boombox.InternalBin do
             last_result: Ready.t() | Wait.t() | nil,
             eos_info: term(),
             rtsp_state: Boombox.InternalBin.RTSP.state() | nil,
-            srt_state: Boombox.InternalBin.SRT.state() | nil,
             output_webrtc_state: Boombox.InternalBin.WebRTC.output_webrtc_state() | nil,
             new_tracks_notification_status:
               Boombox.InternalBin.Pad.new_tracks_notification_status()
@@ -326,16 +324,6 @@ defmodule Boombox.InternalBin do
   def handle_info({:rtmp_client_ref, client_ref}, ctx, state) do
     Boombox.InternalBin.RTMP.handle_connection(client_ref)
     |> proceed_result(ctx, state)
-  end
-
-  @impl true
-  def handle_info({:srt_server_connect_request, _address, stream_id}, ctx, state) do
-    if stream_id == state.srt_state.stream_id do
-      Boombox.InternalBin.SRT.handle_connection(state.srt_state.server)
-      |> proceed_result(ctx, state)
-    else
-      {[], state}
-    end
   end
 
   @impl true

@@ -566,7 +566,7 @@ defmodule BoomboxTest do
     p
   end
 
-  defp receive_srt(ip, port, stream_id \\ "", password \\ nil, output, timeout) do
+  defp receive_srt(ip, port, stream_id, password, output, timeout) do
     spec =
       child(:srt_source, %Membrane.SRT.Source{
         ip: ip,
