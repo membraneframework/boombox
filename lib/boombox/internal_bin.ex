@@ -380,8 +380,8 @@ defmodule Boombox.InternalBin do
   end
 
   defp proceed(ctx, %{status: :output_ready} = state) do
-    {result, state} = create_input(state.input, ctx, state)
-    do_proceed(result, :input_ready, :awaiting_input, ctx, state)
+    create_input(state.input, ctx, state)
+    |> do_proceed(:input_ready, :awaiting_input, ctx, state)
   end
 
   defp proceed(
@@ -432,75 +432,74 @@ defmodule Boombox.InternalBin do
     end
   end
 
-  @spec create_input(input(), Membrane.Bin.CallbackContext.t(), State.t()) ::
-          {Ready.t() | Wait.t(), State.t()}
+  @spec create_input(input(), Membrane.Bin.CallbackContext.t(), State.t()) :: Ready.t() | Wait.t()
   defp create_input({:webrtc, signaling}, ctx, state) do
-    {Boombox.InternalBin.WebRTC.create_input(signaling, state.output, ctx, state), state}
+    Boombox.InternalBin.WebRTC.create_input(signaling, state.output, ctx, state)
   end
 
-  defp create_input({:mp4, location, opts}, _ctx, state) do
-    {Boombox.InternalBin.StorageEndpoints.MP4.create_input(location, opts), state}
+  defp create_input({:mp4, location, opts}, _ctx, _state) do
+    Boombox.InternalBin.StorageEndpoints.MP4.create_input(location, opts)
   end
 
-  defp create_input({:rtsp, uri}, _ctx, state) do
-    {Boombox.InternalBin.RTSP.create_input(uri), state}
+  defp create_input({:rtsp, uri}, _ctx, _state) do
+    Boombox.InternalBin.RTSP.create_input(uri)
   end
 
-  defp create_input({:stream, stream_process, params}, _ctx, state) do
-    {Boombox.InternalBin.ElixirStream.create_input(stream_process, params), state}
+  defp create_input({:stream, stream_process, params}, _ctx, _state) do
+    Boombox.InternalBin.ElixirStream.create_input(stream_process, params)
   end
 
-  defp create_input({:h264, location, opts}, _ctx, state) do
-    {Boombox.InternalBin.StorageEndpoints.H264.create_input(location, opts), state}
+  defp create_input({:h264, location, opts}, _ctx, _state) do
+    Boombox.InternalBin.StorageEndpoints.H264.create_input(location, opts)
   end
 
-  defp create_input({:h265, location, opts}, _ctx, state) do
-    {Boombox.InternalBin.StorageEndpoints.H265.create_input(location, opts), state}
+  defp create_input({:h265, location, opts}, _ctx, _state) do
+    Boombox.InternalBin.StorageEndpoints.H265.create_input(location, opts)
   end
 
-  defp create_input({:aac, location, opts}, _ctx, state) do
-    {Boombox.InternalBin.StorageEndpoints.AAC.create_input(location, opts), state}
+  defp create_input({:aac, location, opts}, _ctx, _state) do
+    Boombox.InternalBin.StorageEndpoints.AAC.create_input(location, opts)
   end
 
-  defp create_input({:wav, location, opts}, _ctx, state) do
-    {Boombox.InternalBin.StorageEndpoints.WAV.create_input(location, opts), state}
+  defp create_input({:wav, location, opts}, _ctx, _state) do
+    Boombox.InternalBin.StorageEndpoints.WAV.create_input(location, opts)
   end
 
-  defp create_input({:mp3, location, opts}, _ctx, state) do
-    {Boombox.InternalBin.StorageEndpoints.MP3.create_input(location, opts), state}
+  defp create_input({:mp3, location, opts}, _ctx, _state) do
+    Boombox.InternalBin.StorageEndpoints.MP3.create_input(location, opts)
   end
 
-  defp create_input({:ivf, location, opts}, _ctx, state) do
-    {Boombox.InternalBin.StorageEndpoints.IVF.create_input(location, opts), state}
+  defp create_input({:ivf, location, opts}, _ctx, _state) do
+    Boombox.InternalBin.StorageEndpoints.IVF.create_input(location, opts)
   end
 
-  defp create_input({:ogg, location, opts}, _ctx, state) do
-    {Boombox.InternalBin.StorageEndpoints.Ogg.create_input(location, opts), state}
+  defp create_input({:ogg, location, opts}, _ctx, _state) do
+    Boombox.InternalBin.StorageEndpoints.Ogg.create_input(location, opts)
   end
 
-  defp create_input({:rtmp, src}, ctx, state) do
-    {Boombox.InternalBin.RTMP.create_input(src, ctx.utility_supervisor), state}
+  defp create_input({:rtmp, src}, ctx, _state) do
+    Boombox.InternalBin.RTMP.create_input(src, ctx.utility_supervisor)
   end
 
-  defp create_input({:rtp, opts}, _ctx, state) do
-    {Boombox.InternalBin.RTP.create_input(opts), state}
+  defp create_input({:rtp, opts}, _ctx, _state) do
+    Boombox.InternalBin.RTP.create_input(opts)
   end
 
-  defp create_input({:hls, url, opts}, _ctx, state) do
-    {Boombox.InternalBin.HLS.create_input(url, opts), state}
+  defp create_input({:hls, url, opts}, _ctx, _state) do
+    Boombox.InternalBin.HLS.create_input(url, opts)
   end
 
-  defp create_input(:membrane_pad, ctx, state) do
-    {Boombox.InternalBin.Pad.create_input(ctx), state}
+  defp create_input(:membrane_pad, ctx, _state) do
+    Boombox.InternalBin.Pad.create_input(ctx)
   end
 
-  defp create_input({:srt, server_awaiting_accept}, _ctx, state)
+  defp create_input({:srt, server_awaiting_accept}, _ctx, _state)
        when is_pid(server_awaiting_accept) do
-    {Boombox.InternalBin.SRT.create_input(server_awaiting_accept), state}
+    Boombox.InternalBin.SRT.create_input(server_awaiting_accept)
   end
 
-  defp create_input({:srt, url, opts}, _ctx, state) when is_binary(url) do
-    {Boombox.InternalBin.SRT.create_input(url, opts), state}
+  defp create_input({:srt, url, opts}, _ctx, _state) when is_binary(url) do
+    Boombox.InternalBin.SRT.create_input(url, opts)
   end
 
   @spec create_output(output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
