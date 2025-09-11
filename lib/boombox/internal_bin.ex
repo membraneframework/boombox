@@ -676,8 +676,16 @@ defmodule Boombox.InternalBin do
   end
 
   defp link_output({:srt, url, opts}, track_builders, spec_builder, _ctx, state) do
+    is_input_realtime = input_realtime?(state.input)
+
     result =
-      Boombox.InternalBin.SRT.link_output(url, opts, track_builders, spec_builder)
+      Boombox.InternalBin.SRT.link_output(
+        url,
+        opts,
+        track_builders,
+        spec_builder,
+        is_input_realtime
+      )
 
     {result, state}
   end
@@ -919,10 +927,11 @@ defmodule Boombox.InternalBin do
   @spec input_realtime?(input()) :: boolean()
   defp input_realtime?(input) do
     case input do
-      {endpoint_type, _parameter} when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp] ->
+      {endpoint_type, _parameter} when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp, :srt] ->
         true
 
-      {endpoint_type, _parameter, _opts} when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp] ->
+      {endpoint_type, _parameter, _opts}
+      when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp, :srt] ->
         true
 
       {:stream, opts} ->

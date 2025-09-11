@@ -64,9 +64,10 @@ defmodule Boombox.InternalBin.SRT do
           String.t(),
           srt_auth_opts(),
           Boombox.InternalBin.track_builders(),
-          Membrane.ChildrenSpec.t()
+          Membrane.ChildrenSpec.t(),
+          boolean()
         ) :: Ready.t()
-  def link_output(url, opts, track_builders, spec_builder) do
+  def link_output(url, opts, track_builders, spec_builder, is_input_realtime) do
     {ip, port} = parse_srt_url(url)
 
     stream_id = opts[:stream_id] || ""
@@ -76,7 +77,6 @@ defmodule Boombox.InternalBin.SRT do
       [
         spec_builder,
         child(:srt_mpeg_ts_muxer, Membrane.MPEGTS.Muxer)
-        |> child(:srt_realtimer, Membrane.Realtimer)
         |> child(:srt_sink, %SRT.Sink{
           ip: ip,
           port: port,
@@ -89,6 +89,11 @@ defmodule Boombox.InternalBin.SRT do
             |> child(:srt_mpeg_ts_audio_transcoder, %Transcoder{
               output_stream_format: AAC
             })
+            |> then(
+              &if is_input_realtime,
+                do: &1,
+                else: child(&1, :srt_audio_realtimer, Membrane.Realtimer)
+            )
             |> via_in(:audio_input)
             |> get_child(:srt_mpeg_ts_muxer)
 
@@ -97,6 +102,11 @@ defmodule Boombox.InternalBin.SRT do
             |> child(:srt_mpeg_ts_video_transcoder, %Transcoder{
               output_stream_format: %H264{stream_structure: :annexb}
             })
+            |> then(
+              &if is_input_realtime,
+                do: &1,
+                else: child(&1, :srt_video_realtimer, Membrane.Realtimer)
+            )
             |> via_in(:video_input)
             |> get_child(:srt_mpeg_ts_muxer)
         end)
