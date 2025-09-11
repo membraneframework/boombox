@@ -1,4 +1,4 @@
-`# Boombox examples
+# Boombox examples
 
 ```elixir
 Logger.configure(level: :info)
