@@ -23,7 +23,10 @@ defmodule Boombox do
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
-  @type srt_auth_opts :: [stream_id: String.t(), password: String.t()]
+  @type srt_auth_opts :: [
+          {:stream_id, String.t()}
+          | {:password, String.t()}
+        ]
   @type in_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
