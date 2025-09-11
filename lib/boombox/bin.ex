@@ -68,7 +68,7 @@ defmodule Boombox.Bin do
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
           | {:rtp, Boombox.in_rtp_opts()}
-          | {:srt, url :: String.t()}
+          | {:srt, url :: String.t(), Boombox.srt_auth_opts()}
 
   @typedoc """
   Value passed via `:output` option.
@@ -94,7 +94,7 @@ defmodule Boombox.Bin do
           | {:hls, location :: String.t()}
           | {:hls, location :: String.t(), [Boombox.transcoding_policy_opt()]}
           | {:rtp, Boombox.out_rtp_opts()}
-          | {:srt, url :: String.t()}
+          | {:srt, url :: String.t(), Boombox.srt_auth_opts()}
 
   @typedoc """
   Type of notification sent to the parent of Boombox.Bin when new tracks arrive.
