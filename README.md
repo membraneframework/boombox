@@ -74,8 +74,8 @@ For more examples, see [examples.livemd](examples.livemd).
 | RTMP | `"rtmp://*"` | _not supported_ |
 | RTSP | `"rtsp://*"` | _not supported_ |
 | RTP | `{:rtp, opts}` | `{:rtp, opts}` |
-| HLS | _not supported_ | `"*.m3u8"` |
-| SRT | `{:srt, opts}` | `srt://*` |
+| HLS | `"*.m3u8"` | `"*.m3u8"` |
+| SRT | `{:srt, stream_id: <stream_id>, password: <password>}` or `srt://<ip>:<port>` | `{:srt, stream_id: <stream_id>, password: <password>}` or `"srt://<ip>:<port>"` |
 | `Enumerable.t()` | `{:stream, opts}` | `{:stream, opts}` |
 
 For the full list of input and output options, see [`Boombox.run/2`](https://hexdocs.pm/boombox/Boombox.html#run/2)

@@ -170,11 +170,29 @@ defmodule BoomboxTest do
   end
 
   describe "supports SRT in the following scenarios:" do
-    @describetag :srt
-
     Enum.each([@bbb_mp4, @bbb_mp4_v, @bbb_mp4_a], fn input ->
       @tag :srt_input
-      async_test "srt -> mp4 with #{inspect(input)} fixture", %{tmp_dir: tmp} do
+      async_test "srt -> mp4 with #{input} fixture", %{tmp_dir: tmp} do
+        input = unquote(input)
+        output = Path.join(tmp, "output.mp4")
+        ip = "127.0.0.1"
+        port = get_free_port()
+        url = "srt://#{ip}:#{port}"
+
+        t =
+          Boombox.async(
+            input: url,
+            output: output
+          )
+
+        p = send_srt(ip, port, input)
+        Task.await(t, 30_000)
+        Testing.Pipeline.terminate(p)
+        Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", kinds: get_kinds(input))
+      end
+
+      @tag :srt_input
+      async_test "srt -> mp4 with #{input} fixture and authentication", %{tmp_dir: tmp} do
         input = unquote(input)
         output = Path.join(tmp, "output.mp4")
         ip = "127.0.0.1"
@@ -196,7 +214,7 @@ defmodule BoomboxTest do
       end
 
       @tag :srt_external_server_input
-      async_test "srt with external server -> mp4 with #{inspect(input)} fixture", %{tmp_dir: tmp} do
+      async_test "srt with external server -> mp4 with #{input} fixture", %{tmp_dir: tmp} do
         input = unquote(input)
         output = Path.join(tmp, "output.mp4")
         ip = "127.0.0.1"
@@ -214,7 +232,9 @@ defmodule BoomboxTest do
       end
 
       @tag :srt_output
-      async_test "mp4 -> srt with with #{inspect(input)} fixture", %{tmp_dir: tmp} do
+      async_test "mp4 -> srt with with #{input} fixture", %{
+        tmp_dir: tmp
+      } do
         input = unquote(input)
         input_duration_ms = 10_000
         output = Path.join(tmp, "output.mp4")
@@ -226,48 +246,30 @@ defmodule BoomboxTest do
 
         t =
           Task.async(fn ->
-            spec =
-              child(:srt_source, %Membrane.SRT.Source{
-                ip: ip,
-                port: port,
-                stream_id: stream_id,
-                password: password
-              })
-              |> child(:demuxer, Membrane.MPEG.TS.Demuxer)
+            receive_srt(ip, port, stream_id, password, output, round(1.2 * input_duration_ms))
+          end)
 
-            {:ok, _sup, p} = Testing.Pipeline.start_link(spec: spec)
+        Boombox.run(input: input, output: {:srt, url, stream_id: stream_id, password: password})
+        Task.await(t)
+        Compare.compare(output, input, kinds: get_kinds(input))
+      end
 
-            assert_pipeline_notified(p, :demuxer, {:mpeg_ts_pmt, pmt})
+      @tag :srt_output
+      async_test "mp4 -> srt with with #{input} fixture and authentication", %{
+        tmp_dir: tmp
+      } do
+        input = unquote(input)
+        input_duration_ms = 10_000
+        output = Path.join(tmp, "output.mp4")
+        ip = "127.0.0.1"
+        port = get_free_port()
+        stream_id = "some_stream_id"
+        password = "some_password"
+        url = "srt://#{ip}:#{port}"
 
-            streams_spec =
-              Enum.map(pmt.streams, fn {id, %{stream_type: type}} ->
-                get_child(:demuxer)
-                |> via_out(Pad.ref(:output, {:stream_id, id}))
-                |> then(
-                  &case type do
-                    :H264 ->
-                      child(&1, %Membrane.H264.Parser{output_stream_structure: :avc1})
-
-                    :AAC ->
-                      &1
-                      |> child(%Membrane.AAC.Parser{
-                        out_encapsulation: :none,
-                        output_config: :esds
-                      })
-                  end
-                )
-                |> get_child(:mp4)
-              end)
-
-            spec =
-              [
-                child(:mp4, Membrane.MP4.Muxer.ISOM)
-                |> child(:file_sink, %Membrane.File.Sink{location: output})
-              ] ++ streams_spec
-
-            Testing.Pipeline.execute_actions(p, spec: spec)
-            assert_end_of_stream(p, :file_sink, :input, round(1.2 * input_duration_ms))
-            Testing.Pipeline.terminate(p)
+        t =
+          Task.async(fn ->
+            receive_srt(ip, port, stream_id, password, output, round(1.2 * input_duration_ms))
           end)
 
         Boombox.run(input: input, output: {:srt, url, stream_id: stream_id, password: password})
@@ -518,7 +520,7 @@ defmodule BoomboxTest do
     p
   end
 
-  defp send_srt(ip, port, stream_id, password, input_path) do
+  defp send_srt(ip, port, stream_id \\ "", password \\ nil, input_path) do
     p =
       Testing.Pipeline.start_link_supervised!(
         spec:
@@ -562,6 +564,51 @@ defmodule BoomboxTest do
 
     Testing.Pipeline.execute_actions(p, spec: spec)
     p
+  end
+
+  defp receive_srt(ip, port, stream_id \\ "", password \\ nil, output, timeout) do
+    spec =
+      child(:srt_source, %Membrane.SRT.Source{
+        ip: ip,
+        port: port,
+        stream_id: stream_id,
+        password: password
+      })
+      |> child(:demuxer, Membrane.MPEG.TS.Demuxer)
+
+    {:ok, _sup, p} = Testing.Pipeline.start_link(spec: spec)
+
+    assert_pipeline_notified(p, :demuxer, {:mpeg_ts_pmt, pmt})
+
+    streams_spec =
+      Enum.map(pmt.streams, fn {id, %{stream_type: type}} ->
+        get_child(:demuxer)
+        |> via_out(Pad.ref(:output, {:stream_id, id}))
+        |> then(
+          &case type do
+            :H264 ->
+              child(&1, %Membrane.H264.Parser{output_stream_structure: :avc1})
+
+            :AAC ->
+              &1
+              |> child(%Membrane.AAC.Parser{
+                out_encapsulation: :none,
+                output_config: :esds
+              })
+          end
+        )
+        |> get_child(:mp4)
+      end)
+
+    spec =
+      [
+        child(:mp4, Membrane.MP4.Muxer.ISOM)
+        |> child(:file_sink, %Membrane.File.Sink{location: output})
+      ] ++ streams_spec
+
+    Testing.Pipeline.execute_actions(p, spec: spec)
+    assert_end_of_stream(p, :file_sink, :input, timeout)
+    Testing.Pipeline.terminate(p)
   end
 
   defp get_kinds(@bbb_mp4), do: [:audio, :video]

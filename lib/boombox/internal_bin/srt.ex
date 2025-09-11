@@ -75,7 +75,7 @@ defmodule Boombox.InternalBin.SRT do
     {ip, port} = parse_srt_url(url)
 
     stream_id = opts[:stream_id] || ""
-    password = opts[:password] || ""
+    password = opts[:password]
 
     spec =
       [
