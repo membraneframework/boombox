@@ -1,4 +1,4 @@
-# Boombox examples
+`# Boombox examples
 
 ```elixir
 Logger.configure(level: :info)
@@ -174,6 +174,44 @@ t =
   end)
 
 {_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Stream content of MP4 via SRT with basic authentication mechanism and broadcast it with HLS
+
+To receive the stream, visit http://localhost:1234/hls.html after running the cell below
+
+```elixir
+mp4_input = "#{input_dir}/bun.mp4"
+hls_output = "#{out_dir}/index.m3u8"
+
+uri = "srt://127.0.0.1:9710"
+
+Boombox.async(input: uri, output: hls_output)
+Boombox.run(input: mp4_input, output: uri)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Section
+
+Run the cell below and visit http://localhost:1234/hls.html.
+
+Then, start streaming from OBS to the following URI:
+
+* `srt://127.0.0.1:9710?streamid=some_stream_id&passphrase=some_password`
+
+For more information on how to configure OBS to stream via SRT, take a look [here](https://private-user-images.githubusercontent.com/10851084/453935345-d5841a09-4edc-4e0a-b25a-a33d91d8f271.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTc1ODQyNzAsIm5iZiI6MTc1NzU4Mzk3MCwicGF0aCI6Ii8xMDg1MTA4NC80NTM5MzUzNDUtZDU4NDFhMDktNGVkYy00ZTBhLWIyNWEtYTMzZDkxZDhmMjcxLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTA5MTElMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwOTExVDA5NDYxMFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTgzYmIxNmJhOTQ0ZWMwNjY0N2IzNGQ0NDgxY2Y5YjE5MTlhNTE0ZDI3MjEyNzQxODVkMmUwMjQzZjM5MmJiNGImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.cg8Lezu0-3onYHgrqCjQ40zHtTk6_PzQtg2ed105aKk).
+
+```elixir
+hls_output = "#{out_dir}/index.m3u8"
+
+uri = "srt://127.0.0.1:9710"
+stream_id = "some_stream_id"
+password = "some_password"
+
+Boombox.run(input: {:srt, uri, stream_id: stream_id, password: password}, output: hls_output)
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -675,9 +713,9 @@ defmodule VideoDiscardingPipeline do
   end
 end
 
-{:ok, supervisor, _pipeline} = 
-  Membrane.Pipeline.start_link(VideoDiscardingPipeline, 
-    boombox_input: "#{input_dir}/bun.mp4", 
+{:ok, supervisor, _pipeline} =
+  Membrane.Pipeline.start_link(VideoDiscardingPipeline,
+    boombox_input: "#{input_dir}/bun.mp4",
     boombox_output: {:webrtc, "ws://localhost:8830"}
   )
 
