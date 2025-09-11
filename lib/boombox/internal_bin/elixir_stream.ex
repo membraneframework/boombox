@@ -40,10 +40,12 @@ defmodule Boombox.InternalBin.ElixirStream do
           consumer :: pid,
           options :: Boombox.out_stream_opts(),
           Boombox.InternalBin.track_builders(),
-          Membrane.ChildrenSpec.t()
+          Membrane.ChildrenSpec.t(),
+          boolean()
         ) :: Ready.t()
-  def link_output(consumer, options, track_builders, spec_builder) do
+  def link_output(consumer, options, track_builders, spec_builder, is_input_realtime) do
     options = parse_options(options, :output)
+    pace_control = Map.get(options, :pace_control, false)
 
     {track_builders, to_ignore} =
       Map.split_with(track_builders, fn {kind, _builder} -> options[kind] != false end)
@@ -55,10 +57,15 @@ defmodule Boombox.InternalBin.ElixirStream do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
+            |> child(:elixir_stream_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawAudio
             })
             |> maybe_plug_resampler(options)
+            |> then(
+              &if pace_control and not is_input_realtime,
+                do: child(&1, :elixir_stream_audio_realtimer, Membrane.Realtimer),
+                else: &1
+            )
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:elixir_stream_sink)
 
@@ -72,6 +79,11 @@ defmodule Boombox.InternalBin.ElixirStream do
               output_width: options[:video_width],
               output_height: options[:video_height]
             })
+            |> then(
+              &if pace_control and not is_input_realtime,
+                do: child(&1, :elixir_stream_video_realtimer, Membrane.Realtimer),
+                else: &1
+            )
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:elixir_stream_sink)
         end),
@@ -94,7 +106,9 @@ defmodule Boombox.InternalBin.ElixirStream do
 
     options =
       options
-      |> Keyword.validate!([:video, :audio, :video_width, :video_height] ++ audio_keys)
+      |> Keyword.validate!(
+        [:video, :audio, :video_width, :video_height, :pace_control, :is_live] ++ audio_keys
+      )
       |> Map.new()
 
     if options.audio == false and options.video == false do
