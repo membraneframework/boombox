@@ -48,53 +48,6 @@ defmodule Boombox.Bin do
   }
 
   @typedoc """
-  Value passed via `:input` option.
-
-  Specifies the input endpoint of `#{inspect(__MODULE__)}`.
-
-  Similar to `t:Boombox.input/0`, but without `:stream` option.
-  """
-  @type input() ::
-          (path_or_uri :: String.t())
-          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
-          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
-             transport: :file | :http}
-          | {:h264, location :: String.t(),
-             transport: :file | :http, framerate: Membrane.H264.framerate()}
-          | {:h265, location :: String.t(),
-             transport: :file | :http, framerate: Membrane.H265.framerate_t()}
-          | {:webrtc, Boombox.webrtc_signaling()}
-          | {:whip, uri :: String.t(), token: String.t()}
-          | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
-          | {:rtsp, url :: String.t()}
-          | {:rtp, Boombox.in_rtp_opts()}
-
-  @typedoc """
-  Value passed via `:output` option.
-
-  Specifies the output endpoint of `#{inspect(__MODULE__)}`.
-
-  Similar to `t:Boombox.output/0`, but without `:stream` option.
-  """
-  @type output ::
-          (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [Boombox.transcoding_policy_opt()]}
-          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
-          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
-             [Boombox.transcoding_policy_opt()]}
-          | {:webrtc, Boombox.webrtc_signaling()}
-          | {:webrtc, Boombox.webrtc_signaling(), [Boombox.transcoding_policy_opt()]}
-          | {:whip, uri :: String.t(),
-             [
-               {:token, String.t()}
-               | {bandit_option :: atom(), term()}
-               | Boombox.transcoding_policy_opt()
-             ]}
-          | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [Boombox.transcoding_policy_opt()]}
-          | {:rtp, Boombox.out_rtp_opts()}
-
-  @typedoc """
   Type of notification sent to the parent of Boombox.Bin when new tracks arrive.
 
   It is sent only when Boombox.Bin is used as a source (the `:input` option is set).
@@ -195,11 +148,11 @@ defmodule Boombox.Bin do
     ]
 
   def_options input: [
-                spec: input() | nil,
+                spec: Boombox.input() | nil,
                 default: nil
               ],
               output: [
-                spec: output() | nil,
+                spec: Boombox.output() | nil,
                 default: nil
               ]
 

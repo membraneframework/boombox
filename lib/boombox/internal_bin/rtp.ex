@@ -123,20 +123,21 @@ defmodule Boombox.InternalBin.RTP do
   @spec link_output(
           Boombox.out_rtp_opts(),
           Boombox.InternalBin.track_builders(),
-          Membrane.ChildrenSpec.t()
+          Membrane.ChildrenSpec.t(),
+          boolean()
         ) :: Ready.t()
-  def link_output(opts, track_builders, spec_builder) do
-    parsed_opts = validate_and_parse_options(:output, opts)
+  def link_output(opts, track_builders, spec_builder, is_input_realtime) do
+    opts = validate_and_parse_options(:output, opts)
 
     spec = [
       spec_builder,
       child(:rtp_muxer, Membrane.RTP.Muxer)
       |> child(:udp_rtp_sink, %Membrane.UDP.Sink{
-        destination_address: parsed_opts.address,
-        destination_port_no: parsed_opts.port
+        destination_address: opts.address,
+        destination_port_no: opts.port
       }),
       Enum.map(track_builders, fn {media_type, builder} ->
-        track_config = parsed_opts.track_configs[media_type]
+        track_config = opts.track_configs[media_type]
 
         {output_stream_format, parser, payloader} =
           case track_config.encoding_name do
@@ -166,11 +167,15 @@ defmodule Boombox.InternalBin.RTP do
         builder
         |> child({:rtp_transcoder, media_type}, %Membrane.Transcoder{
           output_stream_format: output_stream_format,
-          transcoding_policy: parsed_opts.transcoding_policy
+          transcoding_policy: opts.transcoding_policy
         })
         |> child({:rtp_out_parser, media_type}, parser)
         |> child({:rtp_payloader, media_type}, payloader)
-        |> child({:realtimer, media_type}, Membrane.Realtimer)
+        |> then(
+          &if is_input_realtime,
+            do: &1,
+            else: child(&1, {:realtimer, media_type}, Membrane.Realtimer)
+        )
         |> via_in(:input,
           options: [
             encoding: track_config.encoding_name,
@@ -222,8 +227,8 @@ defmodule Boombox.InternalBin.RTP do
         parsed_opts
 
       :output ->
-        transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
-        parsed_opts |> Map.put(:transcoding_policy, transcoding_policy)
+        parsed_opts
+        |> Map.put(:transcoding_policy, Keyword.get(opts, :transcoding_policy, :if_needed))
     end
   end
 

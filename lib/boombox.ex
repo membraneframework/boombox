@@ -13,6 +13,12 @@ defmodule Boombox do
   alias Membrane.RTP
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
+  @typedoc """
+  If true the incoming streams will be passed to the output according to their
+  timestamps, if not they will be passed as fast as possible. True by default.
+  """
+  @type pace_control_opt :: {:pace_control, boolean()}
+  @type hls_mode_opt :: {:mode, :live | :vod}
   @type hls_variant_selection_policy_opt ::
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
@@ -20,6 +26,7 @@ defmodule Boombox do
   @type in_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
+          | {:is_live, boolean()}
         ]
   @type out_stream_opts :: [
           {:audio, :binary | boolean()}
@@ -29,6 +36,7 @@ defmodule Boombox do
           | {:audio_channels, Membrane.RawAudio.channels_t()}
           | {:video_width, non_neg_integer()}
           | {:video_height, non_neg_integer()}
+          | pace_control_opt()
         ]
 
   @typedoc """
@@ -78,7 +86,12 @@ defmodule Boombox do
 
   @type input ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [hls_variant_selection_policy_opt()]}
+          | {path_or_uri :: String.t(),
+             [
+               hls_variant_selection_policy_opt()
+               | hls_mode_opt()
+               | {:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}
+             ]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
              transport: :file | :http}
@@ -92,12 +105,17 @@ defmodule Boombox do
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
           | {:hls, url :: String.t()}
-          | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
-          | {:stream, in_stream_opts()}
+          | {:hls, url :: String.t(),
+             [
+               hls_mode_opt()
+               | hls_variant_selection_policy_opt()
+             ]}
+
+  @type stream_input :: {:stream, in_stream_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [transcoding_policy_opt()]}
+          | {path_or_uri :: String.t(), [transcoding_policy_opt() | hls_mode_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
              [transcoding_policy_opt()]}
@@ -106,14 +124,19 @@ defmodule Boombox do
           | {:whip, uri :: String.t(),
              [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [transcoding_policy_opt()]}
+          | {:hls, location :: String.t(),
+             [
+               hls_mode_opt()
+               | transcoding_policy_opt()
+             ]}
           | {:rtp, out_rtp_opts()}
-          | {:stream, out_stream_opts()}
+
+  @type stream_output :: {:stream, out_stream_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
-           input: input(),
-           output: output(),
+           input: input() | stream_input(),
+           output: output() | stream_output(),
            parent: pid()
          }
 
@@ -126,8 +149,8 @@ defmodule Boombox do
   Boombox.run(input: "rtmp://localhost:5432", output: "index.m3u8")
   ```
 
-  See `t:input/0` and `t:output/0` for available outputs and [examples.livemd](examples.livemd)
-  for examples.
+  See `t:input/0` and `t:output/0` for available inputs and outputs and
+  [examples.livemd](examples.livemd) for examples.
 
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
@@ -139,8 +162,8 @@ defmodule Boombox do
   ```
   """
   @spec run(Enumerable.t() | nil,
-          input: input(),
-          output: output()
+          input: input() | stream_input(),
+          output: output() | stream_output()
         ) :: :ok | Enumerable.t()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
