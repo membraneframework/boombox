@@ -39,8 +39,8 @@ defmodule Boombox.InternalBin.SRT do
     %Wait{actions: [spec: spec]}
   end
 
-  @spec handle_child_notification(term()) :: Ready.t()
-  def handle_child_notification({:mpeg_ts_pmt, pmt}) do
+  @spec handle_tracks_resolved(term()) :: Ready.t()
+  def handle_tracks_resolved(pmt) do
     track_builders =
       Enum.map(pmt.streams, fn {id, %{stream_type: type}} ->
         get_child(:srt_mpeg_ts_demuxer)

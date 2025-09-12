@@ -291,12 +291,12 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_child_notification(
-        {:mpeg_ts_pmt, _pmt} = notification,
+        {:mpeg_ts_pmt, pmt} = notification,
         :srt_mpeg_ts_demuxer,
         ctx,
         state
       ) do
-    Boombox.InternalBin.SRT.handle_child_notification(notification)
+    Boombox.InternalBin.SRT.handle_tracks_resolved(pmt)
     |> proceed_result(ctx, state)
   end
 
@@ -750,10 +750,7 @@ defmodule Boombox.InternalBin do
       {nil, ".m3u8", :output} ->
         {:hls, value, opts}
 
-      {"srt", _ext, :input} ->
-        {:srt, value, opts}
-
-      {"srt", _ext, :output} ->
+      {"srt", _ext, _direction} ->
         {:srt, value, opts}
 
       _other ->
@@ -847,16 +844,10 @@ defmodule Boombox.InternalBin do
       when direction == :input and is_pid(server_awaiting_accept) ->
         {:srt, server_awaiting_accept}
 
-      {:srt, url} when direction == :input and is_binary(url) ->
+      {:srt, url} when is_binary(url) ->
         {:srt, url, []}
 
-      {:srt, url, opts} when direction == :input and is_binary(url) ->
-        {:srt, url, opts}
-
-      {:srt, url} when direction == :output and is_binary(url) ->
-        {:srt, url, []}
-
-      {:srt, url, opts} when direction == :output and is_binary(url) ->
+      {:srt, url, opts} when is_binary(url) ->
         {:srt, url, opts}
 
       :membrane_pad ->

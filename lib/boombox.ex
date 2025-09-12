@@ -116,6 +116,7 @@ defmodule Boombox do
              ]}
           | {:srt, url :: String.t()}
           | {:srt, url :: String.t(), srt_auth_opts()}
+          | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
   @type stream_input :: {:stream, in_stream_opts()}
 
