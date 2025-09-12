@@ -291,7 +291,7 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_child_notification(
-        {:mpeg_ts_pmt, pmt} = notification,
+        {:mpeg_ts_pmt, pmt},
         :srt_mpeg_ts_demuxer,
         ctx,
         state
