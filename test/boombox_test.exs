@@ -143,24 +143,24 @@ defmodule BoomboxTest do
   end)
 
   @file_endpoints [:mp4, :aac, :wav, :mp4, :ivf, :ogg, :h264, :h265]
-  defp is_file_endpoint({endpoint_type, _location}) when endpoint_type in @file_endpoints,
+  defp file_endpoint?({endpoint_type, _location}) when endpoint_type in @file_endpoints,
     do: true
 
-  defp is_file_endpoint({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
+  defp file_endpoint?({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
     do: true
 
-  defp is_file_endpoint({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
+  defp file_endpoint?({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
     do: true
 
-  defp is_file_endpoint(uri) when is_binary(uri) do
+  defp file_endpoint?(uri) when is_binary(uri) do
     URI.parse(uri).scheme in [nil, "http", "https"]
   end
 
-  defp is_file_endpoint({uri, _opts}) when is_binary(uri) do
+  defp file_endpoint?({uri, _opts}) when is_binary(uri) do
     URI.parse(uri).scheme in [nil, "http", "https"]
   end
 
-  defp is_file_endpoint(_other), do: false
+  defp file_endpoint?(_other), do: false
   # This function sorts endpoint pairs in the following manner:
   # * it splits the whole endpoint pairs list into the smallest chunks possible
   # such that each chunk starts with the file input and ends with the file output
@@ -172,13 +172,13 @@ defmodule BoomboxTest do
 
   defp sort_endpoint_pairs([[input, output] = endpoints_pair | rest], to_reverse) do
     cond do
-      is_file_endpoint(input) and is_file_endpoint(output) ->
+      file_endpoint?(input) and is_file_endpoint(output) ->
         [endpoints_pair] ++ sort_endpoint_pairs(rest)
 
-      is_file_endpoint(input) and to_reverse == [] ->
+      file_endpoint?(input) and to_reverse == [] ->
         sort_endpoint_pairs(rest, [endpoints_pair])
 
-      is_file_endpoint(output) ->
+      file_endpoint?(output) ->
         [endpoints_pair | to_reverse] ++ sort_endpoint_pairs(rest)
 
       true ->
