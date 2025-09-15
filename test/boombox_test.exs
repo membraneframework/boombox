@@ -161,6 +161,7 @@ defmodule BoomboxTest do
   end
 
   defp file_endpoint?(_other), do: false
+
   # This function sorts endpoint pairs in the following manner:
   # * it splits the whole endpoint pairs list into the smallest chunks possible
   # such that each chunk starts with the file input and ends with the file output
