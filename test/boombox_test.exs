@@ -142,11 +142,25 @@ defmodule BoomboxTest do
     end
   end)
 
-  defguardp is_file_endpoint(endpoint)
-            when is_binary(endpoint) and
-                   binary_part(endpoint, 0, 5) ==
-                     "test/"
+  @file_endpoints [:mp4, :aac, :wav, :mp4, :ivf, :ogg, :h264, :h265]
+  defp is_file_endpoint({endpoint_type, _location}) when endpoint_type in @file_endpoints,
+    do: true
 
+  defp is_file_endpoint({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
+    do: true
+
+  defp is_file_endpoint({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
+    do: true
+
+  defp is_file_endpoint(uri) when is_binary(uri) do
+    URI.parse(uri).scheme in [nil, "http", "https"]
+  end
+
+  defp is_file_endpoint({uri, _opts}) when is_binary(uri) do
+    URI.parse(uri).scheme in [nil, "http", "https"]
+  end
+
+  defp is_file_endpoint(_other), do: false
   # This function sorts endpoint pairs in the following manner:
   # * it splits the whole endpoint pairs list into the smallest chunks possible
   # such that each chunk starts with the file input and ends with the file output
@@ -156,24 +170,20 @@ defmodule BoomboxTest do
   # is spawned before the SRT client tries to connect to it
   defp sort_endpoint_pairs(endpoint_pairs, to_reverse \\ [])
 
-  defp sort_endpoint_pairs([[input, output] = endpoints_pair | rest], [])
-       when is_file_endpoint(input) and
-              is_file_endpoint(output) do
-    [endpoints_pair] ++ sort_endpoint_pairs(rest)
-  end
+  defp sort_endpoint_pairs([[input, output] = endpoints_pair | rest], to_reverse) do
+    cond do
+      is_file_endpoint(input) and is_file_endpoint(output) ->
+        [endpoints_pair] ++ sort_endpoint_pairs(rest)
 
-  defp sort_endpoint_pairs([[input, _output] = endpoints_pair | rest], [])
-       when is_file_endpoint(input) do
-    sort_endpoint_pairs(rest, [endpoints_pair])
-  end
+      is_file_endpoint(input) and to_reverse == [] ->
+        sort_endpoint_pairs(rest, [endpoints_pair])
 
-  defp sort_endpoint_pairs([[_input, output] = endpoints_pair | rest], to_reverse)
-       when is_file_endpoint(output) do
-    [endpoints_pair | to_reverse] ++ sort_endpoint_pairs(rest)
-  end
+      is_file_endpoint(output) ->
+        [endpoints_pair | to_reverse] ++ sort_endpoint_pairs(rest)
 
-  defp sort_endpoint_pairs([endpoints_pair | rest], to_reverse) do
-    sort_endpoint_pairs(rest, [endpoints_pair | to_reverse])
+      true ->
+        sort_endpoint_pairs(rest, [endpoints_pair | to_reverse])
+    end
   end
 
   defp sort_endpoint_pairs([], to_reverse) do
