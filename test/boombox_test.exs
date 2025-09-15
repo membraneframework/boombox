@@ -93,7 +93,7 @@ defmodule BoomboxTest do
               [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
-       ], "bun10s.mp4", []},
+       ], "bun10s.mp4", [kinds: [:audio]]},
     mp4_v_srt_mp4_with_auth:
       {[
          @bbb_mp4_v,
@@ -103,7 +103,7 @@ defmodule BoomboxTest do
               [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
-       ], "bun10s.mp4", []}
+       ], "bun10s.mp4", [kinds: [:video]]}
   ]
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
@@ -142,7 +142,10 @@ defmodule BoomboxTest do
     end
   end)
 
-  defguardp is_file_endpoint(endpoint) when is_binary(endpoint)
+  defguardp is_file_endpoint(endpoint)
+            when is_binary(endpoint) and
+                   binary_part(endpoint, 0, 5) ==
+                     "test/"
 
   # This function sorts endpoint pairs in the following manner:
   # * it splits the whole endpoint pairs list into the smallest chunks possible
