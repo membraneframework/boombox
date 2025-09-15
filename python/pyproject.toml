@@ -1,5 +1,5 @@
 [project]
-name = "boombox"
+name = "membrane_boombox"
 version = "0.1.0"
 description = "Boombox SDK for Python"
 readme = "README.md"
@@ -26,7 +26,3 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["**"]
-
-#[tool.distutils.bdist_wheel]
-#plat-name = "macosx_14_4_arm64"
-
