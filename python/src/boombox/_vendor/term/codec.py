@@ -6,23 +6,13 @@ import logging
 from typing import Tuple
 
 from .basetypes import BaseTerm, Term
+from .py_codec_impl import (
+    binary_to_term as co_impl_binary_to_term,
+    term_to_binary as co_impl_term_to_binary,
+    PyCodecError,
+)
 
 LOG = logging.getLogger("term")
-
-try:
-    from .native_codec_impl import (
-        binary_to_term as co_impl_binary_to_term,
-        term_to_binary as co_impl_term_to_binary,
-        PyCodecError,
-    )
-except ImportError:
-    LOG.warning("Native term ETF codec library import failed, falling back to slower Python impl")
-    from .py_codec_impl import (
-        binary_to_term as co_impl_binary_to_term,
-        term_to_binary as co_impl_term_to_binary,
-        PyCodecError,
-    )
-
 
 def binary_to_term(data: bytes, options=None, decode_hook=None) -> Tuple[Term, bytes]:
     """
