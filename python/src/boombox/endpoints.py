@@ -159,7 +159,7 @@ class RawData(BoomboxEndpoint):
         Allowed only for output. If true the incoming streams will be passed to
         the output according to their timestamps, if not they will be passed as
         fast as possible. True by default.
-    realtime : bool, optional
+    is_live : bool, optional
         Allowed only for input. If true then Boombox will assume that packets
         will be provided in realtime and won't control their pace when passing
         them to the output. False by default.
@@ -174,7 +174,7 @@ class RawData(BoomboxEndpoint):
     video_width: int | None = None
     video_height: int | None = None
     pace_control: bool | None = None
-    realtime: bool | None = None
+    is_live: bool | None = None
 
     @override
     def get_endpoint_name(self) -> Atom:
