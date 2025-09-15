@@ -149,9 +149,6 @@ defmodule BoomboxTest do
   defp file_endpoint?({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
     do: true
 
-  defp file_endpoint?({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
-    do: true
-
   defp file_endpoint?(uri) when is_binary(uri) do
     URI.parse(uri).scheme in [nil, "http", "https"]
   end
