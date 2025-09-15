@@ -7,6 +7,7 @@ defmodule BoomboxTest do
 
   require Membrane.Pad, as: Pad
   require Logger
+  require Boombox.InternalBin.StorageEndpoints, as: StorageEndpoints
 
   alias Membrane.Testing
   alias Support.Compare
@@ -142,12 +143,13 @@ defmodule BoomboxTest do
     end
   end)
 
-  @file_endpoints [:mp4, :aac, :wav, :mp4, :ivf, :ogg, :h264, :h265]
-  defp file_endpoint?({endpoint_type, _location}) when endpoint_type in @file_endpoints,
-    do: true
+  defp file_endpoint?({endpoint_type, _location})
+       when StorageEndpoints.is_storage_endpoint_type(endpoint_type),
+       do: true
 
-  defp file_endpoint?({endpoint_type, _location, _opts}) when endpoint_type in @file_endpoints,
-    do: true
+  defp file_endpoint?({endpoint_type, _location, _opts})
+       when StorageEndpoints.is_storage_endpoint_type(endpoint_type),
+       do: true
 
   defp file_endpoint?(uri) when is_binary(uri) do
     URI.parse(uri).scheme in [nil, "http", "https"]
