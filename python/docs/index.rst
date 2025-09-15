@@ -25,8 +25,8 @@ output, which are defined through :py:mod:`.endpoints`. For example::
 When this code is run, Boombox will become a RTMP server, wait for clients to connect and save
 the acquired stream to a ``.mp4`` file at the provided location.
 
-To interact with the media in the code the :py:class:`.RawData` endpoint can be used. Boombox will
-then procude or accept packets of raw media data. These packets are :py:class:`.AudioPacket` and
+To interact with raw media in the code, the :py:class:`.RawData` endpoint can be used. Boombox will
+then produce or accept packets of raw media data. These packets are :py:class:`.AudioPacket` and
 :py:class:`.VideoPacket` objects.
 
 You can define a :py:class:`.RawData` output and read the stream through a generator::
