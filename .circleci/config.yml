@@ -2,12 +2,12 @@ version: 2.1
 orbs:
   elixir: membraneframework/elixir@1
 
-jobs: 
+jobs:
   test_exclude_browser:
     docker:
       - image: membraneframeworklabs/docker_membrane
-        environment:
-          MIX_ENV: test
+    environment:
+      MIX_ENV: test
 
     working_directory: ~/app
     steps:
@@ -17,6 +17,20 @@ jobs:
       - run: mix deps.get
       - run: mix compile
       - run: mix test --exclude browser
+
+  mix_release_macos_arm:
+    macos:
+      xcode: 14.0.1
+    resource_class: macos.m1.medium.gen1
+    environment:
+      MIX_ENV: prod
+
+  mix_release_linux_intel:
+    docker:
+      - image: membraneframeworklabs/docker_membrane
+    environment:
+      MIX_ENV: prod
+
 
 workflows:
   version: 2
