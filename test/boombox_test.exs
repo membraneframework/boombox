@@ -170,7 +170,7 @@ defmodule BoomboxTest do
 
   defp sort_endpoint_pairs([[input, output] = endpoints_pair | rest], to_reverse) do
     cond do
-      file_endpoint?(input) and is_file_endpoint(output) ->
+      file_endpoint?(input) and file_endpoint?(output) ->
         [endpoints_pair] ++ sort_endpoint_pairs(rest)
 
       file_endpoint?(input) and to_reverse == [] ->
