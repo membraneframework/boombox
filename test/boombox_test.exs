@@ -142,7 +142,7 @@ defmodule BoomboxTest do
     end
   end)
 
-  @file_endpoints [:mp4, :aac, :wav, :mp4, :ivf, :ogg, :h264, :h265]
+  @file_endpoints [:mp4, :aac, :wav, :mp4, :ivf, :h264, :h265, :ogg]
   defp file_endpoint?({endpoint_type, _location}) when endpoint_type in @file_endpoints,
     do: true
 
