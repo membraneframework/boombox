@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC Stream Sender</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <main>
+    <h1>WebRTC Stream Sender</h1>
+    <div class="controls">
+      <input type="text" value="ws://localhost:8829" id="url" />
+      <button id="button">Connect</button>
+    </div>
+    <div id="status"></div>
+    <div class="video-wrapper">
+        <video id="preview" autoplay muted playsinline></video>
+    </div>
+  </main>
+
+  <script>
+    const button = document.getElementById("button");
+    const connStatus = document.getElementById("status");
+    const preview = document.getElementById("preview");
+    const urlInput = document.getElementById("url");
+
+    const pcConfig = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }] };
+    const mediaConstraints = { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: true };
+
+    let pc = null;
+    let ws = null;
+    let localStream = null;
+
+    const updateStatus = (message, stateClass) => {
+        connStatus.innerText = message;
+        connStatus.className = stateClass || '';
+    };
+
+    const connect = async () => {
+      button.disabled = true;
+      urlInput.disabled = true;
+      updateStatus("Connecting...", "status-connecting");
+
+      if (ws) {
+        ws.onopen = ws.onclose = ws.onerror = null;
+        ws.close();
+      }
+
+      try {
+        ws = new WebSocket(urlInput.value);
+      } catch (e) {
+        console.error("Failed to create WebSocket:", e);
+        updateStatus("Error: Invalid WebSocket URL", "status-disconnected");
+        resetUI();
+        return;
+      }
+
+      ws.onopen = () => {
+        console.log("WebSocket opened.");
+        connectRTC();
+      };
+
+      ws.onclose = event => {
+        console.log("WebSocket connection was terminated:", event);
+        updateStatus("Disconnected", "status-disconnected");
+        if (pc) {
+            pc.close();
+            pc = null;
+        }
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+            preview.srcObject = null;
+        }
+        resetUI();
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        updateStatus("Connection Error", "status-disconnected");
+      };
+    };
+
+    const connectRTC = async () => {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+        preview.srcObject = localStream;
+      } catch (err) {
+        console.error("Could not get user media:", err);
+        updateStatus("Error: Could not access camera/microphone.", "status-disconnected");
+        ws.close();
+        return;
+      }
+
+      pc = new RTCPeerConnection(pcConfig);
+
+      pc.onicecandidate = event => {
+        if (event.candidate === null) return;
+        ws.send(JSON.stringify({ type: "ice_candidate", data: event.candidate }));
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log("PeerConnection state:", pc.connectionState);
+        if (pc.connectionState === "connected") {
+          updateStatus("Connected", "status-connected");
+          button.innerHTML = "Disconnect";
+          button.disabled = false;
+          button.onclick = disconnect;
+        } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
+          ws.close();
+        }
+      };
+
+      for (const track of localStream.getTracks()) {
+        pc.addTrack(track, localStream);
+      }
+
+      ws.onmessage = async event => {
+        try {
+          const { type, data } = JSON.parse(event.data);
+          switch (type) {
+            case "sdp_answer":
+              console.log("Received SDP answer");
+              await pc.setRemoteDescription(new RTCSessionDescription(data));
+              break;
+            case "ice_candidate":
+              console.log("Received ICE candidate");
+              await pc.addIceCandidate(new RTCIceCandidate(data));
+              break;
+          }
+        } catch (err) {
+            console.error("Error processing message:", err);
+        }
+      };
+
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        ws.send(JSON.stringify({ type: "sdp_offer", data: offer }));
+      } catch (err) {
+          console.error("Error creating SDP offer:", err);
+          updateStatus("Error creating WebRTC offer.", "status-disconnected");
+          ws.close();
+      }
+    };
+
+    const disconnect = () => {
+      console.log("Disconnecting...");
+      button.disabled = true;
+      if (ws) {
+          ws.close();
+      }
+    };
+
+    const resetUI = () => {
+      button.disabled = false;
+      urlInput.disabled = false;
+      button.innerHTML = "Connect";
+      button.onclick = connect;
+    };
+
+    button.onclick = connect;
+  </script>
+</body>
+</html>

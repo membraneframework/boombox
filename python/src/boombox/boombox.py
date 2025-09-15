@@ -13,33 +13,13 @@ import os
 import sys
 import warnings
 import dataclasses
+import threading
 
 from term import Atom, Pid
-from .endpoints import BoomboxEndpoint
+from .endpoints import BoomboxEndpoint, AudioSampleFormat
 
-from typing import Generator, ClassVar, TypeAlias, Literal, Optional, Any, get_args
+from typing import Generator, ClassVar, Optional, Any, get_args
 from typing_extensions import override
-
-AudioSampleFormat: TypeAlias = Literal[
-    "s8",
-    "u8",
-    "s16le",
-    "u16le",
-    "s16be",
-    "u16be",
-    "s24le",
-    "u24le",
-    "s24be",
-    "u24be",
-    "s32le",
-    "u32le",
-    "s32be",
-    "u32be",
-    "f32le",
-    "f32be",
-    "f64le",
-    "f64be",
-]
 
 
 class Boombox(pyrlang.process.Process):
@@ -52,10 +32,15 @@ class Boombox(pyrlang.process.Process):
     These objects define the format and its parameters that are used for
     the input or output, whichever they were provided for.
 
-    For example, if an `RTMP("rtmp://my.stream.source:2137/app/key")` endpoint
-    was provided for input and `MP4("path/to/target.mp4")` for output, then
+    For example, if an ``RTMP("rtmp://my.stream.source:2137/app/key")`` endpoint
+    was provided for input and ``MP4("path/to/target.mp4")`` for output, then
     Boombox will become a RTMP server, wait for clients to connect and save
-    the acquired stream to a `.mp4` file at the provided location.
+    the acquired stream to a ``.mp4`` file at the provided location.
+
+    Input and output can also be specified by strings alone, as in
+    ``"rtmp://my.stream.source:2137/app/key"`` or ``"path/to/target.mp4"``,
+    and Boombox will automatically interpret them as :py:class:`.RTMP` and
+    :py:class:`.MP4` endpoints.
 
     For more information about endpoints and to see supported formats refer to
     :py:mod:`.endpoints`.
@@ -105,7 +90,8 @@ class Boombox(pyrlang.process.Process):
 
     _python_node_name = f"{uuid.uuid4()}@127.0.0.1"
     _cookie = str(uuid.uuid4())
-    pyrlang.node.Node(node_name=_python_node_name, cookie=_cookie)
+    _node = pyrlang.node.Node(node_name=_python_node_name, cookie=_cookie)
+    threading.Thread(target=_node.run, daemon=True).start()
 
     def __init__(
         self, input: BoomboxEndpoint | str, output: BoomboxEndpoint | str
@@ -162,7 +148,7 @@ class Boombox(pyrlang.process.Process):
                     yield self._deserialize_packet(packet)
                 case (Atom("finished"), packet):
                     yield self._deserialize_packet(packet)
-                    break
+                    return
                 case (Atom("error"), Atom("incompatible_mode")):
                     raise RuntimeError("Output not defined with an RawData endpoint.")
                 case other:
@@ -212,7 +198,7 @@ class Boombox(pyrlang.process.Process):
             case other:
                 raise RuntimeError(f"Unknown response: {other}")
 
-    def close(self, wait: bool = False, kill: bool = False) -> None:
+    def close(self, wait: bool = True, kill: bool = False) -> None:
         """Closes Boombox for writing.
 
         Enabled only if Boombox has been initialized with input defined with an
@@ -222,7 +208,7 @@ class Boombox(pyrlang.process.Process):
 
         Parameters
         ----------
-        wait : bool, default=False
+        wait : bool, default=True
             Determines whether this method should wait until Boombox finishes
             it's operation and only then return, or if it should return
             immediately and let Boombox finish in the background. Ignored if
@@ -251,14 +237,16 @@ class Boombox(pyrlang.process.Process):
 
     def wait(self) -> None:
         """Waits until Boombox finishes it's operation and then returns."""
-        self.get_node().get_loop().run_until_complete(self._terminated)
+        asyncio.run_coroutine_threadsafe(
+            self._await_future(self._terminated), self.get_node().get_loop()
+        ).result()
 
     def kill(self) -> None:
         """Forces Boombox to exit without waiting for it to gracefully finish
         it's operation."""
         self._erlang_process.kill()
 
-    def __start__(self) -> Boombox:
+    def __enter__(self) -> Boombox:
         return self
 
     def __exit__(self, *_) -> None:
@@ -299,16 +287,19 @@ class Boombox(pyrlang.process.Process):
             sender=self, receiver=self._receiver, message=message
         )
         self._response = self.get_node().get_loop().create_future()
-
-        response = self.get_node().get_loop().run_until_complete(self._response)
+        response = asyncio.run_coroutine_threadsafe(
+            self._await_future(self._response), self.get_node().get_loop()
+        ).result()
         self._handle_termination()
         return response
 
     def _handle_termination(self) -> None:
         if self._terminated.done():
-            reason = self._terminated.result()
-            if reason != Atom("normal"):
+            if (reason := self._terminated.result()) != Atom("normal"):
                 raise RuntimeError(f"Boombox crashed with reason {reason}")
+
+    async def _await_future(self, response_future):
+        return await response_future
 
     @staticmethod
     def _dtype_to_sample_format(dtype: np.dtype) -> tuple[AudioSampleFormat, np.dtype]:

@@ -20,9 +20,30 @@ Examples:
 
 from dataclasses import dataclass, KW_ONLY, fields, is_dataclass
 from term import Atom
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 from typing_extensions import override
 from abc import ABC
+
+AudioSampleFormat: TypeAlias = Literal[
+    "s8",
+    "u8",
+    "s16le",
+    "u16le",
+    "s16be",
+    "u16be",
+    "s24le",
+    "u24le",
+    "s24be",
+    "u24be",
+    "s32le",
+    "u32le",
+    "s32be",
+    "u32be",
+    "f32le",
+    "f32be",
+    "f64le",
+    "f64be",
+]
 
 
 @dataclass
@@ -36,7 +57,7 @@ class BoomboxEndpoint(ABC):
 
     Attributes
     ----------
-    transcoding_policy : {None, "if_needed", "always", "never"}
+    transcoding_policy : {None, "if_needed", "always", "never"}, optional
         Allowed only for output. The default transcoding behavior is "if_needed",
         which means that if the format of the media is the same for input and
         output, then the stream is not decoded and encoded. This approach saves
@@ -128,9 +149,20 @@ class RawData(BoomboxEndpoint):
         Applicable only when `audio` is set to True and the endpoint defines
         the output. Determines how many channels does the produced stream have.
         The channels are interleaved.
+    audio_format : AudioSampleFormat, optional
+        Applicable only when `audio` is set to True and the endpoint defines
+        the output. Determines the sample format of the produced stream.
     video_width, video_height : int, optional
         Applicable only when `video` is set to True and the endpoint defines
         the output. Determines the dimensions of the produced video stream.
+    pace_control : bool, optional
+        Allowed only for output. If true the incoming streams will be passed to
+        the output according to their timestamps, if not they will be passed as
+        fast as possible. True by default.
+    is_live : bool, optional
+        Allowed only for input. If true then Boombox will assume that packets
+        will be provided in realtime and won't control their pace when passing
+        them to the output. False by default.
     """
 
     _: KW_ONLY
@@ -138,8 +170,11 @@ class RawData(BoomboxEndpoint):
     video: bool
     audio_rate: int | None = None
     audio_channels: int | None = None
+    audio_format: AudioSampleFormat | None = None
     video_width: int | None = None
     video_height: int | None = None
+    pace_control: bool | None = None
+    is_live: bool | None = None
 
     @override
     def get_endpoint_name(self) -> Atom:
@@ -162,7 +197,7 @@ class StorageEndpoint(BoomboxEndpoint, ABC):
     location : str
         A path to a file or an HTTP URL, location where the media should be
         read from or written to.
-    transport : {None, "file", "http"}:
+    transport : {None, "file", "http"}, optional:
         An optional attribute that explicitly states whether a file or HTTP
         storage should be assumed. If not provided transport will be determined
         from `location` - paths will resolve to "file" location,
@@ -187,12 +222,13 @@ class H264(StorageEndpoint):
 
     Attributes
     ----------
-    framerate : tuple[int, int], optional
-        Framerate of the stream, if not provided 30 FPS will be assumed.
+    framerate : tuple[int, int], default=(30, 1)
+        Framerate of the stream, where the tuple defines the numerator and
+        denominator of it. If not provided 30 FPS will be assumed.
     """
 
     _: KW_ONLY
-    framerate: tuple[int, int] | None = None
+    framerate: tuple[int, int] = (30, 1)
 
 
 @dataclass
@@ -205,12 +241,13 @@ class H265(StorageEndpoint):
 
     Attributes
     ----------
-    framerate : tuple[int, int], optional
-        Framerate of the stream, if not provided 30 FPS will be assumed.
+    framerate : tuple[int, int], default=(30, 1)
+        Framerate of the stream, where the tuple defines the numerator and
+        denominator of it. If not provided 30 FPS will be assumed.
     """
 
     _: KW_ONLY
-    framerate: tuple[int, int] | None = None
+    framerate: tuple[int, int] = (30, 1)
 
 
 @dataclass
@@ -267,6 +304,7 @@ class WebRTC(BoomboxEndpoint):
     """
 
     signaling: str
+    _: KW_ONLY
 
 
 @dataclass
@@ -288,21 +326,28 @@ class WHIP(BoomboxEndpoint):
 
 @dataclass
 class HLS(BoomboxEndpoint):
-    """Endpoint for HTTP Live Streaming.
-
-    Currently Boombox supports only HLS output - creating playlists.
+    """Endpoint for HTTP Live Streaming. Boombox supports fetching HLS streams
+    as input and creating HLS playlists as output.
 
     Attributes
     ----------
     location : str
-        Path to the location where the HLS playlist will be created. If the
-        path is to a directory, then an "index.m3u8" manifest file and the
-        other files will be created there. If it's a path to ".m3u8" file,
-        the file will be created in provided location and all the other
-        files will be created in the same directory.
+        If set for input it should be an URL to location from which to fetch
+        the HLS stream. If set for output it's a path to the location where
+        the HLS playlist will be created. If the path is to a directory, then
+        an "index.m3u8" manifest file and the other files will be created
+        there. If it's a path to ".m3u8" file, the file will be created in
+        provided location and all the other files will be created in the
+        same directory.
+    mode : {"vod", "live"}, optional
+        If set for output then it determines if the session is live or a VOD
+        type of broadcast. It can influence type of metadata inserted into the
+        playlist's manifest.
     """
 
     location: str
+    _: KW_ONLY
+    mode: Literal["vod", "live"] = "vod"
 
 
 @dataclass
