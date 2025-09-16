@@ -2,12 +2,21 @@ version: 2.1
 orbs:
   elixir: membraneframework/elixir@1
 
-jobs: 
+executors:
+  macosx_arm_executor:
+    macos:
+      xcode: 14.0.1
+    resource_class: macos.m1.medium.gen1
+  linux_x86_executor:
+    docker:
+      - image: membraneframeworklabs/docker_membrane
+
+jobs:
   test_exclude_browser:
     docker:
       - image: membraneframeworklabs/docker_membrane
-        environment:
-          MIX_ENV: test
+    environment:
+      MIX_ENV: test
 
     working_directory: ~/app
     steps:
@@ -17,6 +26,61 @@ jobs:
       - run: mix deps.get
       - run: mix compile
       - run: mix test --exclude browser
+
+  mix_release_server:
+    parameters:
+      platform:
+        type: enum
+        enum: [macosx_arm, linux_x86]
+      cache-version:
+        description: "Cache version number, can be used to force cache recreation"
+        type: integer
+        default: 1
+
+    executor: << parameters.platform >>_executor
+
+    environment:
+      MIX_ENV: prod
+
+    steps:
+      - checkout
+      - when:
+          condition:
+            equal: [<< parameters.platform >>, macosx_arm]
+          steps:
+            - run:
+                command: |
+                  brew install asdf
+                  asdf plugin add elixir || true
+                  asdf plugin add erlang || true
+                  asdf install
+                  mix local.hex --force
+                  mix local.rebar --force
+      - get_mix_deps:
+          cache-version: << parameters.cache-version >>
+      - use_build_cache:
+          cache-version: << parameters.cache-version >>
+      - run: |
+          mix release server
+          mkdir -p artifacts
+          tar -czf artifacts/server_release_<< parameters.platform >>.tar.gz _build/prod/rel/server
+      - persist_to_workspace:
+          root: ~/project/
+          paths:
+            - artifacts
+
+  publish_releases:
+    docker:
+      - image: ubuntu
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: |
+          apt update
+          apt install -y wget
+          wget https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz
+          tar -xf ghr_v0.16.0_linux_amd64.tar.gz
+          ./ghr_v0.16.0_linux_amd64/ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} ~/artifacts/
 
 workflows:
   version: 2
@@ -32,11 +96,30 @@ workflows:
       - test_exclude_browser:
           filters:
             <<: *filters
-      - elixir/hex_publish:
+      - elixir/hex_publish: &publish_params
           requires:
             - elixir/build_test
             - test_exclude_browser
             - elixir/lint
+          context:
+            - Deployment
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v.*/
+      - mix_release_server_macosx_arm:
+          <<: *publish_params
+          job: mix_release_server
+          platform: macosx_arm
+      - mix_release_server_linux_x86:
+          <<: *publish_params
+          job: mix_release_server
+          platform: linux_x86
+      - publish_releases:
+          requires:
+            - mix_release_server_macosx_arm
+            - mix_release_server_linux_x86
           context:
             - Deployment
           filters:
