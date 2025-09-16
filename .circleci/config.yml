@@ -2,14 +2,57 @@ version: 2.1
 orbs:
   elixir: membraneframework/elixir@1
 
-executors:
-  macosx_arm_executor:
-    macos:
-      xcode: 14.0.1
-    resource_class: macos.m1.medium.gen1
-  linux_x86_executor:
-    docker:
-      - image: membraneframeworklabs/docker_membrane
+commands:
+  mix_release_server:
+    parameters:
+      platform:
+        type: enum
+        enum: [macosx-arm, linux-x86]
+      version:
+        description: version of boombox
+        type: string
+      cache-version:
+        description: "Cache version number, can be used to force cache recreation"
+        type: integer
+        default: 1
+
+
+    steps:
+      - checkout
+      - when:
+          condition:
+            equal: [<< parameters.platform >>, macosx-arm]
+          steps:
+            - run:
+                command: |
+                  brew install asdf openssl
+                  asdf plugin add elixir || true
+                  asdf plugin add erlang || true
+                  asdf install
+                  echo 'export PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"' >> $BASH_ENV
+            - run:
+                command: |
+                  mix local.hex --force
+                  mix local.rebar --force
+      - elixir/get_mix_deps:
+          cache-version: << parameters.cache-version >>
+      - elixir/use_build_cache:
+          cache-version: << parameters.cache-version >>
+      - run:
+          mix compile
+      - run:
+          mix release server
+      - run: |
+          mkdir -p artifacts
+          tar -czvf artifacts/boombox-server-<< parameters.version >>-<< parameters.platform >>.tar.gz -C _build/prod/rel/server .
+      - run:
+          du -h artifacts
+      - persist_to_workspace:
+          root: ~/project/
+          paths:
+            - artifacts
+
+
 
 jobs:
   test_exclude_browser:
@@ -27,51 +70,50 @@ jobs:
       - run: mix compile
       - run: mix test --exclude browser
 
-  mix_release_server:
+  mix_release_server_linux_x86:
     parameters:
-      platform:
-        type: enum
-        enum: [macosx_arm, linux_x86]
-      cache-version:
-        description: "Cache version number, can be used to force cache recreation"
-        type: integer
-        default: 1
+      version:
+        description: version of boombox
+        type: string
 
-    executor: << parameters.platform >>_executor
+    docker:
+      - image: membraneframeworklabs/docker_membrane
 
     environment:
       MIX_ENV: prod
 
     steps:
-      - checkout
-      - when:
-          condition:
-            equal: [<< parameters.platform >>, macosx_arm]
-          steps:
-            - run:
-                command: |
-                  brew install asdf
-                  asdf plugin add elixir || true
-                  asdf plugin add erlang || true
-                  asdf install
-                  mix local.hex --force
-                  mix local.rebar --force
-      - get_mix_deps:
-          cache-version: << parameters.cache-version >>
-      - use_build_cache:
-          cache-version: << parameters.cache-version >>
-      - run: |
-          mix release server
-          mkdir -p artifacts
-          tar -czf artifacts/server_release_<< parameters.platform >>.tar.gz _build/prod/rel/server
-      - persist_to_workspace:
-          root: ~/project/
-          paths:
-            - artifacts
+      - mix_release_server:
+          platform: linux-x86
+          version: << parameters.version >>
+
+  mix_release_server_macosx_arm:
+    parameters:
+      version:
+        description: version of boombox
+        type: string
+
+    macos:
+      xcode: 16.4.0
+    resource_class: macos.m1.medium.gen1
+
+    environment:
+      MIX_ENV: prod
+
+    steps:
+      - mix_release_server:
+          platform: macosx-arm
+          version: << parameters.version >>
 
   publish_releases:
+    parameters:
+      version:
+        description: version of boombox
+        type: string
+
     docker:
       - image: ubuntu
+
     steps:
       - attach_workspace:
           at: ~/
@@ -80,7 +122,10 @@ jobs:
           apt install -y wget
           wget https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz
           tar -xf ghr_v0.16.0_linux_amd64.tar.gz
-          ./ghr_v0.16.0_linux_amd64/ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} ~/artifacts/
+      - run: |
+          ./ghr_v0.16.0_linux_amd64/ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete << parameters.version >> ~/artifacts/
+
+
 
 workflows:
   version: 2
@@ -88,15 +133,17 @@ workflows:
     jobs:
       - elixir/build_test:
           filters: &filters
+            branches:
+              ignore: /.*/
             tags:
-              only: /v.*/
+              only: /vv.*/
       - elixir/lint:
           filters:
             <<: *filters
       - test_exclude_browser:
           filters:
             <<: *filters
-      - elixir/hex_publish: &publish_params
+      - elixir/hex_publish:
           requires:
             - elixir/build_test
             - test_exclude_browser
@@ -107,15 +154,33 @@ workflows:
             branches:
               ignore: /.*/
             tags:
-              only: /v.*/
+              only: /vv.*/
       - mix_release_server_macosx_arm:
-          <<: *publish_params
-          job: mix_release_server
-          platform: macosx_arm
+          #requires:
+            #- elixir/build_test
+            #- test_exclude_browser
+            #- elixir/lint
+          context:
+            - Deployment
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v.*/
+          version: << pipeline.git.tag >>
       - mix_release_server_linux_x86:
-          <<: *publish_params
-          job: mix_release_server
-          platform: linux_x86
+          #requires:
+            #- elixir/build_test
+            #- test_exclude_browser
+            #- elixir/lint
+          context:
+            - Deployment
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v.*/
+          version: << pipeline.git.tag >>
       - publish_releases:
           requires:
             - mix_release_server_macosx_arm
@@ -127,3 +192,4 @@ workflows:
               ignore: /.*/
             tags:
               only: /v.*/
+          version: << pipeline.git.tag >>

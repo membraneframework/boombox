@@ -207,7 +207,8 @@ defmodule Boombox.Mixfile do
   # with new symlinks pointing to bundlex's
   # priv/shared/precompiled directory
   defp restore_symlinks(release) do
-    base_dir = "#{__DIR__}/_build/dev/rel/boombox/lib"
+    base_dir =
+      "#{__DIR__}/_build/#{Atom.to_string(Mix.env())}/rel/#{Atom.to_string(release.name)}/libb"
 
     shared =
       Path.wildcard("#{base_dir}/bundlex*/priv/shared/precompiled/*")
