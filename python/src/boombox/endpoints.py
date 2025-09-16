@@ -18,11 +18,13 @@ Examples:
 
 """
 
+import abc
+
+from ._vendor.term import Atom
+
 from dataclasses import dataclass, KW_ONLY, fields, is_dataclass
-from term import Atom
 from typing import Any, Literal, TypeAlias
 from typing_extensions import override
-from abc import ABC
 
 AudioSampleFormat: TypeAlias = Literal[
     "s8",
@@ -47,7 +49,7 @@ AudioSampleFormat: TypeAlias = Literal[
 
 
 @dataclass
-class BoomboxEndpoint(ABC):
+class BoomboxEndpoint(abc.ABC):
     """Abstract base class of a Boombox endpoint.
 
     Boombox endpoints are the definitions of Boombox inputs and outputs. This
@@ -186,7 +188,7 @@ class RawData(BoomboxEndpoint):
 
 
 @dataclass
-class StorageEndpoint(BoomboxEndpoint, ABC):
+class StorageEndpoint(BoomboxEndpoint, abc.ABC):
     """Abstract base class for storage endpoints.
 
     Storage endpoints are endpoints that are used for putting the media in

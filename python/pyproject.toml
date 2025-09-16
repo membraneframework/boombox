@@ -10,8 +10,6 @@ license = "Apache-2.0"
 license-files = [ "LICENSE" ]
 requires-python = ">=3.11"
 dependencies = [
-    "pyrlang-term @ git+https://github.com/Pyrlang/Term@bf762693bff43d7ccad15c854aa075f849bd0dbc",
-    "pyrlang @ git+https://github.com/Pyrlang/Pyrlang@d8b12828f8c9d117af45819f97702b82a43fdb0d",
     "numpy >= 2.2.5",
     "typing-extensions >= 4.13.2, < 5"
 ]
