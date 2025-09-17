@@ -79,11 +79,10 @@ defmodule Boombox.Server do
     @moduledoc false
     @type t :: %__MODULE__{
             boombox_pid: pid(),
-            boombox_mode: Boombox.Server.boombox_mode(),
-            last_produced_packet: Boombox.Server.serialized_boombox_packet() | nil
+            boombox_mode: Boombox.Server.boombox_mode()
           }
 
-    @enforce_keys [:boombox_pid, :boombox_mode, :last_produced_packet]
+    @enforce_keys [:boombox_pid, :boombox_mode]
 
     defstruct @enforce_keys
   end
@@ -230,28 +229,7 @@ defmodule Boombox.Server do
     boombox_pid = spawn(boombox_process_fun)
     Process.monitor(boombox_pid)
 
-    last_produced_packet =
-      case boombox_mode do
-        :consuming ->
-          receive do
-            {:packet_consumed, ^boombox_pid} -> nil
-          end
-
-        :producing ->
-          receive do
-            {:packet_produced, packet, ^boombox_pid} -> packet
-          end
-
-        :standalone ->
-          nil
-      end
-
-    {boombox_mode,
-     %State{
-       boombox_pid: boombox_pid,
-       boombox_mode: boombox_mode,
-       last_produced_packet: last_produced_packet
-     }}
+    {boombox_mode, %State{boombox_pid: boombox_pid, boombox_mode: boombox_mode}}
   end
 
   @spec handle_request(:get_pid, State.t() | nil) :: {pid(), State.t() | nil}
@@ -265,8 +243,7 @@ defmodule Boombox.Server do
          {:consume_packet, packet},
          %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
        ) do
-    packet = deserialize_packet(packet)
-    send(boombox_pid, {:consume_packet, packet})
+    send(boombox_pid, {:consume_packet, deserialize_packet(packet)})
 
     receive do
       {:packet_consumed, ^boombox_pid} ->
@@ -308,16 +285,10 @@ defmodule Boombox.Server do
        ) do
     send(boombox_pid, :produce_packet)
 
-    last_produced_packet = state.last_produced_packet
-
-    {production_phase, state} =
-      receive do
-        {:packet_produced, packet, ^boombox_pid} -> {:ok, %{state | last_produced_packet: packet}}
-        {:finished, ^boombox_pid} -> {:finished, state}
-      end
-
-    serialized_packet = serialize_packet(last_produced_packet)
-    {{production_phase, serialized_packet}, state}
+    receive do
+      {:packet_produced, packet, ^boombox_pid} -> {{:ok, serialize_packet(packet)}, state}
+      {:finished, packet, ^boombox_pid} -> {{:finished, serialize_packet(packet)}, state}
+    end
   end
 
   defp handle_request(:produce_packet, %State{boombox_mode: _other_mode} = state) do
@@ -357,35 +328,42 @@ defmodule Boombox.Server do
   @spec consuming_boombox_run(boombox_opts(), pid()) :: :ok
   defp consuming_boombox_run(boombox_opts, server_pid) do
     Stream.resource(
-      fn -> nil end,
-      fn nil ->
-        send(server_pid, {:packet_consumed, self()})
+      fn -> true end,
+      fn is_first_iteration ->
+        if not is_first_iteration do
+          send(server_pid, {:packet_consumed, self()})
+        end
 
         receive do
           {:consume_packet, packet} ->
-            {[packet], nil}
+            {[packet], false}
 
           :finish_consuming ->
-            {:halt, nil}
+            {:halt, false}
         end
       end,
-      fn nil -> send(server_pid, {:finished, self()}) end
+      fn _is_first_iteration -> send(server_pid, {:finished, self()}) end
     )
     |> Boombox.run(boombox_opts)
   end
 
   @spec producing_boombox_run(boombox_opts(), pid()) :: :ok
   defp producing_boombox_run(boombox_opts, server_pid) do
-    Boombox.run(boombox_opts)
-    |> Enum.each(fn packet ->
-      send(server_pid, {:packet_produced, packet, self()})
+    last_packet =
+      Boombox.run(boombox_opts)
+      |> Enum.reduce(nil, fn new_packet, last_produced_packet ->
+        if last_produced_packet != nil do
+          send(server_pid, {:packet_produced, last_produced_packet, self()})
+        end
 
-      receive do
-        :produce_packet -> :ok
-      end
-    end)
+        receive do
+          :produce_packet -> :ok
+        end
 
-    send(server_pid, {:finished, self()})
+        new_packet
+      end)
+
+    send(server_pid, {:finished, last_packet, self()})
   end
 
   @spec standalone_boombox_run(boombox_opts()) :: :ok
