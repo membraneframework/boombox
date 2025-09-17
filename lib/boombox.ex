@@ -23,6 +23,10 @@ defmodule Boombox do
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
+  @type srt_auth_opts :: [
+          {:stream_id, String.t()}
+          | {:password, String.t()}
+        ]
   @type in_stream_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
@@ -110,6 +114,9 @@ defmodule Boombox do
                hls_mode_opt()
                | hls_variant_selection_policy_opt()
              ]}
+          | {:srt, url :: String.t()}
+          | {:srt, url :: String.t(), srt_auth_opts()}
+          | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
   @type stream_input :: {:stream, in_stream_opts()}
 
@@ -130,6 +137,8 @@ defmodule Boombox do
                | transcoding_policy_opt()
              ]}
           | {:rtp, out_rtp_opts()}
+          | {:srt, url :: String.t()}
+          | {:srt, url :: String.t(), srt_auth_opts()}
 
   @type stream_output :: {:stream, out_stream_opts()}
 
@@ -219,7 +228,7 @@ defmodule Boombox do
 
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
-      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp] ->
+      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp, :srt] ->
         procs = start_pipeline(opts)
 
         task =

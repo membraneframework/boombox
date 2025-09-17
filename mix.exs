@@ -67,6 +67,7 @@ defmodule Boombox.Mixfile do
       {:membrane_ivf_plugin, "~> 0.8.0"},
       {:membrane_ogg_plugin, "~> 0.5.0"},
       {:membrane_stream_plugin, "~> 0.4.0"},
+      {:membrane_srt_plugin, "~> 0.1.1"},
       {:membrane_simple_rtsp_server, "~> 0.1.5", only: :test},
       {:image, "~> 0.54.0"},
       {:async_test, github: "software-mansion-labs/elixir_async_test", only: :test},

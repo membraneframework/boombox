@@ -290,6 +290,17 @@ defmodule Boombox.InternalBin do
   end
 
   @impl true
+  def handle_child_notification(
+        {:mpeg_ts_pmt, pmt},
+        :srt_mpeg_ts_demuxer,
+        ctx,
+        state
+      ) do
+    Boombox.InternalBin.SRT.handle_tracks_resolved(pmt)
+    |> proceed_result(ctx, state)
+  end
+
+  @impl true
   def handle_child_notification(notification, child, _ctx, state) do
     Membrane.Logger.debug_verbose(
       "[Boombox] Ignoring notification #{inspect(notification)} from child #{inspect(child)}"
@@ -300,7 +311,7 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_child_setup_completed(child, _ctx, state)
-      when child in [:udp_source, :rtsp_source] do
+      when child in [:udp_source, :rtsp_source, :srt_source] do
     {[notify_parent: :external_resource_ready], state}
   end
 
@@ -317,7 +328,7 @@ defmodule Boombox.InternalBin do
 
   @impl true
   def handle_element_end_of_stream(element, :input, _ctx, state)
-      when element in [:hls_sink_bin, :file_sink, :udp_rtp_sink] do
+      when element in [:hls_sink_bin, :file_sink, :udp_rtp_sink, :srt_sink] do
     {[notify_parent: :processing_finished], state}
   end
 
@@ -421,8 +432,7 @@ defmodule Boombox.InternalBin do
     end
   end
 
-  @spec create_input(input(), Membrane.Bin.CallbackContext.t(), State.t()) ::
-          Ready.t() | Wait.t()
+  @spec create_input(input(), Membrane.Bin.CallbackContext.t(), State.t()) :: Ready.t() | Wait.t()
   defp create_input({:webrtc, signaling}, ctx, state) do
     Boombox.InternalBin.WebRTC.create_input(signaling, state.output, ctx, state)
   end
@@ -481,6 +491,15 @@ defmodule Boombox.InternalBin do
 
   defp create_input(:membrane_pad, ctx, _state) do
     Boombox.InternalBin.Pad.create_input(ctx)
+  end
+
+  defp create_input({:srt, server_awaiting_accept}, _ctx, _state)
+       when is_pid(server_awaiting_accept) do
+    Boombox.InternalBin.SRT.create_input(server_awaiting_accept)
+  end
+
+  defp create_input({:srt, url, opts}, _ctx, _state) when is_binary(url) do
+    Boombox.InternalBin.SRT.create_input(url, opts)
   end
 
   @spec create_output(output(), Membrane.Bin.CallbackContext.t(), State.t()) ::
@@ -656,6 +675,21 @@ defmodule Boombox.InternalBin do
     {result, state}
   end
 
+  defp link_output({:srt, url, opts}, track_builders, spec_builder, _ctx, state) do
+    is_input_realtime = input_realtime?(state.input)
+
+    result =
+      Boombox.InternalBin.SRT.link_output(
+        url,
+        opts,
+        track_builders,
+        spec_builder,
+        is_input_realtime
+      )
+
+    {result, state}
+  end
+
   defp link_output({:stream, stream_process, params}, track_builders, spec_builder, _ctx, state) do
     is_input_realtime = input_realtime?(state.input)
 
@@ -715,6 +749,9 @@ defmodule Boombox.InternalBin do
 
       {nil, ".m3u8", :output} ->
         {:hls, value, opts}
+
+      {"srt", _ext, _direction} ->
+        {:srt, value, opts}
 
       _other ->
         raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
@@ -803,6 +840,16 @@ defmodule Boombox.InternalBin do
       {:stream, stream_process, opts} when is_pid(stream_process) ->
         if Keyword.keyword?(opts), do: value
 
+      {:srt, server_awaiting_accept}
+      when direction == :input and is_pid(server_awaiting_accept) ->
+        {:srt, server_awaiting_accept}
+
+      {:srt, url} when is_binary(url) ->
+        {:srt, url, []}
+
+      {:srt, url, opts} when is_binary(url) ->
+        {:srt, url, opts}
+
       :membrane_pad ->
         :membrane_pad
 
@@ -871,10 +918,11 @@ defmodule Boombox.InternalBin do
   @spec input_realtime?(input()) :: boolean()
   defp input_realtime?(input) do
     case input do
-      {endpoint_type, _parameter} when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp] ->
+      {endpoint_type, _parameter} when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp, :srt] ->
         true
 
-      {endpoint_type, _parameter, _opts} when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp] ->
+      {endpoint_type, _parameter, _opts}
+      when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp, :srt] ->
         true
 
       {:stream, opts} ->

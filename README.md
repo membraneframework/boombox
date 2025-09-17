@@ -4,7 +4,7 @@
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/boombox)
 [![CircleCI](https://circleci.com/gh/membraneframework/boombox.svg?style=svg)](https://circleci.com/gh/membraneframework/boombox)
 
-Boombox is a high-level tool for audio & video streaming based on the [Membrane Framework](https://membrane.stream).
+Boombox is a high-level tool for audio & video streaming tool based on the [Membrane Framework](https://membrane.stream).
 
 See [examples.livemd](examples.livemd) for examples.
 
@@ -74,7 +74,8 @@ For more examples, see [examples.livemd](examples.livemd).
 | RTMP | `"rtmp://*"` | _not supported_ |
 | RTSP | `"rtsp://*"` | _not supported_ |
 | RTP | `{:rtp, opts}` | `{:rtp, opts}` |
-| HLS | _not supported_ | `"*.m3u8"` |
+| HLS | `"*.m3u8"` | `"*.m3u8"` |
+| SRT | `"srt://<ip>:<port>"` | `"srt://<ip>:<port>"` |
 | `Enumerable.t()` | `{:stream, opts}` | `{:stream, opts}` |
 
 For the full list of input and output options, see [`Boombox.run/2`](https://hexdocs.pm/boombox/Boombox.html#run/2)

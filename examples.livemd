@@ -178,6 +178,44 @@ t =
 
 <!-- livebook:{"branch_parent_index":0} -->
 
+## Stream content of MP4 via SRT with basic authentication mechanism and broadcast it with HLS
+
+To receive the stream, visit http://localhost:1234/hls.html after running the cell below
+
+```elixir
+mp4_input = "#{input_dir}/bun.mp4"
+hls_output = "#{out_dir}/index.m3u8"
+
+uri = "srt://127.0.0.1:9710"
+
+Boombox.async(input: uri, output: hls_output)
+Boombox.run(input: mp4_input, output: uri)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Section
+
+Run the cell below and visit http://localhost:1234/hls.html.
+
+Then, start streaming from OBS to the following URI:
+
+* `srt://127.0.0.1:9710?streamid=some_stream_id&passphrase=some_password`
+
+For more information on how to configure OBS to stream via SRT, take a look [here](https://github.com/membraneframework/membrane_srt_plugin?tab=readme-ov-file#obs-configuration).
+
+```elixir
+hls_output = "#{out_dir}/index.m3u8"
+
+uri = "srt://127.0.0.1:9710"
+stream_id = "some_stream_id"
+password = "some_password"
+
+Boombox.run(input: {:srt, uri, stream_id: stream_id, password: password}, output: hls_output)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
 ## Broadcast WebRTC via HLS
 
 Visit http://localhost:1234/webrtc_from_browser.html to send the stream and http://localhost:1234/hls.html to receive it
@@ -675,9 +713,9 @@ defmodule VideoDiscardingPipeline do
   end
 end
 
-{:ok, supervisor, _pipeline} = 
-  Membrane.Pipeline.start_link(VideoDiscardingPipeline, 
-    boombox_input: "#{input_dir}/bun.mp4", 
+{:ok, supervisor, _pipeline} =
+  Membrane.Pipeline.start_link(VideoDiscardingPipeline,
+    boombox_input: "#{input_dir}/bun.mp4",
     boombox_output: {:webrtc, "ws://localhost:8830"}
   )
 
