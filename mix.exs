@@ -199,10 +199,19 @@ defmodule Boombox.Mixfile do
   # with new symlinks pointing to bundlex's
   # priv/shared/precompiled directory
   defp restore_symlinks(release) do
-    base_dir = "#{__DIR__}/_build/dev/rel/boombox/lib"
+    base_dir =
+      Path.join([
+        __DIR__,
+        "_build",
+        Atom.to_string(Mix.env()),
+        "rel",
+        Atom.to_string(release.name),
+        "lib"
+      ])
 
     shared =
-      Path.wildcard("#{base_dir}/bundlex*/priv/shared/precompiled/*")
+      Path.join(base_dir, "bundlex*/priv/shared/precompiled/*")
+      |> Path.wildcard()
       |> Enum.map(&Path.relative_to(&1, base_dir))
       |> Map.new(&{Path.basename(&1), &1})
 
@@ -210,17 +219,13 @@ defmodule Boombox.Mixfile do
     |> Enum.each(fn path ->
       name = Path.basename(path)
 
-      case shared[name] do
-        nil ->
-          :ok
+      if Map.has_key?(shared, name) do
+        ln =
+          Path.join([base_dir, shared[name], "lib"])
+          |> Path.relative_to(Path.dirname(path), force: true)
 
-        shared_dir ->
-          File.rm_rf!(path)
-          depth = path |> Path.relative_to(base_dir) |> Path.split() |> length()
-          ln = String.duplicate("../", depth - 1) <> shared_dir
-          dbg(path)
-          dbg(ln)
-          File.ln_s!(ln, path)
+        File.rm_rf!(path)
+        File.ln_s!(ln, path)
       end
     end)
 
