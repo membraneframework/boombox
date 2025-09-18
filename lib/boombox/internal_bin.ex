@@ -880,9 +880,6 @@ defmodule Boombox.InternalBin do
       {:stream, opts} ->
         Keyword.get(opts, :is_live, false)
 
-      {:hls, _location, opts} ->
-        Keyword.get(opts, :mode) == :live
-
       _other ->
         false
     end

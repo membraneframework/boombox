@@ -60,6 +60,7 @@ defmodule BoomboxTest do
          "output.mp4"
        ], "ref_bun10s_opus_aac.mp4", []},
     hls_fmp4_mp4: {[@bbb_hls_fmp4_url, "output.mp4"], "bun_hls.mp4", []},
+    hls_live_fmp4_mp4: {[@bbb_hls_fmp4_url, "output.mp4"], "bun_hls.mp4", []},
     hls_fmp4_webrtc:
       {[
          @bbb_hls_fmp4_url,

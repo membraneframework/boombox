@@ -89,7 +89,6 @@ defmodule Boombox do
           | {path_or_uri :: String.t(),
              [
                hls_variant_selection_policy_opt()
-               | hls_mode_opt()
                | {:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}
              ]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
@@ -105,11 +104,7 @@ defmodule Boombox do
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
           | {:hls, url :: String.t()}
-          | {:hls, url :: String.t(),
-             [
-               hls_mode_opt()
-               | hls_variant_selection_policy_opt()
-             ]}
+          | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
 
   @type stream_input :: {:stream, in_stream_opts()}
 
