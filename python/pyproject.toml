@@ -1,5 +1,5 @@
 [project]
-name = "membrane_boombox"
+name = "boomboxlib"
 version = "0.1.0"
 description = "Boombox SDK for Python"
 readme = "README.md"
