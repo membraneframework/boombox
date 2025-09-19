@@ -199,10 +199,18 @@ defmodule Boombox.Mixfile do
   # priv/shared/precompiled directory
   defp restore_symlinks(release) do
     base_dir =
-      "#{__DIR__}/_build/#{Atom.to_string(Mix.env())}/rel/#{Atom.to_string(release.name)}/libb"
+      Path.join([
+        __DIR__,
+        "_build",
+        Atom.to_string(Mix.env()),
+        "rel",
+        Atom.to_string(release.name),
+        "lib"
+      ])
 
     shared =
-      Path.wildcard("#{base_dir}/bundlex*/priv/shared/precompiled/*")
+      Path.join(base_dir, "bundlex*/priv/shared/precompiled/*")
+      |> Path.wildcard()
       |> Enum.map(&Path.relative_to(&1, base_dir))
       |> Map.new(&{Path.basename(&1), &1})
 
@@ -210,18 +218,35 @@ defmodule Boombox.Mixfile do
     |> Enum.each(fn path ->
       name = Path.basename(path)
 
-      case shared[name] do
-        nil ->
-          :ok
+      if Map.has_key?(shared, name) do
+        ln =
+          Path.join([base_dir, shared[name], "lib"])
+          |> Path.relative_to(Path.dirname(path), force: true)
 
-        shared_dir ->
-          File.rm_rf!(path)
-          depth = path |> Path.relative_to(base_dir) |> Path.split() |> length()
-          ln = String.duplicate("../", depth - 1) <> shared_dir
-          dbg(path)
-          dbg(ln)
-          File.ln_s!(ln, path)
+        File.rm_rf!(path)
+        File.ln_s!(ln, path)
       end
+    end)
+
+    Path.join(base_dir, "bundlex*/priv/shared/precompiled/*/lib")
+    |> Path.wildcard()
+    |> Enum.map(fn lib_dir ->
+      File.ls!(lib_dir)
+      |> Enum.group_by(&(String.split(&1, ".") |> List.first()))
+      |> Enum.each(fn {_lib_name, libs} ->
+        lib_to_symlink_to =
+          Enum.max_by(libs, &String.length/1)
+
+        libs
+        |> Enum.filter(&(&1 != lib_to_symlink_to))
+        |> Enum.map(fn lib_to_replace ->
+          lib_to_replace_path =
+            Path.join(lib_dir, lib_to_replace)
+
+          File.rm_rf!(lib_to_replace_path)
+          File.ln_s!(lib_to_symlink_to, lib_to_replace_path)
+        end)
+      end)
     end)
 
     release
