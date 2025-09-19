@@ -180,22 +180,6 @@ t =
 
 ## Stream content of MP4 via SRT with basic authentication mechanism and broadcast it with HLS
 
-To receive the stream, visit http://localhost:1234/hls.html after running the cell below
-
-```elixir
-mp4_input = "#{input_dir}/bun.mp4"
-hls_output = "#{out_dir}/index.m3u8"
-
-uri = "srt://127.0.0.1:9710"
-
-Boombox.async(input: uri, output: hls_output)
-Boombox.run(input: mp4_input, output: uri)
-```
-
-<!-- livebook:{"branch_parent_index":0} -->
-
-## Section
-
 Run the cell below and visit http://localhost:1234/hls.html.
 
 Then, start streaming from OBS to the following URI:
