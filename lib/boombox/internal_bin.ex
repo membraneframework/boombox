@@ -710,7 +710,7 @@ defmodule Boombox.InternalBin do
       {"rtsp", _ext, :input} ->
         {:rtsp, value}
 
-      {scheme, ".m3u8", :input} when scheme in ["http", "https"] ->
+      {scheme, ".m3u8", :input} when scheme in [nil, "http", "https"] ->
         {:hls, value, opts}
 
       {nil, ".m3u8", :output} ->

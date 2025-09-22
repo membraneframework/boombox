@@ -60,14 +60,33 @@ defmodule BoomboxTest do
          "output.mp4"
        ], "ref_bun10s_opus_aac.mp4", []},
     hls_fmp4_mp4: {[@bbb_hls_fmp4_url, "output.mp4"], "bun_hls.mp4", []},
-    hls_live_fmp4_mp4: {[@bbb_hls_fmp4_url, "output.mp4"], "bun_hls.mp4", []},
     hls_fmp4_webrtc:
       {[
          @bbb_hls_fmp4_url,
          {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
          "output.mp4"
        ], "bun_hls_webrtc.mp4", []},
-    hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls_mpegts.mp4", []}
+    hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls_mpegts.mp4", []},
+    live_hls_mp4:
+      {[@bbb_mp4_url, quote(do: {:hls, "index.m3u8", mode: :live}), "output.mp4"], "bun_hls.mp4",
+       []},
+    hls_fmp4_live_hls_webrtc_mp4:
+      {[
+         @bbb_hls_fmp4_url,
+         quote(do: {:hls, "index.m3u8", mode: :live}),
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
+         "output.mp4"
+       ], "bun_hls_webrtc.mp4", []},
+    vod_hls_mp4:
+      {[@bbb_mp4_url, quote(do: {:hls, "index.m3u8", mode: :vod}), "output.mp4"], "bun_hls.mp4",
+       []},
+    hls_fmp4_vod_hls_webrtc_mp4:
+      {[
+         @bbb_hls_fmp4_url,
+         quote(do: {:hls, "index.m3u8", mode: :vod}),
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
+         "output.mp4"
+       ], "bun_hls_webrtc.mp4", []}
   ]
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
@@ -76,16 +95,23 @@ defmodule BoomboxTest do
 
       endpoints
       |> Enum.chunk_every(2, 1, :discard)
-      |> Enum.flat_map(fn
-        [input, {webrtc, _signaling} = output] when webrtc in [:webrtc, :whip] ->
-          boombox_task = Boombox.async(input: input, output: output)
-          [boombox_task]
+      |> Enum.flat_map(fn [input, output] ->
+        case output do
+          {webrtc, _signaling} when webrtc in [:webrtc, :whip] ->
+            boombox_task = Boombox.async(input: input, output: output)
+            [boombox_task]
 
-        [input, output] ->
-          Boombox.run(input: input, output: output)
-          []
+          {:hls, playlist, mode: :live} ->
+            boombox_task = Boombox.async(input: input, output: output)
+            await_until_file_exists!(playlist)
+            [boombox_task]
+
+          output ->
+            Boombox.run(input: input, output: output)
+            []
+        end
       end)
-      |> Task.await_many()
+      |> Task.await_many(15_000)
 
       compare_opts = [tmp_dir: tmp_dir] ++ unquote(compare_opts)
 
@@ -99,13 +125,27 @@ defmodule BoomboxTest do
 
   defp parse_endpoint_paths([head | tail], tmp_dir) do
     modified_tail =
-      Enum.map(tail, fn endpoint ->
-        if is_binary(endpoint),
-          do: Path.join(tmp_dir, endpoint),
-          else: endpoint
+      Enum.map(tail, fn
+        endpoint when is_binary(endpoint) -> Path.join(tmp_dir, endpoint)
+        {:hls, playlist, opts} -> {:hls, Path.join(tmp_dir, playlist), opts}
+        endpoint -> endpoint
       end)
 
     [head | modified_tail]
+  end
+
+  defp await_until_file_exists!(file, seconds \\ 20) do
+    cond do
+      File.exists?(file) ->
+        :ok
+
+      seconds <= 0 ->
+        raise "File #{file} not created within timeout"
+
+      true ->
+        Process.sleep(1_000)
+        await_until_file_exists!(file, seconds - 1)
+    end
   end
 
   defp get_free_local_address() do
