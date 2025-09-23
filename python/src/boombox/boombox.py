@@ -116,7 +116,7 @@ class Boombox(process.Process):
             "RELEASE_DISTRIBUTION": "name",
         }
 
-        self._download_erlang_boombox()
+        self._download_elixir_boombox_release()
         release_path = os.path.join(self._data_dir, "bin", "server")
         self._erlang_process = subprocess.Popen([release_path, "start"], env=env)
         atexit.register(lambda: self._erlang_process.kill())
@@ -312,7 +312,7 @@ class Boombox(process.Process):
     async def _await_future(self, response_future):
         return await response_future
 
-    def _download_erlang_boombox(self) -> None:
+    def _download_elixir_boombox_release(self) -> None:
         class TqdmUpTo(tqdm.tqdm):
             def update_to(self, b=1, bsize=1, tsize=None):
                 if tsize is not None:
@@ -329,9 +329,9 @@ class Boombox(process.Process):
         )
 
         if os.path.exists(os.path.join(self._data_dir, "bin", "server")):
-            print("Erlang boombox release already present.")
+            print("Elixir boombox release already present.")
             return
-        print("Erlang boombox release not found, downloading...")
+        print("Elixir boombox release not found, downloading...")
 
         if self._version == "dev":
             release_url = os.path.join(RELEASES_URL, "latest/download")
