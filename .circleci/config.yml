@@ -2,6 +2,72 @@ version: 2.1
 orbs:
   elixir: membraneframework/elixir@1
 
+executors:
+  linux_x86_executor:
+    docker:
+      - image: membraneframeworklabs/docker_membrane
+
+  manylinux_x86_executor:
+    docker:
+      - image: quay.io/pypa/manylinux2014_x86_64
+    resource_class: medium
+
+  macos_arm_executor:
+    macos:
+      xcode: 16.4.0
+    resource_class: macos.m1.medium.gen1
+
+commands:
+  mix_release_server:
+    parameters:
+      platform:
+        type: enum
+        enum: [macos-arm, linux-x86]
+      version:
+        description: version of boombox
+        type: string
+      cache-version:
+        description: "Cache version number, can be used to force cache recreation"
+        type: integer
+        default: 1
+
+
+    steps:
+      - checkout
+      - when:
+          condition:
+            equal: [<< parameters.platform >>, macos-arm]
+          steps:
+            - run:
+                name: Install erlang and elixir
+                command: |
+                  brew install asdf openssl
+                  asdf plugin add elixir || true
+                  asdf plugin add erlang || true
+                  asdf install
+                  echo 'export PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"' >> $BASH_ENV
+            - run:
+                name: Install hex and rebar
+                command: |
+                  mix local.hex --force
+                  mix local.rebar --force
+      - elixir/get_mix_deps:
+          cache-version: << parameters.cache-version >>
+      - elixir/use_build_cache:
+          cache-version: << parameters.cache-version >>
+      - run:
+          name: Mix release
+          command: mix release server
+      - run:
+          name: Tar the release
+          command: |
+            mkdir -p artifacts
+            tar -czvf artifacts/boombox-server-<< parameters.platform >>.tar.gz -C _build/prod/rel/server .
+      - persist_to_workspace:
+          root: ~/project/
+          paths:
+            - artifacts
+
 jobs:
   test_exclude_browser:
     docker:
@@ -18,43 +84,166 @@ jobs:
       - run: mix compile
       - run: mix test --exclude browser
 
-  mix_release_macos_arm:
-    macos:
-      xcode: 14.0.1
-    resource_class: macos.m1.medium.gen1
+  mix_release_server_linux_x86:
+    parameters:
+      version:
+        description: version of boombox
+        type: string
+
+    executor: linux_x86_executor
+
     environment:
       MIX_ENV: prod
 
-  mix_release_linux_intel:
+    steps:
+      - mix_release_server:
+          platform: linux-x86
+          version: << parameters.version >>
+
+  mix_release_server_macos_arm:
+    parameters:
+      version:
+        description: version of boombox
+        type: string
+
+    executor: macos_arm_executor
+
+    environment:
+      MIX_ENV: prod
+
+    steps:
+      - mix_release_server:
+          platform: macos-arm
+          version: << parameters.version >>
+
+  publish_github_release:
+    parameters:
+      version:
+        description: version of boombox
+        type: string
+
     docker:
-      - image: membraneframeworklabs/docker_membrane
-    environment:
-      MIX_ENV: prod
+      - image: ubuntu
 
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install ghr tool
+          command: |
+            apt update
+            apt install -y wget
+            wget https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz
+            tar -xf ghr_v0.16.0_linux_amd64.tar.gz
+      - run:
+          name: Publish release
+          command:
+            ./ghr_v0.16.0_linux_amd64/ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete << parameters.version >> ~/artifacts/
+
+  publish_python_package_linux_x86:
+    executor: manylinux_x86_executor
+    working_directory: ~/project/python
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Build wheel and repair with auditwheel
+          command: |
+            /opt/python/cp311-cp311/bin/pip install build twine
+            /opt/python/cp311-cp311/bin/python -m build --wheel
+            auditwheel repair dist/*.whl --wheel-dir ../wheelhouse
+      - run:
+          name: Publish to PyPI
+          working_directory: ~/project/wheelhouse
+          command: |
+            /opt/python/cp311-cp311/bin/pip install twine
+            /opt/python/cp311-cp311/bin/twine upload --username __token__ --password $PYPI_API_KEY *
+
+  publish_python_package_macos_arm:
+    executor: macos_arm_executor
+    working_directory: ~/project/python
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install build and publish tools
+          command: pip install build twine
+      - run:
+          name: Build wheel (no sdist)
+          command: python -m build --wheel
+      - run:
+          name: Publish to PyPI
+          command: twine upload --verbose --username __token__ --password $PYPI_API_KEY dist/*
+
+  build_python_docs:
+    docker:
+      - image: ubuntu
+
+    steps:
+      - run: |
+          apt update
+          apt install -y curl
+          curl -X POST -d token=$READTHEDOCS_WEBHOOK_TOKEN $READTHEDOCS_WEBHOOK_URL
 
 workflows:
-  version: 2
   build:
     jobs:
       - elixir/build_test:
-          filters: &filters
+          filters: &regular_filters
             tags:
               only: /v.*/
       - elixir/lint:
-          filters:
-            <<: *filters
+          filters: *regular_filters
       - test_exclude_browser:
-          filters:
-            <<: *filters
+          filters: *regular_filters
       - elixir/hex_publish:
-          requires:
+          requires: &publish_requires
             - elixir/build_test
             - test_exclude_browser
             - elixir/lint
-          context:
-            - Deployment
-          filters:
+          filters: &publish_filters
             branches:
               ignore: /.*/
             tags:
               only: /v.*/
+          context:
+            - Deployment
+      - mix_release_server_macos_arm:
+          requires: *publish_requires
+          filters: *publish_filters
+          context:
+            - Deployment
+          version: << pipeline.git.tag >>
+      - mix_release_server_linux_x86:
+          requires: *publish_requires
+          filters: *publish_filters
+          context:
+            - Deployment
+          version: << pipeline.git.tag >>
+      - publish_github_release:
+          requires:
+            - mix_release_server_macos_arm
+            - mix_release_server_linux_x86
+          filters: *publish_filters
+          context:
+            - Deployment
+          version: << pipeline.git.tag >>
+      - publish_python_package_linux_x86:
+          requires:
+            - publish_github_release
+          filters: *publish_filters
+          context:
+            - Deployment
+      - publish_python_package_macos_arm:
+          requires:
+            - publish_github_release
+          filters: *publish_filters
+          context:
+            - Deployment
+      - build_python_docs:
+          requires:
+            - publish_python_package_macos_arm
+            - publish_python_package_linux_x86
+          filters: *publish_filters
+          context:
+            - Deployment
