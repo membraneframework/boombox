@@ -100,6 +100,22 @@ jobs:
           platform: linux-x86
           version: << parameters.version >>
 
+  compare_versions:
+    docker:
+      - image: ubuntu
+
+    steps:
+      - checkout
+      - run:
+          name: Compare the versions from mix.exs and python/pyproject.toml
+          command: |
+            python_package_version=$(grep "^version =" python/pyproject.toml | awk '{print $3}' | tr -d ' "')
+            elixir_package_version=$(grep "^  @version" mix.exs | awk '{print $2}' | tr -d ' "')
+            if [ $python_package_version != $elixir_package_version ]; then
+                echo "package versions don't match - python: $python_package_version, elixir: $elixir_package_version"
+                exit 1
+            fi
+
   mix_release_server_macos_arm:
     parameters:
       version:
@@ -180,27 +196,32 @@ jobs:
       - image: ubuntu
 
     steps:
-      - run: |
-          apt update
-          apt install -y curl
-          curl -X POST -d token=$READTHEDOCS_WEBHOOK_TOKEN $READTHEDOCS_WEBHOOK_URL
+      - run:
+          name: Trigger docs build
+          command: |
+            apt update
+            apt install -y curl
+            curl -X POST -d token=$READTHEDOCS_WEBHOOK_TOKEN $READTHEDOCS_WEBHOOK_URL
 
 workflows:
   build:
     jobs:
       - elixir/build_test:
-          filters: &regular_filters
+          filters: &push_filters
             tags:
               only: /v.*/
       - elixir/lint:
-          filters: *regular_filters
+          filters: *push_filters
       - test_exclude_browser:
-          filters: *regular_filters
+          filters: *push_filters
+      - compare_versions:
+          filters: *push_filters
       - elixir/hex_publish:
           requires: &publish_requires
             - elixir/build_test
             - test_exclude_browser
             - elixir/lint
+            - compare_versions
           filters: &publish_filters
             branches:
               ignore: /.*/
