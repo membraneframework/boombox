@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import asyncio
-import pyrlang.process
-import pyrlang.node
 import uuid
 import subprocess
 import atexit
@@ -15,14 +13,15 @@ import warnings
 import dataclasses
 import threading
 
-from term import Atom, Pid
+from ._vendor.pyrlang import process, node
+from ._vendor.term import Atom, Pid
 from .endpoints import BoomboxEndpoint, AudioSampleFormat
 
 from typing import Generator, ClassVar, Optional, Any, get_args
 from typing_extensions import override
 
 
-class Boombox(pyrlang.process.Process):
+class Boombox(process.Process):
     """
     Boombox is a tool that allows to transform a media stream from one
     format into another.
@@ -90,7 +89,7 @@ class Boombox(pyrlang.process.Process):
 
     _python_node_name = f"{uuid.uuid4()}@127.0.0.1"
     _cookie = str(uuid.uuid4())
-    _node = pyrlang.node.Node(node_name=_python_node_name, cookie=_cookie)
+    _node = node.Node(node_name=_python_node_name, cookie=_cookie)
     threading.Thread(target=_node.run, daemon=True).start()
 
     def __init__(
