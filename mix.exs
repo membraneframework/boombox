@@ -229,6 +229,27 @@ defmodule Boombox.Mixfile do
       end
     end)
 
+    Path.join(base_dir, "bundlex*/priv/shared/precompiled/*/lib")
+    |> Path.wildcard()
+    |> Enum.map(fn lib_dir ->
+      File.ls!(lib_dir)
+      |> Enum.group_by(&(String.split(&1, ".") |> List.first()))
+      |> Enum.each(fn {_lib_name, libs} ->
+        lib_to_symlink_to =
+          Enum.max_by(libs, &String.length/1)
+
+        libs
+        |> Enum.filter(&(&1 != lib_to_symlink_to))
+        |> Enum.map(fn lib_to_replace ->
+          lib_to_replace_path =
+            Path.join(lib_dir, lib_to_replace)
+
+          File.rm_rf!(lib_to_replace_path)
+          File.ln_s!(lib_to_symlink_to, lib_to_replace_path)
+        end)
+      end)
+    end)
+
     release
   end
 end
