@@ -211,7 +211,10 @@ defmodule Boombox.Mixfile do
       |> Enum.map(&Path.relative_to(&1, base_dir))
       |> Map.new(&{Path.basename(&1), &1})
 
-    Path.wildcard("#{base_dir}/*/priv/bundlex/*/*")
+    # Restore symlinks
+    # <package>/priv/shared/precompiled/<precompiled_dir> -> ../../../../bundlex-<version>/priv/shared/<precompiled_dir>/lib
+    Path.join(base_dir, "*/priv/bundlex/*/*")
+    |> Path.wildcard()
     |> Enum.each(fn path ->
       name = Path.basename(path)
 
@@ -225,6 +228,9 @@ defmodule Boombox.Mixfile do
       end
     end)
 
+    # Restore symlinks
+    # bundlex-<version>/priv/shared/precompiled/<precompiled_dir>/lib/<some_lib>.dylib -> <some_lib>.<most_precise_version>.dylib
+    # e.g. libvpx.dylib -> libvpx.11.dylib
     Path.join(base_dir, "bundlex*/priv/shared/precompiled/*/lib")
     |> Path.wildcard()
     |> Enum.map(fn lib_dir ->
