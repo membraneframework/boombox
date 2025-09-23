@@ -1,6 +1,6 @@
 [project]
 name = "boomboxlib"
-version = "0.2.2"
+version = "0.2.4"
 description = "Boombox SDK for Python"
 readme = "README.md"
 authors = [
