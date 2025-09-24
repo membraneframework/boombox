@@ -18,6 +18,7 @@ import platformdirs
 import platform
 import importlib.metadata
 import tarfile
+import logging
 
 from ._vendor.pyrlang import process, node
 from ._vendor.term import Atom, Pid
@@ -90,6 +91,7 @@ class Boombox(process.Process):
     _cookie: ClassVar[str]
 
     _data_dir: str
+    _server_release_path: str
     _version: str
     _process_name: Atom
     _erlang_node_name: Atom
@@ -116,9 +118,10 @@ class Boombox(process.Process):
             "RELEASE_DISTRIBUTION": "name",
         }
 
+        self._server_release_path = os.path.join(self._data_dir, "bin", "server")
         self._download_elixir_boombox_release()
-        release_path = os.path.join(self._data_dir, "bin", "server")
-        self._erlang_process = subprocess.Popen([release_path, "start"], env=env)
+
+        self._erlang_process = subprocess.Popen([self._server_release_path, "start"], env=env)
         atexit.register(lambda: self._erlang_process.kill())
 
         super().__init__(True)
@@ -328,10 +331,10 @@ class Boombox(process.Process):
             appname=PACKAGE_NAME, ensure_exists=True, version=self._version
         )
 
-        if os.path.exists(os.path.join(self._data_dir, "bin", "server")):
-            print("Elixir boombox release already present.")
+        if os.path.exists(self._server_release_path):
+            logging.info("Elixir boombox release already present.")
             return
-        print("Elixir boombox release not found, downloading...")
+        logging.info("Elixir boombox release not found, downloading...")
 
         if self._version == "dev":
             release_url = os.path.join(RELEASES_URL, "latest/download")
@@ -362,7 +365,7 @@ class Boombox(process.Process):
                 download_url, filename=tarball_path, reporthook=t.update_to
             )
 
-        print("Download complete. Extracting...")
+        logging.info("Download complete. Extracting...")
         with tarfile.open(tarball_path) as tar:
             tar.extractall(self._data_dir)
             os.remove(tarball_path)
