@@ -45,42 +45,4 @@ defmodule Boombox.InternalBin.StorageEndpoints.Ogg do
 
     %Ready{actions: [spec: spec]}
   end
-
-  # defp foo() do
-  # audio_spec =
-  # case track_builders do
-  # %{audio: audio_track_builder} ->
-  # [
-  # audio_track_builder
-  # |> child(:ogg_audio_transcoder, %Membrane.Transcoder{
-  # output_stream_format: Membrane.Opus,
-  # transcoding_policy: transcoding_policy
-  # })
-  # |> child(:parser, %Membrane.Opus.Parser{
-  # generate_best_effort_timestamps?: true,
-  # delimitation: :undelimit,
-  # input_delimitted?: false
-  # })
-  # |> child(:ogg_muxer, Membrane.Ogg.Muxer)
-  # |> child(:file_sink, %Membrane.File.Sink{location: location})
-  # ]
-
-  # _no_audio_track ->
-  # raise "Output endpoint supports only audio, but no audio track is present"
-  # end
-
-  # video_spec =
-  # case track_builders do
-  # %{video: video_track_builder} ->
-  # Logger.warning("Output endpoint supports only audio, discarding video track")
-
-  # [
-  # video_track_builder
-  # |> child(:video_fake_sink, Membrane.Fake.Sink)
-  # ]
-
-  # _no_video_track ->
-  # []
-  # end
-  # end
 end
