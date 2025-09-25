@@ -104,7 +104,27 @@ defmodule BoomboxTest do
               [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
-       ], "bun10s.mp4", [kinds: [:video]]}
+       ], "bun10s.mp4", [kinds: [:video]]},
+    live_hls_mp4:
+      {[@bbb_mp4_url, quote(do: {:hls, "index.m3u8", mode: :live}), "output.mp4"], "bun_hls.mp4",
+       []},
+    hls_fmp4_live_hls_webrtc_mp4:
+      {[
+         @bbb_hls_fmp4_url,
+         quote(do: {:hls, "index.m3u8", mode: :live}),
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
+         "output.mp4"
+       ], "bun_hls_webrtc.mp4", []},
+    vod_hls_mp4:
+      {[@bbb_mp4_url, quote(do: {:hls, "index.m3u8", mode: :vod}), "output.mp4"], "bun_hls.mp4",
+       []},
+    hls_fmp4_vod_hls_webrtc_mp4:
+      {[
+         @bbb_hls_fmp4_url,
+         quote(do: {:hls, "index.m3u8", mode: :vod}),
+         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
+         "output.mp4"
+       ], "bun_hls_webrtc.mp4", []}
   ]
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
@@ -119,6 +139,11 @@ defmodule BoomboxTest do
           boombox_task = Boombox.async(input: input, output: output)
           [boombox_task]
 
+        [input, {:hls, playlist, mode: :live} = output] ->
+          boombox_task = Boombox.async(input: input, output: output)
+          await_until_file_exists!(playlist)
+          [boombox_task]
+
         [{:srt, _url} = input, output] ->
           boombox_task = Boombox.async(input: input, output: output)
           [boombox_task]
@@ -131,7 +156,7 @@ defmodule BoomboxTest do
           Boombox.run(input: input, output: output)
           []
       end)
-      |> Task.await_many()
+      |> Task.await_many(15_000)
 
       compare_opts = [tmp_dir: tmp_dir] ++ unquote(compare_opts)
 
@@ -161,24 +186,43 @@ defmodule BoomboxTest do
 
   defp file_endpoint?(_other), do: false
 
+  defp hls_endpoint?({:hls, _playlist} = _endpoint), do: true
+  defp hls_endpoint?({:hls, _playlist, _opts} = _endpoint), do: true
+  defp hls_endpoint?(uri) when is_binary(uri), do: String.ends_with?(uri, ".m3u8")
+  defp hls_endpoint?({uri, _opts}) when is_binary(uri), do: String.ends_with?(uri, ".m3u8")
+  defp hls_endpoint?(_other), do: false
+
+  defp order_requiring_endpoint?(endpoint),
+    do: file_endpoint?(endpoint) or hls_endpoint?(endpoint)
+
   # This function sorts endpoint pairs in the following manner:
   # * it splits the whole endpoint pairs list into the smallest chunks possible
-  # such that each chunk starts with the file input and ends with the file output
-  # * it reverses the endpoint pairs in each chunk
+  #   such that each chunk starts with the file or HLS input and ends with the file
+  #   or HLS output
+  # * reverses the order of endpoint pairs within each chunk
+  # * so that:
+  #   - if pair A and pair B are in the same chunk and originally A was before B,
+  #     then in the final list B will be before A
+  #   - if pair A and pair B are in different chunks and originally A was before B,
+  #     then in the final list A will be before B as well
   # It means that all the Boomboxes in each chunk are started in reversed
   # order so we can be sure that e.g. the listening socket of a SRT server
   # is spawned before the SRT client tries to connect to it
+  # defp sort_endpoint_pairs(endpoint_pairs) do
+  #   chunks = Enum.split
+  # end
+
   defp sort_endpoint_pairs(endpoint_pairs, to_reverse \\ [])
 
   defp sort_endpoint_pairs([[input, output] = endpoints_pair | rest], to_reverse) do
     cond do
-      file_endpoint?(input) and file_endpoint?(output) ->
+      order_requiring_endpoint?(input) and order_requiring_endpoint?(output) ->
         [endpoints_pair] ++ sort_endpoint_pairs(rest)
 
-      file_endpoint?(input) and to_reverse == [] ->
+      order_requiring_endpoint?(input) and to_reverse == [] ->
         sort_endpoint_pairs(rest, [endpoints_pair])
 
-      file_endpoint?(output) ->
+      order_requiring_endpoint?(output) ->
         [endpoints_pair | to_reverse] ++ sort_endpoint_pairs(rest)
 
       true ->
@@ -192,13 +236,27 @@ defmodule BoomboxTest do
 
   defp parse_endpoint_paths([head | tail], tmp_dir) do
     modified_tail =
-      Enum.map(tail, fn endpoint ->
-        if is_binary(endpoint),
-          do: Path.join(tmp_dir, endpoint),
-          else: endpoint
+      Enum.map(tail, fn
+        endpoint when is_binary(endpoint) -> Path.join(tmp_dir, endpoint)
+        {:hls, playlist, opts} -> {:hls, Path.join(tmp_dir, playlist), opts}
+        endpoint -> endpoint
       end)
 
     [head | modified_tail]
+  end
+
+  defp await_until_file_exists!(file, seconds \\ 20) do
+    cond do
+      File.exists?(file) ->
+        :ok
+
+      seconds <= 0 ->
+        raise "File #{file} not created within timeout"
+
+      true ->
+        Process.sleep(1_000)
+        await_until_file_exists!(file, seconds - 1)
+    end
   end
 
   defp get_free_local_address() do
