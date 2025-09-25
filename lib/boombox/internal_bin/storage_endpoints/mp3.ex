@@ -29,13 +29,17 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP3 do
   def link_output(location, opts, track_builders, _spec_builder) do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
 
-    spec =
-      track_builders[:audio]
+    pipeline_tail = fn builder ->
+      builder
       |> child(:mp3_audio_transcoder, %Membrane.Transcoder{
         output_stream_format: Membrane.MPEGAudio,
         transcoding_policy: transcoding_policy
       })
       |> child(:file_sink, %Membrane.File.Sink{location: location})
+    end
+
+    spec =
+      StorageEndpoints.get_spec_for_single_track_output(:audio, track_builders, pipeline_tail)
 
     %Ready{actions: [spec: spec]}
   end
