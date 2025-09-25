@@ -25,14 +25,14 @@ defmodule BoomboxStorageEndpointsTest do
     {:mp4, [:audio, :video]}
   ]
 
-  @test_cases for {input_path, input_tracks} <- @inputs,
-                  {output_type, output_tracks} <- @outputs,
-                  not Enum.empty?(Enum.filter(input_tracks, &(&1 in output_tracks))),
-                  do: {input_path, output_type, Enum.filter(input_tracks, &(&1 in output_tracks))}
+  @test_cases for {input_path, input_kinds} <- @inputs,
+                  {output_type, output_kinds} <- @outputs,
+                  not Enum.empty?(Enum.filter(input_kinds, &(&1 in output_kinds))),
+                  do: {input_path, output_type, Enum.filter(input_kinds, &(&1 in output_kinds))}
 
   @moduletag :tmp_dir
 
-  Enum.each(@test_cases, fn {input_path, output_type, tracks} ->
+  Enum.each(@test_cases, fn {input_path, output_type, kinds} ->
     async_test "#{inspect(input_path)} file -> #{inspect(output_type)} file", %{tmp_dir: tmp} do
       fixtures_dir = "test/fixtures/storage_endpoints/"
       ref_file = Path.join(fixtures_dir, "bun10s.mp4")
@@ -50,7 +50,7 @@ defmodule BoomboxStorageEndpointsTest do
         output: output_mp4_path
       )
 
-      Compare.compare(output_mp4_path, ref_file, kinds: unquote(tracks))
+      Compare.compare(output_mp4_path, ref_file, kinds: unquote(kinds))
     end
   end)
 end
