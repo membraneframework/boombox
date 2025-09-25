@@ -56,62 +56,49 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP4 do
   def link_output(location, opts, track_builders, spec_builder) do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
 
-    audio_branch =
-      case track_builders[:audio] do
-        nil ->
-          []
+    pipeline_tails =
+      Enum.map(track_builders, fn
+        {:audio, audio_builder} ->
+          audio_builder
+          |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
+            output_stream_format: Membrane.AAC,
+            transcoding_policy: transcoding_policy
+          })
+          |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
+            out_encapsulation: :none,
+            output_config: :esds
+          })
+          |> via_in(Pad.ref(:input, :audio))
+          |> get_child(:mp4_muxer)
 
-        audio_builder ->
-          [
-            audio_builder
-            |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.AAC,
-              transcoding_policy: transcoding_policy
-            })
-            |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
-              out_encapsulation: :none,
-              output_config: :esds
-            })
-            |> via_in(Pad.ref(:input, :audio))
-            |> get_child(:mp4_muxer)
-          ]
-      end
+        {:video, video_builder} ->
+          video_builder
+          |> child(:mp4_video_transcoder, %Membrane.Transcoder{
+            output_stream_format: fn
+              %H264{stream_structure: :annexb} = h264 ->
+                %H264{h264 | stream_structure: :avc3, alignment: :au}
 
-    video_branch =
-      case track_builders[:video] do
-        nil ->
-          []
+              %H265{stream_structure: :annexb} = h265 ->
+                %H265{h265 | stream_structure: :hev1, alignment: :au}
 
-        video_builder ->
-          [
-            video_builder
-            |> child(:mp4_video_transcoder, %Membrane.Transcoder{
-              output_stream_format: fn
-                %H264{stream_structure: :annexb} = h264 ->
-                  %H264{h264 | stream_structure: :avc3, alignment: :au}
+              h26x when is_h26x(h26x) ->
+                %{h26x | alignment: :au}
 
-                %H265{stream_structure: :annexb} = h265 ->
-                  %H265{h265 | stream_structure: :hev1, alignment: :au}
-
-                h26x when is_h26x(h26x) ->
-                  %{h26x | alignment: :au}
-
-                _not_h26x ->
-                  %H264{stream_structure: :avc3, alignment: :au}
-              end,
-              transcoding_policy: transcoding_policy
-            })
-            |> via_in(Pad.ref(:input, :video))
-            |> get_child(:mp4_muxer)
-          ]
-      end
+              _not_h26x ->
+                %H264{stream_structure: :avc3, alignment: :au}
+            end,
+            transcoding_policy: transcoding_policy
+          })
+          |> via_in(Pad.ref(:input, :video))
+          |> get_child(:mp4_muxer)
+      end)
 
     spec =
       [
         spec_builder,
         child(:mp4_muxer, Membrane.MP4.Muxer.ISOM)
         |> child(:file_sink, %Membrane.File.Sink{location: location})
-      ] ++ audio_branch ++ video_branch
+      ] ++ pipeline_tails
 
     %Ready{actions: [spec: spec]}
   end
