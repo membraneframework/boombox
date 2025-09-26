@@ -744,7 +744,7 @@ defmodule Boombox.InternalBin do
       {"rtsp", _ext, :input} ->
         {:rtsp, value}
 
-      {scheme, ".m3u8", :input} when scheme in ["http", "https"] ->
+      {scheme, ".m3u8", :input} when scheme in [nil, "http", "https"] ->
         {:hls, value, opts}
 
       {nil, ".m3u8", :output} ->
@@ -927,9 +927,6 @@ defmodule Boombox.InternalBin do
 
       {:stream, opts} ->
         Keyword.get(opts, :is_live, false)
-
-      {:hls, _location, opts} ->
-        Keyword.get(opts, :mode) == :live
 
       _other ->
         false
