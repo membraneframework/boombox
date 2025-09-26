@@ -68,20 +68,16 @@ defmodule BoomboxTest do
          "output.mp4"
        ], "bun_hls_webrtc.mp4", []},
     hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls_mpegts.mp4", []},
-    mp4_srt_mp4: {[@bbb_mp4, {:srt, "srt://127.0.0.1:9710"}, "output.mp4"], "bun10s.mp4", []},
+    mp4_srt_mp4: {[@bbb_mp4, {:srt, "srt://127.0.0.1"}, "output.mp4"], "bun10s.mp4", []},
     mp4_a_srt_mp4:
-      {[@bbb_mp4_a, {:srt, "srt://127.0.0.1:9710"}, "output.mp4"], "bun10s.mp4",
-       [kinds: [:audio]]},
+      {[@bbb_mp4_a, {:srt, "srt://127.0.0.1"}, "output.mp4"], "bun10s.mp4", [kinds: [:audio]]},
     mp4_v_srt_mp4:
-      {[@bbb_mp4_v, {:srt, "srt://127.0.0.1:9710"}, "output.mp4"], "bun10s.mp4",
-       [kinds: [:video]]},
+      {[@bbb_mp4_v, {:srt, "srt://127.0.0.1"}, "output.mp4"], "bun10s.mp4", [kinds: [:video]]},
     mp4_srt_mp4_with_auth:
       {[
          @bbb_mp4,
          quote(
-           do:
-             {:srt, "srt://127.0.0.1:9710",
-              [stream_id: "some_stream_id", password: "some_password"]}
+           do: {:srt, "srt://127.0.0.1", [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
        ], "bun10s.mp4", []},
@@ -89,9 +85,7 @@ defmodule BoomboxTest do
       {[
          @bbb_mp4_a,
          quote(
-           do:
-             {:srt, "srt://127.0.0.1:9710",
-              [stream_id: "some_stream_id", password: "some_password"]}
+           do: {:srt, "srt://127.0.0.1", [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
        ], "bun10s.mp4", [kinds: [:audio]]},
@@ -99,9 +93,7 @@ defmodule BoomboxTest do
       {[
          @bbb_mp4_v,
          quote(
-           do:
-             {:srt, "srt://127.0.0.1:9710",
-              [stream_id: "some_stream_id", password: "some_password"]}
+           do: {:srt, "srt://127.0.0.1", [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
        ], "bun10s.mp4", [kinds: [:video]]},
@@ -129,7 +121,7 @@ defmodule BoomboxTest do
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
     async_test "#{tag}", %{tmp_dir: tmp_dir} do
-      endpoints = unquote(endpoints) |> parse_endpoint_paths(tmp_dir)
+      endpoints = unquote(endpoints) |> parse_endpoints(tmp_dir)
 
       endpoints
       |> Enum.chunk_every(2, 1, :discard)
@@ -208,9 +200,6 @@ defmodule BoomboxTest do
   # It means that all the Boomboxes in each chunk are started in reversed
   # order so we can be sure that e.g. the listening socket of a SRT server
   # is spawned before the SRT client tries to connect to it
-  # defp sort_endpoint_pairs(endpoint_pairs) do
-  #   chunks = Enum.split
-  # end
 
   defp sort_endpoint_pairs(endpoint_pairs, to_reverse \\ [])
 
@@ -234,11 +223,13 @@ defmodule BoomboxTest do
     to_reverse
   end
 
-  defp parse_endpoint_paths([head | tail], tmp_dir) do
+  defp parse_endpoints([head | tail], tmp_dir) do
     modified_tail =
       Enum.map(tail, fn
         endpoint when is_binary(endpoint) -> Path.join(tmp_dir, endpoint)
         {:hls, playlist, opts} -> {:hls, Path.join(tmp_dir, playlist), opts}
+        {:srt, uri, opts} -> {:srt, uri <> ":#{get_free_port()}", opts}
+        {:srt, uri} -> {:srt, uri <> ":#{get_free_port()}"}
         endpoint -> endpoint
       end)
 
