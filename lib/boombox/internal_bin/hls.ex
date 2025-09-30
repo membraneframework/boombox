@@ -65,13 +65,12 @@ defmodule Boombox.InternalBin.HLS do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
     mode = opts |> Keyword.get(:mode, :vod)
 
-    {directory, manifest_name} = g
-
-    if Path.extname(location) == ".m3u8" do
-      {Path.dirname(location), Path.basename(location, ".m3u8")}
-    else
-      {location, "index"}
-    end
+    {directory, manifest_name} =
+      if Path.extname(location) == ".m3u8" do
+        {Path.dirname(location), Path.basename(location, ".m3u8")}
+      else
+        {location, "index"}
+      end
 
     hls_mode =
       if Map.keys(track_builders) == [:video], do: :separate_av, else: :muxed_av
