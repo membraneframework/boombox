@@ -33,7 +33,7 @@ defmodule BoomboxTest do
       {[@bbb_mp4, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}, "output.mp4"],
        "ref_bun10s_opus_aac.mp4", []},
     file_whip:
-      {[@bbb_mp4, {:whip, quote(do: get_free_local_address())}, "output.mp4"],
+      {[@bbb_mp4, {:whip, quote(do: get_free_local_address(:http))}, "output.mp4"],
        "ref_bun10s_opus_aac.mp4", []},
     http_webrtc:
       {[
@@ -68,16 +68,31 @@ defmodule BoomboxTest do
          "output.mp4"
        ], "bun_hls_webrtc.mp4", []},
     hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls_mpegts.mp4", []},
-    mp4_srt_mp4: {[@bbb_mp4, {:srt, "srt://127.0.0.1"}, "output.mp4"], "bun10s.mp4", []},
+    mp4_srt_mp4:
+      {[
+         @bbb_mp4,
+         quote(do: {:srt, get_free_local_address(:srt)}),
+         "output.mp4"
+       ], "bun10s.mp4", []},
     mp4_a_srt_mp4:
-      {[@bbb_mp4_a, {:srt, "srt://127.0.0.1"}, "output.mp4"], "bun10s.mp4", [kinds: [:audio]]},
+      {[
+         @bbb_mp4_a,
+         quote(do: {:srt, get_free_local_address(:srt)}),
+         "output.mp4"
+       ], "bun10s.mp4", [kinds: [:audio]]},
     mp4_v_srt_mp4:
-      {[@bbb_mp4_v, {:srt, "srt://127.0.0.1"}, "output.mp4"], "bun10s.mp4", [kinds: [:video]]},
+      {[
+         @bbb_mp4_v,
+         quote(do: {:srt, get_free_local_address(:srt)}),
+         "output.mp4"
+       ], "bun10s.mp4", [kinds: [:video]]},
     mp4_srt_mp4_with_auth:
       {[
          @bbb_mp4,
          quote(
-           do: {:srt, "srt://127.0.0.1", [stream_id: "some_stream_id", password: "some_password"]}
+           do:
+             {:srt, get_free_local_address(:srt),
+              [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
        ], "bun10s.mp4", []},
@@ -85,7 +100,9 @@ defmodule BoomboxTest do
       {[
          @bbb_mp4_a,
          quote(
-           do: {:srt, "srt://127.0.0.1", [stream_id: "some_stream_id", password: "some_password"]}
+           do:
+             {:srt, get_free_local_address(:srt),
+              [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
        ], "bun10s.mp4", [kinds: [:audio]]},
@@ -93,7 +110,9 @@ defmodule BoomboxTest do
       {[
          @bbb_mp4_v,
          quote(
-           do: {:srt, "srt://127.0.0.1", [stream_id: "some_stream_id", password: "some_password"]}
+           do:
+             {:srt, get_free_local_address(:srt),
+              [stream_id: "some_stream_id", password: "some_password"]}
          ),
          "output.mp4"
        ], "bun10s.mp4", [kinds: [:video]]},
@@ -250,8 +269,8 @@ defmodule BoomboxTest do
     end
   end
 
-  defp get_free_local_address() do
-    "http://127.0.0.1:#{get_free_port()}"
+  defp get_free_local_address(protocol) do
+    "#{protocol}://127.0.0.1:#{get_free_port()}"
   end
 
   defp get_free_port() do

@@ -52,7 +52,6 @@ defmodule Boombox.Mixfile do
       {:membrane_mp4_plugin, "~> 0.36.0"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.20.1"},
-      {:ex_hls, "~> 0.1.2"},
       {:membrane_rtmp_plugin, "~> 0.27.2"},
       {:membrane_rtsp_plugin, "~> 0.6.1"},
       {:membrane_rtp_plugin, "~> 0.30.0"},
