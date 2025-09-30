@@ -2,13 +2,22 @@ defmodule Boombox.InternalBin.HLS do
   @moduledoc false
 
   import Membrane.ChildrenSpec
-
+  require Logger
   require Membrane.Pad, as: Pad
   alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.{AAC, H264, HTTPAdaptiveStream, RemoteStream, Time, Transcoder}
 
   @spec create_input(String.t(), [Boombox.hls_variant_selection_policy_opt()]) :: Wait.t()
   def create_input(url, opts) do
+    maybe_hls_mode = Keyword.get(opts, :mode, nil)
+
+    if maybe_hls_mode != nil do
+      Logger.warning("""
+      Option :mode is deprecated for HLS input. Its value will be ignored.
+      It was set to #{inspect(maybe_hls_mode)}.
+      """)
+    end
+
     variant_selection_policy = Keyword.get(opts, :variant_selection_policy, :highest_resolution)
 
     spec =

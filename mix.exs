@@ -1,7 +1,7 @@
 defmodule Boombox.Mixfile do
   use Mix.Project
 
-  @version "0.2.4"
+  @version "0.2.5"
   @github_url "https://github.com/membraneframework/boombox"
 
   def project do
@@ -51,7 +51,7 @@ defmodule Boombox.Mixfile do
       {:membrane_webrtc_plugin, "~> 0.25.0"},
       {:membrane_mp4_plugin, "~> 0.36.0"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
-      {:membrane_http_adaptive_stream_plugin, "~> 0.19.0"},
+      {:membrane_http_adaptive_stream_plugin, "~> 0.20.1"},
       {:membrane_rtmp_plugin, "~> 0.27.2"},
       {:membrane_rtsp_plugin, "~> 0.6.1"},
       {:membrane_rtp_plugin, "~> 0.30.0"},
@@ -71,11 +71,7 @@ defmodule Boombox.Mixfile do
       {:membrane_simple_rtsp_server, "~> 0.1.5", only: :test},
       {:image, "~> 0.54.0"},
       {:async_test, github: "software-mansion-labs/elixir_async_test", only: :test},
-      # {:playwright, "~> 1.49.1-alpha.1", only: :test},
-      {:playwright,
-       github: "membraneframework-labs/playwright-elixir",
-       ref: "5c02249512fa543f5e619a69b7e5c9e046605fe5",
-       only: :test},
+      {:playwright, "~> 1.49.1-alpha.2", only: :test},
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
@@ -199,10 +195,19 @@ defmodule Boombox.Mixfile do
   # with new symlinks pointing to bundlex's
   # priv/shared/precompiled directory
   defp restore_symlinks(release) do
-    base_dir = "#{__DIR__}/_build/dev/rel/boombox/lib"
+    base_dir =
+      Path.join([
+        __DIR__,
+        "_build",
+        Atom.to_string(Mix.env()),
+        "rel",
+        Atom.to_string(release.name),
+        "lib"
+      ])
 
     shared =
-      Path.wildcard("#{base_dir}/bundlex*/priv/shared/precompiled/*")
+      Path.join(base_dir, "bundlex*/priv/shared/precompiled/*")
+      |> Path.wildcard()
       |> Enum.map(&Path.relative_to(&1, base_dir))
       |> Map.new(&{Path.basename(&1), &1})
 
@@ -210,18 +215,35 @@ defmodule Boombox.Mixfile do
     |> Enum.each(fn path ->
       name = Path.basename(path)
 
-      case shared[name] do
-        nil ->
-          :ok
+      if Map.has_key?(shared, name) do
+        ln =
+          Path.join([base_dir, shared[name], "lib"])
+          |> Path.relative_to(Path.dirname(path), force: true)
 
-        shared_dir ->
-          File.rm_rf!(path)
-          depth = path |> Path.relative_to(base_dir) |> Path.split() |> length()
-          ln = String.duplicate("../", depth - 1) <> shared_dir
-          dbg(path)
-          dbg(ln)
-          File.ln_s!(ln, path)
+        File.rm_rf!(path)
+        File.ln_s!(ln, path)
       end
+    end)
+
+    Path.join(base_dir, "bundlex*/priv/shared/precompiled/*/lib")
+    |> Path.wildcard()
+    |> Enum.map(fn lib_dir ->
+      File.ls!(lib_dir)
+      |> Enum.group_by(&(String.split(&1, ".") |> List.first()))
+      |> Enum.each(fn {_lib_name, libs} ->
+        lib_to_symlink_to =
+          Enum.max_by(libs, &String.length/1)
+
+        libs
+        |> Enum.filter(&(&1 != lib_to_symlink_to))
+        |> Enum.map(fn lib_to_replace ->
+          lib_to_replace_path =
+            Path.join(lib_dir, lib_to_replace)
+
+          File.rm_rf!(lib_to_replace_path)
+          File.ln_s!(lib_to_symlink_to, lib_to_replace_path)
+        end)
+      end)
     end)
 
     release

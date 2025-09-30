@@ -29,87 +29,142 @@ defmodule BoomboxTest do
     file_file_mp4_video: {[@bbb_mp4_v, "output.mp4"], "ref_bun10s_aac.mp4", kinds: [:video]},
     http_file_mp4: {[@bbb_mp4_url, "output.mp4"], "ref_bun10s_aac.mp4", []},
     file_file_file_mp4: {[@bbb_mp4, "mid_output.mp4", "output.mp4"], "ref_bun10s_aac.mp4", []},
-    file_webrtc:
-      {[@bbb_mp4, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}, "output.mp4"],
-       "ref_bun10s_opus_aac.mp4", []},
+    file_webrtc: {
+      quote do
+        [@bbb_mp4, {:webrtc, Membrane.WebRTC.Signaling.new()}, "output.mp4"]
+      end,
+      "ref_bun10s_opus_aac.mp4",
+      []
+    },
     file_whip:
-      {[@bbb_mp4, {:whip, quote(do: get_free_local_address())}, "output.mp4"],
-       "ref_bun10s_opus_aac.mp4", []},
+      {quote do
+         [@bbb_mp4, {:whip, get_free_local_address(:http)}, "output.mp4"]
+       end, "ref_bun10s_opus_aac.mp4", []},
     http_webrtc:
-      {[
-         @bbb_mp4_url,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", []},
+      {quote do
+         [
+           @bbb_mp4_url,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "ref_bun10s_opus_aac.mp4", []},
     webrtc_audio:
-      {[
-         @bbb_mp4_a,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", [kinds: [:audio]]},
+      {quote do
+         [
+           @bbb_mp4_a,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "ref_bun10s_opus_aac.mp4", [kinds: [:audio]]},
     webrtc_video:
-      {[
-         @bbb_mp4_v,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", [kinds: [:video]]},
+      {quote do
+         [
+           @bbb_mp4_v,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "ref_bun10s_opus_aac.mp4", [kinds: [:video]]},
     webrtc_webrtc:
-      {[
-         @bbb_mp4,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", []},
+      {quote do
+         [
+           @bbb_mp4,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "ref_bun10s_opus_aac.mp4", []},
     hls_fmp4_mp4: {[@bbb_hls_fmp4_url, "output.mp4"], "bun_hls.mp4", []},
     hls_fmp4_webrtc:
-      {[
-         @bbb_hls_fmp4_url,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "bun_hls_webrtc.mp4", []},
+      {quote do
+         [
+           @bbb_hls_fmp4_url,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "bun_hls_webrtc.mp4", []},
     hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls_mpegts.mp4", []},
-    mp4_srt_mp4: {[@bbb_mp4, {:srt, "srt://127.0.0.1:9710"}, "output.mp4"], "bun10s.mp4", []},
+    mp4_srt_mp4:
+      {quote do
+         [
+           @bbb_mp4,
+           {:srt, get_free_local_address(:srt)},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", []},
     mp4_a_srt_mp4:
-      {[@bbb_mp4_a, {:srt, "srt://127.0.0.1:9710"}, "output.mp4"], "bun10s.mp4",
-       [kinds: [:audio]]},
+      {quote do
+         [
+           @bbb_mp4_a,
+           {:srt, get_free_local_address(:srt)},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", [kinds: [:audio]]},
     mp4_v_srt_mp4:
-      {[@bbb_mp4_v, {:srt, "srt://127.0.0.1:9710"}, "output.mp4"], "bun10s.mp4",
-       [kinds: [:video]]},
+      {quote do
+         [
+           @bbb_mp4_v,
+           {:srt, get_free_local_address(:srt)},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", [kinds: [:video]]},
     mp4_srt_mp4_with_auth:
-      {[
-         @bbb_mp4,
-         quote(
-           do:
-             {:srt, "srt://127.0.0.1:9710",
-              [stream_id: "some_stream_id", password: "some_password"]}
-         ),
-         "output.mp4"
-       ], "bun10s.mp4", []},
+      {quote do
+         [
+           @bbb_mp4,
+           {:srt, get_free_local_address(:srt),
+            [stream_id: "some_stream_id", password: "some_password"]},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", []},
     mp4_a_srt_mp4_with_auth:
-      {[
-         @bbb_mp4_a,
-         quote(
-           do:
-             {:srt, "srt://127.0.0.1:9710",
-              [stream_id: "some_stream_id", password: "some_password"]}
-         ),
-         "output.mp4"
-       ], "bun10s.mp4", [kinds: [:audio]]},
+      {quote do
+         [
+           @bbb_mp4_a,
+           {:srt, get_free_local_address(:srt),
+            [stream_id: "some_stream_id", password: "some_password"]},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", [kinds: [:audio]]},
     mp4_v_srt_mp4_with_auth:
-      {[
-         @bbb_mp4_v,
-         quote(
-           do:
-             {:srt, "srt://127.0.0.1:9710",
-              [stream_id: "some_stream_id", password: "some_password"]}
-         ),
-         "output.mp4"
-       ], "bun10s.mp4", [kinds: [:video]]}
+      {quote do
+         [
+           @bbb_mp4_v,
+           {:srt, get_free_local_address(:srt),
+            [stream_id: "some_stream_id", password: "some_password"]},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", [kinds: [:video]]},
+    live_hls_mp4:
+      {quote do
+         [@bbb_mp4_url, {:hls, "index.m3u8", mode: :live}, "output.mp4"]
+       end, "bun_hls.mp4", []},
+    hls_fmp4_live_hls_webrtc_mp4:
+      {quote do
+         [
+           @bbb_hls_fmp4_url,
+           {:hls, "index.m3u8", mode: :live},
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "bun_hls_webrtc.mp4", []},
+    vod_hls_mp4:
+      {quote do
+         [@bbb_mp4_url, {:hls, "index.m3u8", mode: :vod}, "output.mp4"]
+       end, "bun_hls.mp4", []},
+    hls_fmp4_vod_hls_webrtc_mp4:
+      {quote do
+         [
+           @bbb_hls_fmp4_url,
+           {:hls, "index.m3u8", mode: :vod},
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "bun_hls_webrtc.mp4", []}
   ]
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
     async_test "#{tag}", %{tmp_dir: tmp_dir} do
-      endpoints = unquote(endpoints) |> parse_endpoint_paths(tmp_dir)
+      endpoints = unquote(endpoints) |> parse_endpoints(tmp_dir)
 
       endpoints
       |> Enum.chunk_every(2, 1, :discard)
@@ -117,6 +172,11 @@ defmodule BoomboxTest do
       |> Enum.flat_map(fn
         [{webrtc, _signaling} = input, output] when webrtc in [:webrtc, :whip] ->
           boombox_task = Boombox.async(input: input, output: output)
+          [boombox_task]
+
+        [input, {:hls, playlist, mode: :live} = output] ->
+          boombox_task = Boombox.async(input: input, output: output)
+          await_until_file_exists!(playlist)
           [boombox_task]
 
         [{:srt, _url} = input, output] ->
@@ -131,7 +191,7 @@ defmodule BoomboxTest do
           Boombox.run(input: input, output: output)
           []
       end)
-      |> Task.await_many()
+      |> Task.await_many(15_000)
 
       compare_opts = [tmp_dir: tmp_dir] ++ unquote(compare_opts)
 
@@ -161,24 +221,40 @@ defmodule BoomboxTest do
 
   defp file_endpoint?(_other), do: false
 
+  defp hls_endpoint?({:hls, _playlist} = _endpoint), do: true
+  defp hls_endpoint?({:hls, _playlist, _opts} = _endpoint), do: true
+  defp hls_endpoint?(uri) when is_binary(uri), do: String.ends_with?(uri, ".m3u8")
+  defp hls_endpoint?({uri, _opts}) when is_binary(uri), do: String.ends_with?(uri, ".m3u8")
+  defp hls_endpoint?(_other), do: false
+
+  defp order_requiring_endpoint?(endpoint),
+    do: file_endpoint?(endpoint) or hls_endpoint?(endpoint)
+
   # This function sorts endpoint pairs in the following manner:
   # * it splits the whole endpoint pairs list into the smallest chunks possible
-  # such that each chunk starts with the file input and ends with the file output
-  # * it reverses the endpoint pairs in each chunk
+  #   such that each chunk starts with the file or HLS input and ends with the file
+  #   or HLS output
+  # * reverses the order of endpoint pairs within each chunk
+  # * so that:
+  #   - if pair A and pair B are in the same chunk and originally A was before B,
+  #     then in the final list B will be before A
+  #   - if pair A and pair B are in different chunks and originally A was before B,
+  #     then in the final list A will be before B as well
   # It means that all the Boomboxes in each chunk are started in reversed
   # order so we can be sure that e.g. the listening socket of a SRT server
   # is spawned before the SRT client tries to connect to it
+
   defp sort_endpoint_pairs(endpoint_pairs, to_reverse \\ [])
 
   defp sort_endpoint_pairs([[input, output] = endpoints_pair | rest], to_reverse) do
     cond do
-      file_endpoint?(input) and file_endpoint?(output) ->
+      order_requiring_endpoint?(input) and order_requiring_endpoint?(output) ->
         [endpoints_pair] ++ sort_endpoint_pairs(rest)
 
-      file_endpoint?(input) and to_reverse == [] ->
+      order_requiring_endpoint?(input) and to_reverse == [] ->
         sort_endpoint_pairs(rest, [endpoints_pair])
 
-      file_endpoint?(output) ->
+      order_requiring_endpoint?(output) ->
         [endpoints_pair | to_reverse] ++ sort_endpoint_pairs(rest)
 
       true ->
@@ -190,19 +266,35 @@ defmodule BoomboxTest do
     to_reverse
   end
 
-  defp parse_endpoint_paths([head | tail], tmp_dir) do
+  defp parse_endpoints([head | tail], tmp_dir) do
     modified_tail =
-      Enum.map(tail, fn endpoint ->
-        if is_binary(endpoint),
-          do: Path.join(tmp_dir, endpoint),
-          else: endpoint
+      Enum.map(tail, fn
+        endpoint when is_binary(endpoint) -> Path.join(tmp_dir, endpoint)
+        {:hls, playlist, opts} -> {:hls, Path.join(tmp_dir, playlist), opts}
+        {:srt, uri, opts} -> {:srt, uri <> ":#{get_free_port()}", opts}
+        {:srt, uri} -> {:srt, uri <> ":#{get_free_port()}"}
+        endpoint -> endpoint
       end)
 
     [head | modified_tail]
   end
 
-  defp get_free_local_address() do
-    "http://127.0.0.1:#{get_free_port()}"
+  defp await_until_file_exists!(file, seconds \\ 20) do
+    cond do
+      File.exists?(file) ->
+        :ok
+
+      seconds <= 0 ->
+        raise "File #{file} not created within timeout"
+
+      true ->
+        Process.sleep(1_000)
+        await_until_file_exists!(file, seconds - 1)
+    end
+  end
+
+  defp get_free_local_address(protocol) do
+    "#{protocol}://127.0.0.1:#{get_free_port()}"
   end
 
   defp get_free_port() do
