@@ -29,113 +29,137 @@ defmodule BoomboxTest do
     file_file_mp4_video: {[@bbb_mp4_v, "output.mp4"], "ref_bun10s_aac.mp4", kinds: [:video]},
     http_file_mp4: {[@bbb_mp4_url, "output.mp4"], "ref_bun10s_aac.mp4", []},
     file_file_file_mp4: {[@bbb_mp4, "mid_output.mp4", "output.mp4"], "ref_bun10s_aac.mp4", []},
-    file_webrtc:
-      {[@bbb_mp4, {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())}, "output.mp4"],
-       "ref_bun10s_opus_aac.mp4", []},
+    file_webrtc: {
+      quote do
+        [@bbb_mp4, {:webrtc, Membrane.WebRTC.Signaling.new()}, "output.mp4"]
+      end,
+      "ref_bun10s_opus_aac.mp4",
+      []
+    },
     file_whip:
-      {[@bbb_mp4, {:whip, quote(do: get_free_local_address(:http))}, "output.mp4"],
-       "ref_bun10s_opus_aac.mp4", []},
+      {quote do
+         [@bbb_mp4, {:whip, get_free_local_address(:http)}, "output.mp4"]
+       end, "ref_bun10s_opus_aac.mp4", []},
     http_webrtc:
-      {[
-         @bbb_mp4_url,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", []},
+      {quote do
+         [
+           @bbb_mp4_url,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "ref_bun10s_opus_aac.mp4", []},
     webrtc_audio:
-      {[
-         @bbb_mp4_a,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", [kinds: [:audio]]},
+      {quote do
+         [
+           @bbb_mp4_a,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "ref_bun10s_opus_aac.mp4", [kinds: [:audio]]},
     webrtc_video:
-      {[
-         @bbb_mp4_v,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", [kinds: [:video]]},
+      {quote do
+         [
+           @bbb_mp4_v,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "ref_bun10s_opus_aac.mp4", [kinds: [:video]]},
     webrtc_webrtc:
-      {[
-         @bbb_mp4,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "ref_bun10s_opus_aac.mp4", []},
+      {quote do
+         [
+           @bbb_mp4,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "ref_bun10s_opus_aac.mp4", []},
     hls_fmp4_mp4: {[@bbb_hls_fmp4_url, "output.mp4"], "bun_hls.mp4", []},
     hls_fmp4_webrtc:
-      {[
-         @bbb_hls_fmp4_url,
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "bun_hls_webrtc.mp4", []},
+      {quote do
+         [
+           @bbb_hls_fmp4_url,
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "bun_hls_webrtc.mp4", []},
     hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls_mpegts.mp4", []},
     mp4_srt_mp4:
-      {[
-         @bbb_mp4,
-         quote(do: {:srt, get_free_local_address(:srt)}),
-         "output.mp4"
-       ], "bun10s.mp4", []},
+      {quote do
+         [
+           @bbb_mp4,
+           {:srt, get_free_local_address(:srt)},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", []},
     mp4_a_srt_mp4:
-      {[
-         @bbb_mp4_a,
-         quote(do: {:srt, get_free_local_address(:srt)}),
-         "output.mp4"
-       ], "bun10s.mp4", [kinds: [:audio]]},
+      {quote do
+         [
+           @bbb_mp4_a,
+           {:srt, get_free_local_address(:srt)},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", [kinds: [:audio]]},
     mp4_v_srt_mp4:
-      {[
-         @bbb_mp4_v,
-         quote(do: {:srt, get_free_local_address(:srt)}),
-         "output.mp4"
-       ], "bun10s.mp4", [kinds: [:video]]},
+      {quote do
+         [
+           @bbb_mp4_v,
+           {:srt, get_free_local_address(:srt)},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", [kinds: [:video]]},
     mp4_srt_mp4_with_auth:
-      {[
-         @bbb_mp4,
-         quote(
-           do:
-             {:srt, get_free_local_address(:srt),
-              [stream_id: "some_stream_id", password: "some_password"]}
-         ),
-         "output.mp4"
-       ], "bun10s.mp4", []},
+      {quote do
+         [
+           @bbb_mp4,
+           {:srt, get_free_local_address(:srt),
+            [stream_id: "some_stream_id", password: "some_password"]},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", []},
     mp4_a_srt_mp4_with_auth:
-      {[
-         @bbb_mp4_a,
-         quote(
-           do:
-             {:srt, get_free_local_address(:srt),
-              [stream_id: "some_stream_id", password: "some_password"]}
-         ),
-         "output.mp4"
-       ], "bun10s.mp4", [kinds: [:audio]]},
+      {quote do
+         [
+           @bbb_mp4_a,
+           {:srt, get_free_local_address(:srt),
+            [stream_id: "some_stream_id", password: "some_password"]},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", [kinds: [:audio]]},
     mp4_v_srt_mp4_with_auth:
-      {[
-         @bbb_mp4_v,
-         quote(
-           do:
-             {:srt, get_free_local_address(:srt),
-              [stream_id: "some_stream_id", password: "some_password"]}
-         ),
-         "output.mp4"
-       ], "bun10s.mp4", [kinds: [:video]]},
+      {quote do
+         [
+           @bbb_mp4_v,
+           {:srt, get_free_local_address(:srt),
+            [stream_id: "some_stream_id", password: "some_password"]},
+           "output.mp4"
+         ]
+       end, "bun10s.mp4", [kinds: [:video]]},
     live_hls_mp4:
-      {[@bbb_mp4_url, quote(do: {:hls, "index.m3u8", mode: :live}), "output.mp4"], "bun_hls.mp4",
-       []},
+      {quote do
+         [@bbb_mp4_url, {:hls, "index.m3u8", mode: :live}, "output.mp4"]
+       end, "bun_hls.mp4", []},
     hls_fmp4_live_hls_webrtc_mp4:
-      {[
-         @bbb_hls_fmp4_url,
-         quote(do: {:hls, "index.m3u8", mode: :live}),
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "bun_hls_webrtc.mp4", []},
+      {quote do
+         [
+           @bbb_hls_fmp4_url,
+           {:hls, "index.m3u8", mode: :live},
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "bun_hls_webrtc.mp4", []},
     vod_hls_mp4:
-      {[@bbb_mp4_url, quote(do: {:hls, "index.m3u8", mode: :vod}), "output.mp4"], "bun_hls.mp4",
-       []},
+      {quote do
+         [@bbb_mp4_url, {:hls, "index.m3u8", mode: :vod}, "output.mp4"]
+       end, "bun_hls.mp4", []},
     hls_fmp4_vod_hls_webrtc_mp4:
-      {[
-         @bbb_hls_fmp4_url,
-         quote(do: {:hls, "index.m3u8", mode: :vod}),
-         {:webrtc, quote(do: Membrane.WebRTC.Signaling.new())},
-         "output.mp4"
-       ], "bun_hls_webrtc.mp4", []}
+      {quote do
+         [
+           @bbb_hls_fmp4_url,
+           {:hls, "index.m3u8", mode: :vod},
+           {:webrtc, Membrane.WebRTC.Signaling.new()},
+           "output.mp4"
+         ]
+       end, "bun_hls_webrtc.mp4", []}
   ]
   |> Enum.each(fn {tag, {endpoints, fixture, compare_opts}} ->
     @tag tag
