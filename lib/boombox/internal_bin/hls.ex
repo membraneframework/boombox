@@ -12,10 +12,12 @@ defmodule Boombox.InternalBin.HLS do
     maybe_hls_mode = Keyword.get(opts, :mode, nil)
 
     if maybe_hls_mode != nil do
-      Logger.warning("""
-      Option :mode is deprecated for HLS input. Its value will be ignored.
-      It was set to #{inspect(maybe_hls_mode)}.
-      """)
+      mixgit(
+        Logger.warning("""
+        Option :mode is deprecated for HLS input. Its value will be ignored.
+        It was set to #{inspect(maybe_hls_mode)}.
+        """)
+      )
     end
 
     variant_selection_policy = Keyword.get(opts, :variant_selection_policy, :highest_resolution)
