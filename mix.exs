@@ -48,14 +48,7 @@ defmodule Boombox.Mixfile do
     [
       {:membrane_core, "~> 1.2"},
       {:membrane_transcoder_plugin, "~> 0.3.2"},
-      {
-        :membrane_webrtc_plugin,
-        # "~> 0.25.0"
-        # path: "../membrane_webrtc_plugin/",
-        github: "membraneframework/membrane_webrtc_plugin",
-        branch: "update-ex-webrtc",
-        override: true
-      },
+      {:membrane_webrtc_plugin, "~> 0.26.0"},
       {:membrane_mp4_plugin, "~> 0.36.0"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.20.1"},
