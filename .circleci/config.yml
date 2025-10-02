@@ -6,11 +6,22 @@ executors:
   linux_x86_executor:
     docker:
       - image: membraneframeworklabs/docker_membrane
+    resource_class: medium
+
+  linux_arm_executor:
+    docker:
+      - image: membraneframeworklabs/docker_membrane
+    resource_class: arm.medium
 
   manylinux_x86_executor:
     docker:
       - image: quay.io/pypa/manylinux2014_x86_64
     resource_class: medium
+
+  manylinux_arm_executor:
+    docker:
+      - image: quay.io/pypa/manylinux2014_aarch64
+    resource_class: arm.medium
 
   macos_arm_executor:
     macos:
@@ -22,15 +33,11 @@ commands:
     parameters:
       platform:
         type: enum
-        enum: [macos-arm, linux-x86]
-      version:
-        description: version of boombox
-        type: string
+        enum: [macos-arm, linux-x86, linux-arm]
       cache-version:
         description: "Cache version number, can be used to force cache recreation"
         type: integer
         default: 1
-
 
     steps:
       - checkout
@@ -68,6 +75,23 @@ commands:
           paths:
             - artifacts
 
+  publish_python_package_linux:
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Build wheel and repair with auditwheel
+          command: |
+            /opt/python/cp311-cp311/bin/pip install build twine
+            /opt/python/cp311-cp311/bin/python -m build --wheel
+            auditwheel repair dist/*.whl --wheel-dir ../wheelhouse
+      - run:
+          name: Publish to PyPI
+          working_directory: ~/project/wheelhouse
+          command: |
+            /opt/python/cp311-cp311/bin/pip install twine
+            /opt/python/cp311-cp311/bin/twine upload --username __token__ --password $PYPI_API_KEY *
+
 jobs:
   test_exclude_browser:
     docker:
@@ -84,21 +108,6 @@ jobs:
       - run: mix compile
       - run: mix test --exclude browser
 
-  mix_release_server_linux_x86:
-    parameters:
-      version:
-        description: version of boombox
-        type: string
-
-    executor: linux_x86_executor
-
-    environment:
-      MIX_ENV: prod
-
-    steps:
-      - mix_release_server:
-          platform: linux-x86
-          version: << parameters.version >>
 
   compare_versions:
     docker:
@@ -117,11 +126,6 @@ jobs:
             fi
 
   mix_release_server_macos_arm:
-    parameters:
-      version:
-        description: version of boombox
-        type: string
-
     executor: macos_arm_executor
 
     environment:
@@ -130,7 +134,26 @@ jobs:
     steps:
       - mix_release_server:
           platform: macos-arm
-          version: << parameters.version >>
+
+  mix_release_server_linux_x86:
+    executor: linux_x86_executor
+
+    environment:
+      MIX_ENV: prod
+
+    steps:
+      - mix_release_server:
+          platform: linux-x86
+
+  mix_release_server_linux_arm:
+    executor: linux_arm_executor
+
+    environment:
+      MIX_ENV: prod
+
+    steps:
+      - mix_release_server:
+          platform: linux-arm
 
   publish_github_release:
     parameters:
@@ -156,25 +179,6 @@ jobs:
           command:
             ./ghr_v0.16.0_linux_amd64/ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete << parameters.version >> ~/artifacts/
 
-  publish_python_package_linux_x86:
-    executor: manylinux_x86_executor
-    working_directory: ~/project/python
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Build wheel and repair with auditwheel
-          command: |
-            /opt/python/cp311-cp311/bin/pip install build twine
-            /opt/python/cp311-cp311/bin/python -m build --wheel
-            auditwheel repair dist/*.whl --wheel-dir ../wheelhouse
-      - run:
-          name: Publish to PyPI
-          working_directory: ~/project/wheelhouse
-          command: |
-            /opt/python/cp311-cp311/bin/pip install twine
-            /opt/python/cp311-cp311/bin/twine upload --username __token__ --password $PYPI_API_KEY *
-
   publish_python_package_macos_arm:
     executor: macos_arm_executor
     working_directory: ~/project/python
@@ -191,16 +195,26 @@ jobs:
           name: Publish to PyPI
           command: twine upload --verbose --username __token__ --password $PYPI_API_KEY dist/*
 
+  publish_python_package_linux_x86:
+    executor: manylinux_x86_executor
+    working_directory: ~/project/python
+    steps:
+      - publish_python_package_linux
+
+  publish_python_package_linux_arm:
+    executor: manylinux_arm_executor
+    working_directory: ~/project/python
+    steps:
+      - publish_python_package_linux
+
   build_python_docs:
     docker:
-      - image: ubuntu
+      - image: curlimages/curl:8.16.0
 
     steps:
       - run:
           name: Trigger docs build
-          command: |
-            apt update
-            apt install -y curl
+          command:
             curl -X POST -d token=$READTHEDOCS_WEBHOOK_TOKEN $READTHEDOCS_WEBHOOK_URL
 
 workflows:
@@ -217,7 +231,7 @@ workflows:
       - compare_versions:
           filters: *push_filters
       - elixir/hex_publish:
-          requires: &publish_requires
+          requires:
             - elixir/build_test
             - test_exclude_browser
             - elixir/lint
@@ -229,42 +243,39 @@ workflows:
               only: /v.*/
           context:
             - Deployment
-      - mix_release_server_macos_arm:
-          requires: *publish_requires
+      - mix_release_server_macos_arm: &mix_release_job_config
+          requires:
+            - elixir/build_test
+            - test_exclude_browser
+            - elixir/lint
+            - compare_versions
           filters: *publish_filters
           context:
             - Deployment
-          version: << pipeline.git.tag >>
-      - mix_release_server_linux_x86:
-          requires: *publish_requires
-          filters: *publish_filters
-          context:
-            - Deployment
-          version: << pipeline.git.tag >>
+      - mix_release_server_linux_x86: *mix_release_job_config
+      - mix_release_server_linux_arm: *mix_release_job_config
       - publish_github_release:
           requires:
             - mix_release_server_macos_arm
             - mix_release_server_linux_x86
+            - mix_release_server_linux_arm
           filters: *publish_filters
           context:
             - Deployment
           version: << pipeline.git.tag >>
-      - publish_python_package_linux_x86:
+      - publish_python_package_macos_arm: &publish_python_package_job_config
           requires:
             - publish_github_release
           filters: *publish_filters
           context:
             - Deployment
-      - publish_python_package_macos_arm:
-          requires:
-            - publish_github_release
-          filters: *publish_filters
-          context:
-            - Deployment
+      - publish_python_package_linux_x86: *publish_python_package_job_config
+      - publish_python_package_linux_arm: *publish_python_package_job_config
       - build_python_docs:
           requires:
             - publish_python_package_macos_arm
             - publish_python_package_linux_x86
+            - publish_python_package_linux_arm
           filters: *publish_filters
           context:
             - Deployment
