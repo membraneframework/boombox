@@ -27,12 +27,12 @@ defmodule Boombox do
           {:stream_id, String.t()}
           | {:password, String.t()}
         ]
-  @type in_stream_opts :: [
+  @type in_raw_data_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
           | {:is_live, boolean()}
         ]
-  @type out_stream_opts :: [
+  @type out_raw_data_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
           | {:audio_format, Membrane.RawAudio.SampleFormat.t()}
@@ -111,7 +111,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
-  @type stream_input :: {:stream, in_stream_opts()}
+  @type raw_data_input :: {:stream | :message, in_raw_data_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
@@ -130,12 +130,12 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | :player
 
-  @type stream_output :: {:stream, out_stream_opts()}
+  @type raw_data_output :: {:stream | :message, out_raw_data_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
-           input: input() | stream_input(),
-           output: output() | stream_output(),
+           input: input() | raw_data_input(),
+           output: output() | raw_data_output(),
            parent: pid()
          }
 
@@ -153,6 +153,11 @@ defmodule Boombox do
 
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
+
+
+  If the input or output are `{:message, opts}` this function will return a pid of a process which
+  can be further communicated with.
+
   ```
   Boombox.run(
     input: "path/to/file.mp4",
@@ -161,8 +166,8 @@ defmodule Boombox do
   ```
   """
   @spec run(Enumerable.t() | nil,
-          input: input() | stream_input(),
-          output: output() | stream_output()
+          input: input() | raw_data_input(),
+          output: output() | raw_data_output()
         ) :: :ok | Enumerable.t()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
@@ -177,6 +182,12 @@ defmodule Boombox do
         procs = start_pipeline(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
+
+      %{input: {:message, _message_opts}} ->
+        start_server(opts)
+
+      %{output: {:message, _message_opts}} ->
+        start_server(opts)
 
       opts ->
         opts
@@ -256,31 +267,6 @@ defmodule Boombox do
     end
   end
 
-  @endpoint_opts [:input, :output]
-  defp validate_opts!(stream, opts) do
-    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
-
-    cond do
-      Map.keys(opts) -- @endpoint_opts != [] ->
-        raise ArgumentError,
-              "Both input and output are required. #{@endpoint_opts -- Map.keys(opts)} were not provided"
-
-      stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
-        raise ArgumentError,
-              "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
-
-      stream?(opts[:input]) && stream?(opts[:output]) ->
-        raise ArgumentError,
-              ":stream on both input and output is not supported"
-
-      true ->
-        opts
-    end
-  end
-
-  defp stream?({:stream, _opts}), do: true
-  defp stream?(_io), do: false
-
   @doc """
   Runs boombox with CLI arguments.
 
@@ -301,6 +287,38 @@ defmodule Boombox do
       {:args, args} -> run(args)
       {:script, script} -> Code.eval_file(script)
     end
+  end
+
+  @endpoint_opts [:input, :output]
+  defp validate_opts!(stream, opts) do
+    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
+
+    cond do
+      Map.keys(opts) -- @endpoint_opts != [] ->
+        raise ArgumentError,
+              "Both input and output are required. #{@endpoint_opts -- Map.keys(opts)} were not provided"
+
+      match?({:stream, _opts}, opts.input) && !Enumerable.impl_for(stream) ->
+        raise ArgumentError,
+              "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
+
+      raw_data_endpoint?(opts[:input]) && raw_data_endpoint?(opts[:output]) ->
+        raise ArgumentError,
+              ":stream or :message on both input and output is not supported"
+
+      true ->
+        opts
+    end
+  end
+
+  defp raw_data_endpoint?({:stream, _opts}), do: true
+  defp raw_data_endpoint?({:message, _opts}), do: true
+  defp raw_data_endpoint?(_io), do: false
+
+  @spec start_server(opts_map()) :: Boombox.Server.t()
+  defp start_server(opts) do
+    pid = Boombox.Server.start(packet_serialization: false, stop_application: false)
+    Boombox.Server.run(pid, Map.to_list(opts))
   end
 
   @spec consume_stream(Enumerable.t(), pid(), procs()) :: term()
