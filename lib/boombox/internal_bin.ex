@@ -60,6 +60,7 @@ defmodule Boombox.InternalBin do
                   last_result: nil,
                   eos_info: nil,
                   rtsp_state: nil,
+                  player_state: nil,
                   pending_new_tracks: %{input: [], output: []},
                   output_webrtc_state: nil,
                   new_tracks_notification_status: :not_resolved
@@ -341,6 +342,12 @@ defmodule Boombox.InternalBin do
       [] -> {[notify_parent: :processing_finished], state}
       _eos_info -> {[], state}
     end
+  end
+
+  @impl true
+  def handle_element_end_of_stream(player_sink, :input, _ctx, state)
+      when player_sink in [:player_audio_sink, :player_video_sink] do
+    Boombox.InternalBin.Player.handle_element_end_of_stream(player_sink, state)
   end
 
   @impl true
@@ -705,8 +712,17 @@ defmodule Boombox.InternalBin do
     {result, state}
   end
 
-  defp link_output(:membrane_pad, track_builder, spec_builder, ctx, state) do
-    Boombox.InternalBin.Pad.link_output(ctx, track_builder, spec_builder, state)
+  defp link_output(:membrane_pad, track_builders, spec_builder, ctx, state) do
+    Boombox.InternalBin.Pad.link_output(ctx, track_builders, spec_builder, state)
+  end
+
+  defp link_output(:player, track_builders, spec_builder, _ctx, state) do
+    Boombox.InternalBin.Player.link_output(
+      track_builders,
+      spec_builder,
+      input_realtime?(state.input),
+      state
+    )
   end
 
   # Wait between sending the last packet
@@ -852,6 +868,9 @@ defmodule Boombox.InternalBin do
 
       :membrane_pad ->
         :membrane_pad
+
+      :player when direction == :output ->
+        :player
 
       _other ->
         nil

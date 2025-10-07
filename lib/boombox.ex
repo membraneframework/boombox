@@ -132,6 +132,7 @@ defmodule Boombox do
           | {:rtp, out_rtp_opts()}
           | {:srt, url :: String.t()}
           | {:srt, url :: String.t(), srt_auth_opts()}
+          | :player
 
   @type stream_output :: {:stream, out_stream_opts()}
 
@@ -186,6 +187,22 @@ defmodule Boombox do
         |> start_pipeline()
         |> await_pipeline()
     end
+  end
+
+  @doc """
+  Runs boombox with given input and plays audio and video streams on your computer.
+
+  Idiomatic to `Boombox.run(input: ..., output: :player)`.
+
+  ## Example
+
+  ```
+  Boombox.play(input: "rtmp://localhost:5432")
+  ```
+  """
+  @spec play(Enumerable.t() | nil, input: input() | stream_input()) :: :ok
+  def play(stream \\ nil, opts) do
+    run(stream, Keyword.put(opts, :output, :player))
   end
 
   @doc """
