@@ -166,7 +166,7 @@ defmodule Boombox.Server do
   end
 
   @doc """
-  Informs Boombox that it will not be provided any more packets and should operate and terminate
+  Informs Boombox that it will not be provided any more packets and should terminate
   accordingly.
   Can be called only when Boombox is in `:consuming` mode.
   """

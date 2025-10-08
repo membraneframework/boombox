@@ -159,9 +159,8 @@ defmodule Boombox do
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
 
-
-  If the input or output are `{:message, opts}` this function will return a pid of a process which
-  can be further communicated with.
+  If the input or output are `{:message, opts}` this function will return a pid of a process to
+  further communicate with `read/1`, `write/2` and `close/1`.
 
   ```
   Boombox.run(
@@ -294,6 +293,15 @@ defmodule Boombox do
     end
   end
 
+  @doc """
+  Reads a packet from Boombox.
+
+  If returned with `:ok`, then this function can be called
+  again to request the next packet, and if returned with `:finished`, then Boombox finished it's
+  operation and will not produce any more packets.
+
+  Can be called only when the output was set to `:message` endpoint.
+  """
   @spec read(boombox_server()) ::
           {:ok | :finished, Boombox.Packet.t()}
           | {:error, :incompatible_mode | :boombox_not_running}
@@ -301,12 +309,27 @@ defmodule Boombox do
     Boombox.Server.produce_packet(pid)
   end
 
+  @doc """
+  Writes provided packet to Boombox.
+
+  Returns `:ok` if more packets can be provided, and
+  `:finished` when Boombox finished consuming and will not accept any more packets. Returns
+  synchronously once the packet has been processed by Boombox.
+
+  Can be called only when the input was set to `:message` endpoint.
+  """
   @spec write(boombox_server(), Boombox.Packet.t()) ::
           :ok | :finished | {:error, :incompatible_mode | :boombox_not_running}
   def write(pid, packet) do
     Boombox.Server.consume_packet(pid, packet)
   end
 
+  @doc """
+  Informs Boombox that it will not be provided any more packets with `write/2` and should terminate
+  accordingly.
+
+  Can be called only when the input was set to `:message` endpoint.
+  """
   @spec close(boombox_server()) ::
           :finished | {:error, :incompatible_mode | :boombox_not_running}
   def close(pid) do
