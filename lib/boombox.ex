@@ -12,6 +12,11 @@ defmodule Boombox do
   alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
 
+  @typedoc """
+  PID of a process with which to communicate when using `:message` endpoint.
+  """
+  @type boombox_server :: pid()
+
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
   @typedoc """
   If true the incoming streams will be passed to the output according to their
@@ -168,7 +173,7 @@ defmodule Boombox do
   @spec run(Enumerable.t() | nil,
           input: input() | raw_data_input(),
           output: output() | raw_data_output()
-        ) :: :ok | Enumerable.t()
+        ) :: :ok | Enumerable.t() | boombox_server()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
 
@@ -187,7 +192,7 @@ defmodule Boombox do
         start_server(opts)
 
       %{output: {:message, _message_opts}} ->
-        start_server(opts)
+        start_server(opts) |> dbg()
 
       opts ->
         opts
@@ -289,6 +294,25 @@ defmodule Boombox do
     end
   end
 
+  @spec read(boombox_server()) ::
+          {:ok | :finished, Boombox.Packet.t()}
+          | {:error, :incompatible_mode | :boombox_not_running}
+  def read(pid) do
+    Boombox.Server.produce_packet(pid)
+  end
+
+  @spec write(boombox_server(), Boombox.Packet.t()) ::
+          :ok | :finished | {:error, :incompatible_mode | :boombox_not_running}
+  def write(pid, packet) do
+    Boombox.Server.consume_packet(pid, packet)
+  end
+
+  @spec close(boombox_server()) ::
+          :finished | {:error, :incompatible_mode | :boombox_not_running}
+  def close(pid) do
+    Boombox.Server.finish_consuming(pid)
+  end
+
   @endpoint_opts [:input, :output]
   defp validate_opts!(stream, opts) do
     opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
@@ -302,7 +326,7 @@ defmodule Boombox do
         raise ArgumentError,
               "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
 
-      raw_data_endpoint?(opts[:input]) && raw_data_endpoint?(opts[:output]) ->
+      raw_data_endpoint?(opts.input) and raw_data_endpoint?(opts.output) ->
         raise ArgumentError,
               ":stream or :message on both input and output is not supported"
 
@@ -317,8 +341,17 @@ defmodule Boombox do
 
   @spec start_server(opts_map()) :: Boombox.Server.t()
   defp start_server(opts) do
-    pid = Boombox.Server.start(packet_serialization: false, stop_application: false)
-    Boombox.Server.run(pid, Map.to_list(opts))
+    {:ok, pid} = Boombox.Server.start(packet_serialization: false, stop_application: false)
+
+    opts =
+      opts
+      |> Enum.map(fn
+        {direction, {:stream, opts}} -> {direction, {:message, opts}}
+        other -> other
+      end)
+
+    Boombox.Server.run(pid, opts)
+    pid
   end
 
   @spec consume_stream(Enumerable.t(), pid(), procs()) :: term()

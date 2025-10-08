@@ -30,7 +30,10 @@ defmodule Boombox.Application do
     end
 
     Supervisor.start_link(
-      [{Boombox.Server, [packet_serialization: true, stop_application: true]}],
+      [
+        {Boombox.Server,
+         [packet_serialization: true, stop_application: true, name: :boombox_server]}
+      ],
       strategy: :one_for_one
     )
   end

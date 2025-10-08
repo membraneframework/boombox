@@ -26,6 +26,7 @@ defmodule Boombox.Server do
   @type t :: GenServer.server()
 
   @type opts :: [
+          name: GenServer.name(),
           packet_serialization: boolean(),
           stop_application: boolean()
         ]
@@ -104,7 +105,8 @@ defmodule Boombox.Server do
   """
   @spec start_link(opts()) :: GenServer.on_start()
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts)
+    genserver_opts = Keyword.take(opts, [:name])
+    GenServer.start_link(__MODULE__, opts, genserver_opts)
   end
 
   @doc """
@@ -112,7 +114,8 @@ defmodule Boombox.Server do
   """
   @spec start(opts()) :: GenServer.on_start()
   def start(opts) do
-    GenServer.start(__MODULE__, opts)
+    genserver_opts = Keyword.take(opts, [:name]) |> dbg()
+    GenServer.start(__MODULE__, opts, genserver_opts)
   end
 
   @doc """
@@ -122,20 +125,28 @@ defmodule Boombox.Server do
 
   All endpoints work the same way as in `Boombox.run/2` with the exception of `:message` endpoints.
   When run with `:message` input, Boombox will operate in `:consuming` mode, and when run with
-  `:stream` output it will operate in `:procuding` mode. If neither input nor output is
+  `:message` output it will operate in `:procuding` mode. If neither input nor output is
   `:message`, Boombox will operate in `:standalone` mode.
   """
-  @spec run(GenServer.server(), boombox_opts()) :: boombox_mode()
+  @spec run(GenServer.server(), boombox_opts()) :: boombox_mode() | :boombox_not_running
   def run(server, boombox_opts) do
-    GenServer.call(server, {:run, boombox_opts})
+    if Process.alive?(server) do
+      GenServer.call(server, {:run, boombox_opts})
+    else
+      :boombox_not_running
+    end
   end
 
   @doc """
   Returns the pid of the server.
   """
-  @spec get_pid(GenServer.server()) :: pid()
+  @spec get_pid(GenServer.server()) :: pid() | :boombox_not_running
   def get_pid(server) do
-    GenServer.call(server, :get_pid)
+    if Process.alive?(server) do
+      GenServer.call(server, :get_pid)
+    else
+      :boombox_not_running
+    end
   end
 
   @doc """
@@ -147,7 +158,11 @@ defmodule Boombox.Server do
   @spec consume_packet(GenServer.server(), serialized_boombox_packet() | Boombox.Packet.t()) ::
           :ok | :finished | {:error, :boombox_not_running | :incompatible_mode}
   def consume_packet(server, packet) do
-    GenServer.call(server, {:consume_packet, packet})
+    if Process.alive?(server) do
+      GenServer.call(server, {:consume_packet, packet})
+    else
+      {:error, :boombox_not_running}
+    end
   end
 
   @doc """
@@ -158,7 +173,11 @@ defmodule Boombox.Server do
   @spec finish_consuming(GenServer.server()) ::
           :finished | {:error, :boombox_not_running | :incompatible_mode}
   def finish_consuming(server) do
-    GenServer.call(server, :finish_consuming)
+    if Process.alive?(server) do
+      GenServer.call(server, :finish_consuming)
+    else
+      {:error, :boombox_not_running}
+    end
   end
 
   @doc """
@@ -171,13 +190,15 @@ defmodule Boombox.Server do
           {:ok | :finished, serialized_boombox_packet() | Boombox.Packet.t()}
           | {:error, :boombox_not_running}
   def produce_packet(server) do
-    GenServer.call(server, :produce_packet)
+    if Process.alive?(server) do
+      GenServer.call(server, :produce_packet)
+    else
+      {:error, :boombox_not_running}
+    end
   end
 
   @impl true
   def init(opts) do
-    Process.register(self(), :boombox_server)
-
     {:ok,
      %State{
        packet_serialization: Keyword.get(opts, :packet_serialization, false),
@@ -236,6 +257,14 @@ defmodule Boombox.Server do
   @spec handle_request({:run, boombox_opts()}, State.t()) :: {boombox_mode(), State.t()}
   defp handle_request({:run, boombox_opts}, state) do
     boombox_mode = get_boombox_mode(boombox_opts)
+
+    boombox_opts =
+      boombox_opts
+      |> Enum.map(fn
+        {direction, {:message, opts}} -> {direction, {:stream, opts}}
+        other -> other
+      end)
+
     server_pid = self()
 
     boombox_process_fun =
@@ -346,13 +375,13 @@ defmodule Boombox.Server do
   @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
   defp get_boombox_mode(boombox_opts) do
     case Map.new(boombox_opts) do
-      %{input: {:stream, _input_opts}, output: {:stream, _output_opts}} ->
-        raise ArgumentError, ":stream on both input and output is not supported"
+      %{input: {:message, _input_opts}, output: {:message, _output_opts}} ->
+        raise ArgumentError, ":message on both input and output is not supported"
 
-      %{input: {:stream, _input_opts}} ->
+      %{input: {:message, _input_opts}} ->
         :consuming
 
-      %{output: {:stream, _output_opts}} ->
+      %{output: {:message, _output_opts}} ->
         :producing
 
       _neither_input_or_output ->
