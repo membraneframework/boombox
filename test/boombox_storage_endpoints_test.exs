@@ -27,8 +27,9 @@ defmodule BoomboxStorageEndpointsTest do
 
   @test_cases for {input_path, input_kinds} <- @inputs,
                   {output_type, output_kinds} <- @outputs,
-                  not Enum.empty?(Enum.filter(input_kinds, &(&1 in output_kinds))),
-                  do: {input_path, output_type, Enum.filter(input_kinds, &(&1 in output_kinds))}
+                  kinds = Enum.filter(input_kinds, &(&1 in output_kinds)),
+                  not Enum.empty?(kinds),
+                  do: {input_path, output_type, kinds}
 
   @moduletag :tmp_dir
 
