@@ -114,7 +114,7 @@ defmodule Boombox.Server do
   """
   @spec start(opts()) :: GenServer.on_start()
   def start(opts) do
-    genserver_opts = Keyword.take(opts, [:name]) |> dbg()
+    genserver_opts = Keyword.take(opts, [:name])
     GenServer.start(__MODULE__, opts, genserver_opts)
   end
 

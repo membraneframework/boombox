@@ -191,7 +191,7 @@ defmodule Boombox do
         start_server(opts)
 
       %{output: {:message, _message_opts}} ->
-        start_server(opts) |> dbg()
+        start_server(opts)
 
       opts ->
         opts

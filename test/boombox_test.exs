@@ -469,11 +469,12 @@ defmodule BoomboxTest do
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun_rotated.mp4")
   end
 
-  @tag :bouncing_bubble_webrtc_mp4
-  async_test "bouncing bubble -> webrtc -> mp4", %{tmp_dir: tmp} do
-    signaling = Membrane.WebRTC.Signaling.new()
+  [:stream, :message]
+  |> Enum.each(fn raw_data_endpoint ->
+    @tag String.to_atom("bouncing_bubble_#{raw_data_endpoint}_webrtc_mp4")
+    async_test "bouncing bubble -> #{raw_data_endpoint} -> webrtc -> mp4", %{tmp_dir: tmp} do
+      signaling = Membrane.WebRTC.Signaling.new()
 
-    Task.async(fn ->
       overlay =
         Image.new!(_w = 100, _h = 100, color: [0, 0, 0, 0])
         |> Image.Draw.circle!(_x = 50, _y = 50, _r = 48, color: :blue)
@@ -483,46 +484,82 @@ defmodule BoomboxTest do
       max_y = Image.height(bg) - Image.height(overlay)
       fps = 60
 
-      Stream.iterate({_x = 300, _y = 0, _dx = 1, _dy = 2, _pts = 0}, fn {x, y, dx, dy, pts} ->
-        dx = if (x + dx) in 0..max_x, do: dx, else: -dx
-        dy = if (y + dy) in 0..max_y, do: dy, else: -dy
-        pts = pts + div(Membrane.Time.seconds(1), fps)
-        {x + dx, y + dy, dx, dy, pts}
+      image_sink =
+        case unquote(raw_data_endpoint) do
+          :stream ->
+            &Boombox.run(&1,
+              input: {:stream, video: :image, audio: false},
+              output: {:webrtc, signaling}
+            )
+
+          :message ->
+            pid =
+              Boombox.run(
+                input: {:message, video: :image, audio: false},
+                output: {:webrtc, signaling}
+              )
+
+            fn stream ->
+              Enum.each(stream, &Boombox.write(pid, &1))
+              Boombox.close(pid)
+            end
+        end
+
+      Task.async(fn ->
+        Stream.iterate({_x = 300, _y = 0, _dx = 1, _dy = 2, _pts = 0}, fn {x, y, dx, dy, pts} ->
+          dx = if (x + dx) in 0..max_x, do: dx, else: -dx
+          dy = if (y + dy) in 0..max_y, do: dy, else: -dy
+          pts = pts + div(Membrane.Time.seconds(1), fps)
+          {x + dx, y + dy, dx, dy, pts}
+        end)
+        |> Stream.map(fn {x, y, _dx, _dy, pts} ->
+          img = Image.compose!(bg, overlay, x: x, y: y)
+          %Boombox.Packet{kind: :video, payload: img, pts: pts}
+        end)
+        |> Stream.take(5 * fps)
+        |> then(image_sink)
       end)
-      |> Stream.map(fn {x, y, _dx, _dy, pts} ->
-        img = Image.compose!(bg, overlay, x: x, y: y)
-        %Boombox.Packet{kind: :video, payload: img, pts: pts}
-      end)
-      |> Stream.take(5 * fps)
-      |> Boombox.run(
-        input: {:stream, video: :image, audio: false},
-        output: {:webrtc, signaling}
-      )
-    end)
 
-    output = Path.join(tmp, "output.mp4")
-    Boombox.run(input: {:webrtc, signaling}, output: output)
-    Compare.compare(output, "test/fixtures/ref_bouncing_bubble.mp4", kinds: [:video])
-  end
+      output = Path.join(tmp, "output.mp4")
+      Boombox.run(input: {:webrtc, signaling}, output: output)
+      Compare.compare(output, "test/fixtures/ref_bouncing_bubble.mp4", kinds: [:video])
+    end
 
-  @tag :mp4_resampled_pcm
-  async_test "mp4 -> resampled PCM" do
-    pcm =
-      Boombox.run(
-        input: @bbb_mp4,
-        output:
-          {:stream,
-           video: false,
-           audio: :binary,
-           audio_rate: 16_000,
-           audio_channels: 1,
-           audio_format: :s16le}
-      )
-      |> Enum.map_join(& &1.payload)
+    @tag String.to_atom("mp4_#{raw_data_endpoint}_resampled_pcm")
+    async_test "mp4 -> #{raw_data_endpoint} -> resampled PCM" do
+      boombox =
+        Boombox.run(
+          input: @bbb_mp4,
+          output:
+            {unquote(raw_data_endpoint),
+             video: false,
+             audio: :binary,
+             audio_rate: 16_000,
+             audio_channels: 1,
+             audio_format: :s16le}
+        )
 
-    ref = File.read!("test/fixtures/ref_bun.pcm")
-    assert Compare.samples_min_squared_error(ref, pcm, 16) < 500
-  end
+      pcm =
+        case unquote(raw_data_endpoint) do
+          :stream ->
+            boombox
+
+          :message ->
+            Stream.unfold(:ok, fn
+              :ok ->
+                {result, packet} = Boombox.read(boombox)
+                {packet, result}
+
+              :finished ->
+                nil
+            end)
+        end
+        |> Enum.map_join(& &1.payload)
+
+      ref = File.read!("test/fixtures/ref_bun.pcm")
+      assert Compare.samples_min_squared_error(ref, pcm, 16) < 500
+    end
+  end)
 
   @tag :rtp2
   async_test "mp4 -> rtp -> rtp -> hls", %{tmp_dir: tmp} do
