@@ -9,12 +9,10 @@ defmodule Boombox.InternalBin.HLS do
 
   @spec create_input(String.t(), [Boombox.hls_variant_selection_policy_opt()]) :: Wait.t()
   def create_input(url, opts) do
-    maybe_hls_mode = Keyword.get(opts, :mode, nil)
-
-    if maybe_hls_mode != nil do
+    with {:ok, mode} <- Keyword.fetch(opts, :mode) do
       Logger.warning("""
       Option :mode is deprecated for HLS input. Its value will be ignored.
-      It was set to #{inspect(maybe_hls_mode)}.
+      It was set to #{inspect(mode)}.
       """)
     end
 

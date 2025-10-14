@@ -91,7 +91,7 @@ defmodule Boombox do
   @type input ::
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(),
-             [hls_variant_selection_policy_opt() | hls_mode_opt()]
+             [hls_variant_selection_policy_opt()]
              | [{:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
@@ -106,7 +106,7 @@ defmodule Boombox do
           | {:rtsp, url :: String.t()}
           | {:rtp, in_rtp_opts()}
           | {:hls, url :: String.t()}
-          | {:hls, url :: String.t(), [hls_variant_selection_policy_opt() | hls_mode_opt()]}
+          | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
           | {:srt, url :: String.t()}
           | {:srt, url :: String.t(), srt_auth_opts()}
           | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
@@ -124,11 +124,7 @@ defmodule Boombox do
           | {:whip, uri :: String.t(),
              [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
           | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(),
-             [
-               hls_mode_opt()
-               | transcoding_policy_opt()
-             ]}
+          | {:hls, location :: String.t(), [hls_mode_opt() | transcoding_policy_opt()]}
           | {:rtp, out_rtp_opts()}
           | {:srt, url :: String.t()}
           | {:srt, url :: String.t(), srt_auth_opts()}

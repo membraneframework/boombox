@@ -71,10 +71,11 @@ defmodule Boombox.InternalBin.Player do
     {actions, state}
   end
 
-  defp maybe_plug_realtimer(spec, kind, true) do
+  defp maybe_plug_realtimer(spec, kind, true = _do_it?) do
     spec
+    |> via_in(:input, toilet_capacity: 1000)
     |> child({:player, kind, :realtimer}, Membrane.Realtimer)
   end
 
-  defp maybe_plug_realtimer(spec, _kind, false), do: spec
+  defp maybe_plug_realtimer(spec, _kind, false = _do_it?), do: spec
 end

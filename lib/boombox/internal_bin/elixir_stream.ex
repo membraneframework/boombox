@@ -45,7 +45,7 @@ defmodule Boombox.InternalBin.ElixirStream do
         ) :: Ready.t()
   def link_output(consumer, options, track_builders, spec_builder, is_input_realtime) do
     options = parse_options(options, :output)
-    pace_control = Map.get(options, :pace_control, false)
+    pace_control = Map.get(options, :pace_control, true)
 
     {track_builders, to_ignore} =
       Map.split_with(track_builders, fn {kind, _builder} -> options[kind] != false end)
@@ -61,11 +61,7 @@ defmodule Boombox.InternalBin.ElixirStream do
               output_stream_format: Membrane.RawAudio
             })
             |> maybe_plug_resampler(options)
-            |> then(
-              &if pace_control and not is_input_realtime,
-                do: child(&1, :elixir_stream_audio_realtimer, Membrane.Realtimer),
-                else: &1
-            )
+            |> maybe_plug_realtimer(:audio, pace_control, is_input_realtime)
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:elixir_stream_sink)
 
@@ -79,11 +75,7 @@ defmodule Boombox.InternalBin.ElixirStream do
               output_width: options[:video_width],
               output_height: options[:video_height]
             })
-            |> then(
-              &if pace_control and not is_input_realtime,
-                do: child(&1, :elixir_stream_video_realtimer, Membrane.Realtimer),
-                else: &1
-            )
+            |> maybe_plug_realtimer(:video, pace_control, is_input_realtime)
             |> via_in(Pad.ref(:input, :video))
             |> get_child(:elixir_stream_sink)
         end),
@@ -92,6 +84,16 @@ defmodule Boombox.InternalBin.ElixirStream do
 
     %Ready{actions: [spec: spec], eos_info: Map.keys(track_builders)}
   end
+
+  defp maybe_plug_realtimer(builder, kind, pace_control, is_input_realtime)
+
+  defp maybe_plug_realtimer(builder, kind, true, false) do
+    builder
+    |> via_in(:input, toilet_capacity: 1000)
+    |> child(:"elixir_stream_#{kind}_realtimer", Membrane.Realtimer)
+  end
+
+  defp maybe_plug_realtimer(builder, _kind, _pace_control, _is_input_realtime), do: builder
 
   @spec parse_options(Boombox.in_stream_opts(), :input) :: map()
   @spec parse_options(Boombox.out_stream_opts(), :output) :: map()
