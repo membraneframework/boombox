@@ -77,6 +77,7 @@ For more examples, see [examples.livemd](examples.livemd).
 | HLS | `"*.m3u8"` | `"*.m3u8"` |
 | SRT | `"srt://<ip>:<port>"` | `"srt://<ip>:<port>"` |
 | `Enumerable.t()` | `{:stream, opts}` | `{:stream, opts}` |
+| `:player` | _not supported_ | `:player` |
 
 For the full list of input and output options, see [`Boombox.run/2`](https://hexdocs.pm/boombox/Boombox.html#run/2)
 
