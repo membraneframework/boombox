@@ -188,7 +188,7 @@ defmodule Boombox do
   @doc """
   Runs boombox with given input and plays audio and video streams on your computer.
 
-  `Boombox.play(input) is idiomatic to `Boombox.run(input: input, output: :player)`.
+  `Boombox.play(input)` is idiomatic to `Boombox.run(input: input, output: :player)`.
 
   ## Example
 
