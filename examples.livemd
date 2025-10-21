@@ -95,7 +95,7 @@ end
 ## Play MP4 file
 
 ```elixir
-Boombox.play(input: "#{input_dir}/bun.mp4")
+Boombox.play("#{input_dir}/bun.mp4")
 # or, alternatively, Boombox.run(input: "#{input_dir}/bun.mp4", output: :player)
 ```
 

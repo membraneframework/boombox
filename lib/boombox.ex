@@ -188,17 +188,17 @@ defmodule Boombox do
   @doc """
   Runs boombox with given input and plays audio and video streams on your computer.
 
-  Idiomatic to `Boombox.run(input: ..., output: :player)`.
+  `Boombox.play(input) is idiomatic to `Boombox.run(input: input, output: :player)`.
 
   ## Example
 
   ```
-  Boombox.play(input: "rtmp://localhost:5432")
+  Boombox.play("rtmp://localhost:5432")
   ```
   """
-  @spec play(Enumerable.t() | nil, input: input() | stream_input()) :: :ok
-  def play(stream \\ nil, opts) do
-    run(stream, Keyword.put(opts, :output, :player))
+  @spec play(Enumerable.t() | nil, input() | stream_input()) :: :ok
+  def play(stream \\ nil, input) do
+    stream |> run(input: input, output: :player)
   end
 
   @doc """

@@ -10,6 +10,10 @@ defmodule Boombox.InternalBin.ElixirStream do
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
+  # the size of the toilet capacity is supposed to handle more or less
+  # the burst of packets from one segment of Live HLS stream
+  @realtimer_toilet_capacity 1000
+
   @spec create_input(producer :: pid, options :: Boombox.in_stream_opts()) :: Ready.t()
   def create_input(producer, options) do
     options = parse_options(options, :input)
@@ -89,8 +93,8 @@ defmodule Boombox.InternalBin.ElixirStream do
 
   defp maybe_plug_realtimer(builder, kind, true, false) do
     builder
-    |> via_in(:input, toilet_capacity: 1000)
-    |> child(:"elixir_stream_#{kind}_realtimer", Membrane.Realtimer)
+    |> via_in(:input, toilet_capacity: @realtimer_toilet_capacity)
+    |> child({:elixir_stream, kind, :realtimer}, Membrane.Realtimer)
   end
 
   defp maybe_plug_realtimer(builder, _kind, _pace_control, _is_input_realtime), do: builder

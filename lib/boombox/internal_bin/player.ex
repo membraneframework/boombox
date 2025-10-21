@@ -6,6 +6,10 @@ defmodule Boombox.InternalBin.Player do
   alias Boombox.InternalBin.Ready
   alias Membrane.{RawAudio, RawVideo}
 
+  # the size of the toilet capacity is supposed to handle more or less
+  # the burst of packets from one segment of Live HLS stream
+  @realtimer_toilet_capacity 1000
+
   @spec link_output(
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
@@ -73,7 +77,7 @@ defmodule Boombox.InternalBin.Player do
 
   defp maybe_plug_realtimer(spec, kind, true = _do_it?) do
     spec
-    |> via_in(:input, toilet_capacity: 1000)
+    |> via_in(:input, toilet_capacity: @realtimer_toilet_capacity)
     |> child({:player, kind, :realtimer}, Membrane.Realtimer)
   end
 
