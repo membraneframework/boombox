@@ -69,6 +69,13 @@ For more examples, see [examples.livemd](examples.livemd).
 | format | input | output |
 |---|---|---|
 | MP4 | `"*.mp4"` | `"*.mp4"` |
+| MP3 | `"*.mp3"` | `"*.mp3"` |
+| AAC | `"*.aac"` | `"*.aac"` |
+| Ogg | `"*.ogg"` | `"*.ogg"` |
+| H264 | `"*.h264"` | `"*.h264"` |
+| H265 | `"*.h265"` | `"*.h265"` |
+| WAV | `"*.wav"` | `"*.wav"` |
+| IVF | `"*.ivf"` | `"*.ivf"` |
 | WebRTC | `{:webrtc, signaling}` | `{:webrtc, signaling}` |
 | WHIP | `{:whip, "http://*", token: "token"}` | `{:whip, "http://*", token: "token"}` |
 | RTMP | `"rtmp://*"` | _not supported_ |

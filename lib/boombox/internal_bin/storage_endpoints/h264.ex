@@ -28,13 +28,17 @@ defmodule Boombox.InternalBin.StorageEndpoints.H264 do
   def link_output(location, opts, track_builders, _spec_builder) do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
 
-    spec =
-      track_builders[:video]
+    pipeline_tail = fn builder ->
+      builder
       |> child(:h264_video_transcoder, %Membrane.Transcoder{
         output_stream_format: %H264{stream_structure: :annexb},
         transcoding_policy: transcoding_policy
       })
       |> child(:file_sink, %Membrane.File.Sink{location: location})
+    end
+
+    spec =
+      StorageEndpoints.get_spec_for_single_track_output(:video, track_builders, pipeline_tail)
 
     %Ready{actions: [spec: spec]}
   end

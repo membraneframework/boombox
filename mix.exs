@@ -52,7 +52,7 @@ defmodule Boombox.Mixfile do
       {:membrane_mp4_plugin, "~> 0.36.0"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.20.1"},
-      {:membrane_rtmp_plugin, "~> 0.27.2"},
+      {:membrane_rtmp_plugin, "~> 0.29.1"},
       {:membrane_rtsp_plugin, "~> 0.6.1"},
       {:membrane_rtp_plugin, "~> 0.30.0"},
       {:membrane_rtp_format, "~> 0.10.0"},
@@ -60,6 +60,7 @@ defmodule Boombox.Mixfile do
       {:membrane_rtp_h264_plugin, "~> 0.20.0"},
       {:membrane_rtp_opus_plugin, "~> 0.10.0"},
       {:membrane_rtp_h265_plugin, "~> 0.5.2"},
+      {:membrane_vpx_plugin, "~> 0.4.2"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
@@ -213,7 +214,10 @@ defmodule Boombox.Mixfile do
       |> Enum.map(&Path.relative_to(&1, base_dir))
       |> Map.new(&{Path.basename(&1), &1})
 
-    Path.wildcard("#{base_dir}/*/priv/bundlex/*/*")
+    # Restore symlinks
+    # <package>/priv/shared/precompiled/<precompiled_dir> -> ../../../../bundlex-<version>/priv/shared/<precompiled_dir>/lib
+    Path.join(base_dir, "*/priv/bundlex/*/*")
+    |> Path.wildcard()
     |> Enum.each(fn path ->
       name = Path.basename(path)
 
@@ -227,6 +231,9 @@ defmodule Boombox.Mixfile do
       end
     end)
 
+    # Restore symlinks
+    # bundlex-<version>/priv/shared/precompiled/<precompiled_dir>/lib/<some_lib>.dylib -> <some_lib>.<most_precise_version>.dylib
+    # e.g. libvpx.dylib -> libvpx.11.dylib
     Path.join(base_dir, "bundlex*/priv/shared/precompiled/*/lib")
     |> Path.wildcard()
     |> Enum.map(fn lib_dir ->

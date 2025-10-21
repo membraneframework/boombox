@@ -23,8 +23,8 @@ defmodule Boombox.InternalBin.StorageEndpoints.IVF do
   def link_output(location, opts, track_builders, _spec_builder) do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
 
-    spec =
-      track_builders[:video]
+    pipeline_tail = fn builder ->
+      builder
       |> child(:ivf_video_transcoder, %Membrane.Transcoder{
         output_stream_format: fn
           %VP8{} -> VP8
@@ -36,6 +36,10 @@ defmodule Boombox.InternalBin.StorageEndpoints.IVF do
       })
       |> child(:ivf_serializer, Membrane.IVF.Serializer)
       |> child(:file_sink, %Membrane.File.Sink{location: location})
+    end
+
+    spec =
+      StorageEndpoints.get_spec_for_single_track_output(:video, track_builders, pipeline_tail)
 
     %Ready{actions: [spec: spec]}
   end
