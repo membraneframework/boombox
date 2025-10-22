@@ -5,8 +5,8 @@ defmodule Boombox.InternalBin.RTSP do
   require Membrane.Pad
 
   require Membrane.Logger
-  alias Membrane.{RTP, RTSP}
   alias Boombox.InternalBin.{Ready, State, Wait}
+  alias Membrane.{RTP, RTSP}
 
   @type state :: %{
           set_up_tracks: %{
