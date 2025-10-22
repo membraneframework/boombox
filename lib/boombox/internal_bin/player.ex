@@ -8,7 +8,7 @@ defmodule Boombox.InternalBin.Player do
 
   # the size of the toilet capacity is supposed to handle more or less
   # the burst of packets from one segment of Live HLS stream
-  @realtimer_toilet_capacity 1000
+  @realtimer_toilet_capacity 10_000
 
   @spec link_output(
           Boombox.InternalBin.track_builders(),

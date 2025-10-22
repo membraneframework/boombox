@@ -12,7 +12,7 @@ defmodule Boombox.InternalBin.ElixirStream do
 
   # the size of the toilet capacity is supposed to handle more or less
   # the burst of packets from one segment of Live HLS stream
-  @realtimer_toilet_capacity 1000
+  @realtimer_toilet_capacity 10_000
 
   @spec create_input(producer :: pid, options :: Boombox.in_stream_opts()) :: Ready.t()
   def create_input(producer, options) do
