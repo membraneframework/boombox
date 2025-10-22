@@ -153,14 +153,6 @@ defmodule Boombox.Server do
   end
 
   @doc """
-  Returns the pid of the server.
-  """
-  @spec get_pid(t()) :: pid()
-  def get_pid(server) do
-    GenServer.call(server.server_reference, :get_pid)
-  end
-
-  @doc """
   Makes Boombox consume provided packet. Returns `:ok` if more packets can be provided, and
   `:finished` when Boombox finished consuming and will not accept any more packets. Returns
   synchronously once the packet has been processed by Boombox.
