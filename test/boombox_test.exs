@@ -470,9 +470,9 @@ defmodule BoomboxTest do
   end
 
   [:stream, :message]
-  |> Enum.each(fn raw_data_endpoint ->
-    @tag String.to_atom("bouncing_bubble_#{raw_data_endpoint}_webrtc_mp4")
-    async_test "bouncing bubble -> #{raw_data_endpoint} -> webrtc -> mp4", %{tmp_dir: tmp} do
+  |> Enum.each(fn elixir_endpoint ->
+    @tag String.to_atom("bouncing_bubble_#{elixir_endpoint}_webrtc_mp4")
+    async_test "bouncing bubble -> #{elixir_endpoint} -> webrtc -> mp4", %{tmp_dir: tmp} do
       signaling = Membrane.WebRTC.Signaling.new()
 
       overlay =
@@ -485,7 +485,7 @@ defmodule BoomboxTest do
       fps = 60
 
       image_sink =
-        case unquote(raw_data_endpoint) do
+        case unquote(elixir_endpoint) do
           :stream ->
             &Boombox.run(&1,
               input: {:stream, video: :image, audio: false},
@@ -525,13 +525,13 @@ defmodule BoomboxTest do
       Compare.compare(output, "test/fixtures/ref_bouncing_bubble.mp4", kinds: [:video])
     end
 
-    @tag String.to_atom("mp4_#{raw_data_endpoint}_resampled_pcm")
-    async_test "mp4 -> #{raw_data_endpoint} -> resampled PCM" do
+    @tag String.to_atom("mp4_#{elixir_endpoint}_resampled_pcm")
+    async_test "mp4 -> #{elixir_endpoint} -> resampled PCM" do
       boombox =
         Boombox.run(
           input: @bbb_mp4,
           output:
-            {unquote(raw_data_endpoint),
+            {unquote(elixir_endpoint),
              video: false,
              audio: :binary,
              audio_rate: 16_000,
@@ -540,7 +540,7 @@ defmodule BoomboxTest do
         )
 
       pcm =
-        case unquote(raw_data_endpoint) do
+        case unquote(elixir_endpoint) do
           :stream ->
             boombox
 

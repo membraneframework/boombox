@@ -116,7 +116,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
-  @type raw_data_input :: {:stream | :message, in_raw_data_opts()}
+  @type elixir_input :: {:stream | :message, in_raw_data_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
@@ -135,12 +135,12 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | :player
 
-  @type raw_data_output :: {:stream | :message, out_raw_data_opts()}
+  @type elixir_output :: {:stream | :message, out_raw_data_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
-           input: input() | raw_data_input(),
-           output: output() | raw_data_output(),
+           input: input() | elixir_input(),
+           output: output() | elixir_output(),
            parent: pid()
          }
 
@@ -170,8 +170,8 @@ defmodule Boombox do
   ```
   """
   @spec run(Enumerable.t() | nil,
-          input: input() | raw_data_input(),
-          output: output() | raw_data_output()
+          input: input() | elixir_input(),
+          output: output() | elixir_output()
         ) :: :ok | Enumerable.t() | boombox_server()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
@@ -349,7 +349,7 @@ defmodule Boombox do
         raise ArgumentError,
               "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
 
-      raw_data_endpoint?(opts.input) and raw_data_endpoint?(opts.output) ->
+      elixir_endpoint?(opts.input) and elixir_endpoint?(opts.output) ->
         raise ArgumentError,
               ":stream or :message on both input and output is not supported"
 
@@ -358,9 +358,9 @@ defmodule Boombox do
     end
   end
 
-  defp raw_data_endpoint?({:stream, _opts}), do: true
-  defp raw_data_endpoint?({:message, _opts}), do: true
-  defp raw_data_endpoint?(_io), do: false
+  defp elixir_endpoint?({:stream, _opts}), do: true
+  defp elixir_endpoint?({:message, _opts}), do: true
+  defp elixir_endpoint?(_io), do: false
 
   @spec start_server(opts_map()) :: Boombox.Server.t()
   defp start_server(opts) do

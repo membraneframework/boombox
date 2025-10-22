@@ -23,7 +23,12 @@ defmodule Boombox.Server do
 
   alias Boombox.Packet
 
-  @type t :: GenServer.server()
+  @opaque t :: %__MODULE__{
+            server_reference: GenServer.server()
+          }
+
+  @enforce_keys [:server_reference]
+  defstruct @enforce_keys
 
   @type opts :: [
           name: GenServer.name(),
@@ -103,19 +108,33 @@ defmodule Boombox.Server do
   @doc """
   Starts the server and links it to the current process, for more information see `GenServer.start_link/3`
   """
-  @spec start_link(opts()) :: GenServer.on_start()
+  @spec start_link(opts()) :: {:ok, t()} | {:error, {:already_started, t()}}
   def start_link(opts) do
     genserver_opts = Keyword.take(opts, [:name])
-    GenServer.start_link(__MODULE__, opts, genserver_opts)
+
+    case GenServer.start_link(__MODULE__, opts, genserver_opts) do
+      {:ok, pid} ->
+        {:ok, %__MODULE__{server_reference: pid}}
+
+      {:error, {:already_started, pid}} ->
+        {:error, {:already_started, %__MODULE__{server_reference: pid}}}
+    end
   end
 
   @doc """
   Starts the server, for more information see `GenServer.start/3`
   """
-  @spec start(opts()) :: GenServer.on_start()
+  @spec start(opts()) :: {:ok, t()} | {:error, {:already_started, t()}}
   def start(opts) do
     genserver_opts = Keyword.take(opts, [:name])
-    GenServer.start(__MODULE__, opts, genserver_opts)
+
+    case GenServer.start(__MODULE__, opts, genserver_opts) do
+      {:ok, pid} ->
+        {:ok, %__MODULE__{server_reference: pid}}
+
+      {:error, {:already_started, pid}} ->
+        {:error, {:already_started, %__MODULE__{server_reference: pid}}}
+    end
   end
 
   @doc """
@@ -128,25 +147,17 @@ defmodule Boombox.Server do
   `:message` output it will operate in `:procuding` mode. If neither input nor output is
   `:message`, Boombox will operate in `:standalone` mode.
   """
-  @spec run(GenServer.server(), boombox_opts()) :: boombox_mode() | :boombox_not_running
+  @spec run(t(), boombox_opts()) :: boombox_mode()
   def run(server, boombox_opts) do
-    if Process.alive?(server) do
-      GenServer.call(server, {:run, boombox_opts})
-    else
-      :boombox_not_running
-    end
+    GenServer.call(server.server_reference, {:run, boombox_opts})
   end
 
   @doc """
   Returns the pid of the server.
   """
-  @spec get_pid(GenServer.server()) :: pid() | :boombox_not_running
+  @spec get_pid(t()) :: pid()
   def get_pid(server) do
-    if Process.alive?(server) do
-      GenServer.call(server, :get_pid)
-    else
-      :boombox_not_running
-    end
+    GenServer.call(server.server_reference, :get_pid)
   end
 
   @doc """
@@ -155,14 +166,10 @@ defmodule Boombox.Server do
   synchronously once the packet has been processed by Boombox.
   Can be called only when Boombox is in `:consuming` mode.
   """
-  @spec consume_packet(GenServer.server(), serialized_boombox_packet() | Boombox.Packet.t()) ::
-          :ok | :finished | {:error, :boombox_not_running | :incompatible_mode}
+  @spec consume_packet(t(), serialized_boombox_packet() | Boombox.Packet.t()) ::
+          :ok | :finished | {:error, :incompatible_mode}
   def consume_packet(server, packet) do
-    if Process.alive?(server) do
-      GenServer.call(server, {:consume_packet, packet})
-    else
-      {:error, :boombox_not_running}
-    end
+    GenServer.call(server.server_reference, {:consume_packet, packet})
   end
 
   @doc """
@@ -170,14 +177,9 @@ defmodule Boombox.Server do
   accordingly.
   Can be called only when Boombox is in `:consuming` mode.
   """
-  @spec finish_consuming(GenServer.server()) ::
-          :finished | {:error, :boombox_not_running | :incompatible_mode}
+  @spec finish_consuming(t()) :: :finished | {:error, :incompatible_mode}
   def finish_consuming(server) do
-    if Process.alive?(server) do
-      GenServer.call(server, :finish_consuming)
-    else
-      {:error, :boombox_not_running}
-    end
+    GenServer.call(server.server_reference, :finish_consuming)
   end
 
   @doc """
@@ -186,15 +188,11 @@ defmodule Boombox.Server do
   operation and will not produce any more packets.
   Can be called only when Boombox is in `:producing` mode.
   """
-  @spec produce_packet(GenServer.server()) ::
+  @spec produce_packet(t()) ::
           {:ok | :finished, serialized_boombox_packet() | Boombox.Packet.t()}
-          | {:error, :boombox_not_running}
+          | {:error, :incompatible_mode}
   def produce_packet(server) do
-    if Process.alive?(server) do
-      GenServer.call(server, :produce_packet)
-    else
-      {:error, :boombox_not_running}
-    end
+    GenServer.call(server.server_reference, :produce_packet)
   end
 
   @impl true
