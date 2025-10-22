@@ -12,10 +12,7 @@ defmodule Boombox do
   alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
 
-  @typedoc """
-  PID of a process with which to communicate when using `:message` endpoint.
-  """
-  @type boombox_server :: pid()
+  @opaque boombox_server :: Boombox.Server.t()
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
   @typedoc """
@@ -303,10 +300,9 @@ defmodule Boombox do
   Can be called only when the output was set to `:message` endpoint.
   """
   @spec read(boombox_server()) ::
-          {:ok | :finished, Boombox.Packet.t()}
-          | {:error, :incompatible_mode | :boombox_not_running}
-  def read(pid) do
-    Boombox.Server.produce_packet(pid)
+          {:ok | :finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
+  def read(server) do
+    Boombox.Server.produce_packet(server)
   end
 
   @doc """
@@ -319,9 +315,9 @@ defmodule Boombox do
   Can be called only when the input was set to `:message` endpoint.
   """
   @spec write(boombox_server(), Boombox.Packet.t()) ::
-          :ok | :finished | {:error, :incompatible_mode | :boombox_not_running}
-  def write(pid, packet) do
-    Boombox.Server.consume_packet(pid, packet)
+          :ok | :finished | {:error, :incompatible_mode}
+  def write(server, packet) do
+    Boombox.Server.consume_packet(server, packet)
   end
 
   @doc """
@@ -330,10 +326,9 @@ defmodule Boombox do
 
   Can be called only when the input was set to `:message` endpoint.
   """
-  @spec close(boombox_server()) ::
-          :finished | {:error, :incompatible_mode | :boombox_not_running}
-  def close(pid) do
-    Boombox.Server.finish_consuming(pid)
+  @spec close(boombox_server()) :: :finished | {:error, :incompatible_mode}
+  def close(server) do
+    Boombox.Server.finish_consuming(server)
   end
 
   @endpoint_opts [:input, :output]
@@ -362,7 +357,7 @@ defmodule Boombox do
   defp elixir_endpoint?({:message, _opts}), do: true
   defp elixir_endpoint?(_io), do: false
 
-  @spec start_server(opts_map()) :: Boombox.Server.t()
+  @spec start_server(opts_map()) :: boombox_server()
   defp start_server(opts) do
     {:ok, pid} = Boombox.Server.start(packet_serialization: false, stop_application: false)
 
