@@ -92,6 +92,15 @@ end
 
 <!-- livebook:{"branch_parent_index":0} -->
 
+## Play MP4 file
+
+```elixir
+Boombox.play("#{input_dir}/bun.mp4")
+# or, alternatively, Boombox.run(input: "#{input_dir}/bun.mp4", output: :player)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
 ## WebRTC proxy
 
 Visit http://localhost:1234/webrtc_from_browser.html to send the stream and http://localhost:1234/webrtc_to_browser.html to receive it

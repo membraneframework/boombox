@@ -84,6 +84,7 @@ For more examples, see [examples.livemd](examples.livemd).
 | HLS | `"*.m3u8"` | `"*.m3u8"` |
 | SRT | `"srt://<ip>:<port>"` | `"srt://<ip>:<port>"` |
 | `Enumerable.t()` | `{:stream, opts}` | `{:stream, opts}` |
+| `:player` | _not relevant_ | `:player` |
 
 For the full list of input and output options, see [`Boombox.run/2`](https://hexdocs.pm/boombox/Boombox.html#run/2)
 
@@ -92,7 +93,7 @@ For the full list of input and output options, see [`Boombox.run/2`](https://hex
 To use Boombox as an Elixir library, add
 
 ```elixir
-{:boombox, "~> 0.2.5"}
+{:boombox, "~> 0.2.6"}
 ```
 
 to your dependencies or `Mix.install`.
