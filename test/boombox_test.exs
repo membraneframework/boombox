@@ -469,7 +469,7 @@ defmodule BoomboxTest do
     Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun_rotated.mp4")
   end
 
-  [:stream, :message]
+  [:stream, :writer]
   |> Enum.each(fn elixir_endpoint ->
     @tag String.to_atom("bouncing_bubble_#{elixir_endpoint}_webrtc_mp4")
     async_test "bouncing bubble -> #{elixir_endpoint} -> webrtc -> mp4", %{tmp_dir: tmp} do
@@ -492,16 +492,16 @@ defmodule BoomboxTest do
               output: {:webrtc, signaling}
             )
 
-          :message ->
-            pid =
+          :writer ->
+            writer =
               Boombox.run(
-                input: {:message, video: :image, audio: false},
+                input: {:writer, video: :image, audio: false},
                 output: {:webrtc, signaling}
               )
 
             fn stream ->
-              Enum.each(stream, &Boombox.write(pid, &1))
-              Boombox.close(pid)
+              Enum.each(stream, &Boombox.write(writer, &1))
+              Boombox.close(writer)
             end
         end
 
@@ -524,7 +524,10 @@ defmodule BoomboxTest do
       Boombox.run(input: {:webrtc, signaling}, output: output)
       Compare.compare(output, "test/fixtures/ref_bouncing_bubble.mp4", kinds: [:video])
     end
+  end)
 
+  [:stream, :reader]
+  |> Enum.each(fn elixir_endpoint ->
     @tag String.to_atom("mp4_#{elixir_endpoint}_resampled_pcm")
     async_test "mp4 -> #{elixir_endpoint} -> resampled PCM" do
       boombox =
@@ -544,7 +547,7 @@ defmodule BoomboxTest do
           :stream ->
             boombox
 
-          :message ->
+          :reader ->
             Stream.unfold(:ok, fn
               :ok ->
                 {result, packet} = Boombox.read(boombox)

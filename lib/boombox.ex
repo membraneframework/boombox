@@ -12,6 +12,30 @@ defmodule Boombox do
   alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
 
+  defmodule Writer do
+    @moduledoc """
+    Defines a struct to be used when interacting with boombox when using `:writer` endpoint.
+    """
+    @opaque t :: %__MODULE__{
+              server_reference: GenServer.server()
+            }
+
+    @enforce_keys [:server_reference]
+    defstruct @enforce_keys
+  end
+
+  defmodule Reader do
+    @moduledoc """
+    Defines a struct to be used when interacting with boombox when using `:reader` endpoint.
+    """
+    @opaque t :: %__MODULE__{
+              server_reference: GenServer.server()
+            }
+
+    @enforce_keys [:server_reference]
+    defstruct @enforce_keys
+  end
+
   @opaque boombox_server :: Boombox.Server.t()
 
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
@@ -113,7 +137,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
-  @type elixir_input :: {:stream | :message, in_raw_data_opts()}
+  @type elixir_input :: {:stream | :writer, in_raw_data_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
@@ -132,7 +156,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | :player
 
-  @type elixir_output :: {:stream | :message, out_raw_data_opts()}
+  @type elixir_output :: {:stream | :writer, out_raw_data_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
@@ -156,8 +180,11 @@ defmodule Boombox do
   If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
   as the first argument.
 
-  If the input or output are `{:message, opts}` this function will return a pid of a process to
-  further communicate with `read/1`, `write/2` and `close/1`.
+  If the input is `{:writer, opts}` this function will return a `Boombox.Writer` struct,
+  which is used to write media packets to boombox with `write/2` and to finish writing with `close/1`.
+
+  If the output is `{:reader, opts}` this function will return a `Boombox.Reader` struct,
+  which is used to read media packets from boombox with `read/1`.
 
   ```
   Boombox.run(
@@ -169,7 +196,7 @@ defmodule Boombox do
   @spec run(Enumerable.t() | nil,
           input: input() | elixir_input(),
           output: output() | elixir_output()
-        ) :: :ok | Enumerable.t() | boombox_server()
+        ) :: :ok | Enumerable.t() | Writer.t() | Reader.t()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
 
@@ -184,11 +211,13 @@ defmodule Boombox do
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
-      %{input: {:message, _message_opts}} ->
-        start_server(opts)
+      %{input: {:writer, _writer_opts}} ->
+        pid = start_server(opts)
+        %Writer{server_reference: pid}
 
-      %{output: {:message, _message_opts}} ->
-        start_server(opts)
+      %{output: {:reader, _reader_opts}} ->
+        pid = start_server(opts)
+        %Reader{server_reference: pid}
 
       opts ->
         opts
@@ -297,12 +326,12 @@ defmodule Boombox do
   again to request the next packet, and if returned with `:finished`, then Boombox finished it's
   operation and will not produce any more packets.
 
-  Can be called only when the output was set to `:message` endpoint.
+  Can be called only when using `:reader` endpoint on output.
   """
-  @spec read(boombox_server()) ::
+  @spec read(Reader.t()) ::
           {:ok | :finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
-  def read(server) do
-    Boombox.Server.produce_packet(server)
+  def read(reader) do
+    Boombox.Server.produce_packet(reader.server_reference)
   end
 
   @doc """
@@ -312,23 +341,23 @@ defmodule Boombox do
   `:finished` when Boombox finished consuming and will not accept any more packets. Returns
   synchronously once the packet has been processed by Boombox.
 
-  Can be called only when the input was set to `:message` endpoint.
+  Can be called only when using `:writer` endpoint on input.
   """
-  @spec write(boombox_server(), Boombox.Packet.t()) ::
+  @spec write(Writer.t(), Boombox.Packet.t()) ::
           :ok | :finished | {:error, :incompatible_mode}
-  def write(server, packet) do
-    Boombox.Server.consume_packet(server, packet)
+  def write(writer, packet) do
+    Boombox.Server.consume_packet(writer.server_reference, packet)
   end
 
   @doc """
   Informs Boombox that it will not be provided any more packets with `write/2` and should terminate
   accordingly.
 
-  Can be called only when the input was set to `:message` endpoint.
+  Can be called only when using `:writer` endpoint on input.
   """
-  @spec close(boombox_server()) :: :finished | {:error, :incompatible_mode}
-  def close(server) do
-    Boombox.Server.finish_consuming(server)
+  @spec close(Writer.t()) :: :finished | {:error, :incompatible_mode}
+  def close(writer) do
+    Boombox.Server.finish_consuming(writer.server_reference)
   end
 
   @endpoint_opts [:input, :output]
@@ -346,29 +375,22 @@ defmodule Boombox do
 
       elixir_endpoint?(opts.input) and elixir_endpoint?(opts.output) ->
         raise ArgumentError,
-              ":stream or :message on both input and output is not supported"
+              ":stream, :writer or :reader on both input and output is not supported"
 
       true ->
         opts
     end
   end
 
+  defp elixir_endpoint?({:reader, _opts}), do: true
+  defp elixir_endpoint?({:writer, _opts}), do: true
   defp elixir_endpoint?({:stream, _opts}), do: true
-  defp elixir_endpoint?({:message, _opts}), do: true
   defp elixir_endpoint?(_io), do: false
 
   @spec start_server(opts_map()) :: boombox_server()
   defp start_server(opts) do
     {:ok, pid} = Boombox.Server.start(packet_serialization: false, stop_application: false)
-
-    opts =
-      opts
-      |> Enum.map(fn
-        {direction, {:stream, opts}} -> {direction, {:message, opts}}
-        other -> other
-      end)
-
-    Boombox.Server.run(pid, opts)
+    Boombox.Server.run(pid, Map.to_list(opts))
     pid
   end
 

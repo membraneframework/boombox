@@ -23,12 +23,7 @@ defmodule Boombox.Server do
 
   alias Boombox.Packet
 
-  @opaque t :: %__MODULE__{
-            server_reference: GenServer.server()
-          }
-
-  @enforce_keys [:server_reference]
-  defstruct @enforce_keys
+  @type t :: pid()
 
   @type opts :: [
           name: GenServer.name(),
@@ -37,8 +32,8 @@ defmodule Boombox.Server do
         ]
 
   @type boombox_opts :: [
-          input: Boombox.input() | {:message, Boombox.in_raw_data_opts()},
-          output: Boombox.output() | {:message, Boombox.out_raw_data_opts()}
+          input: Boombox.input() | {:writer, Boombox.in_raw_data_opts()},
+          output: Boombox.output() | {:reader, Boombox.out_raw_data_opts()}
         ]
 
   @typedoc """
@@ -112,13 +107,7 @@ defmodule Boombox.Server do
   def start_link(opts) do
     genserver_opts = Keyword.take(opts, [:name])
 
-    case GenServer.start_link(__MODULE__, opts, genserver_opts) do
-      {:ok, pid} ->
-        {:ok, %__MODULE__{server_reference: pid}}
-
-      {:error, {:already_started, pid}} ->
-        {:error, {:already_started, %__MODULE__{server_reference: pid}}}
-    end
+    GenServer.start_link(__MODULE__, opts, genserver_opts)
   end
 
   @doc """
@@ -128,13 +117,7 @@ defmodule Boombox.Server do
   def start(opts) do
     genserver_opts = Keyword.take(opts, [:name])
 
-    case GenServer.start(__MODULE__, opts, genserver_opts) do
-      {:ok, pid} ->
-        {:ok, %__MODULE__{server_reference: pid}}
-
-      {:error, {:already_started, pid}} ->
-        {:error, {:already_started, %__MODULE__{server_reference: pid}}}
-    end
+    GenServer.start(__MODULE__, opts, genserver_opts)
   end
 
   @doc """
@@ -142,14 +125,14 @@ defmodule Boombox.Server do
   with it. Availability of different functionalities depends on the mode (`t:boombox_mode/0`) in which
   Boombox is operating.
 
-  All endpoints work the same way as in `Boombox.run/2` with the exception of `:message` endpoints.
-  When run with `:message` input, Boombox will operate in `:consuming` mode, and when run with
-  `:message` output it will operate in `:procuding` mode. If neither input nor output is
-  `:message`, Boombox will operate in `:standalone` mode.
+  All endpoints work the same way as in `Boombox.run/2` with the exception of `:wrtier` and
+  `:reader` endpoints. When run with `:writer` input, Boombox will operate in `:consuming`
+  mode, and when run with `:reader` output it will operate in `:procuding` mode.
+  Otherwise, Boombox will operate in `:standalone` mode.
   """
   @spec run(t(), boombox_opts()) :: boombox_mode()
   def run(server, boombox_opts) do
-    GenServer.call(server.server_reference, {:run, boombox_opts})
+    GenServer.call(server, {:run, boombox_opts})
   end
 
   @doc """
@@ -161,7 +144,7 @@ defmodule Boombox.Server do
   @spec consume_packet(t(), serialized_boombox_packet() | Boombox.Packet.t()) ::
           :ok | :finished | {:error, :incompatible_mode}
   def consume_packet(server, packet) do
-    GenServer.call(server.server_reference, {:consume_packet, packet})
+    GenServer.call(server, {:consume_packet, packet})
   end
 
   @doc """
@@ -171,7 +154,7 @@ defmodule Boombox.Server do
   """
   @spec finish_consuming(t()) :: :finished | {:error, :incompatible_mode}
   def finish_consuming(server) do
-    GenServer.call(server.server_reference, :finish_consuming)
+    GenServer.call(server, :finish_consuming)
   end
 
   @doc """
@@ -184,7 +167,7 @@ defmodule Boombox.Server do
           {:ok | :finished, serialized_boombox_packet() | Boombox.Packet.t()}
           | {:error, :incompatible_mode}
   def produce_packet(server) do
-    GenServer.call(server.server_reference, :produce_packet)
+    GenServer.call(server, :produce_packet)
   end
 
   @impl true
@@ -251,7 +234,8 @@ defmodule Boombox.Server do
     boombox_opts =
       boombox_opts
       |> Enum.map(fn
-        {direction, {:message, opts}} -> {direction, {:stream, opts}}
+        {direction, {:writer, opts}} -> {direction, {:stream, opts}}
+        {direction, {:reader, opts}} -> {direction, {:stream, opts}}
         other -> other
       end)
 
@@ -365,13 +349,13 @@ defmodule Boombox.Server do
   @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
   defp get_boombox_mode(boombox_opts) do
     case Map.new(boombox_opts) do
-      %{input: {:message, _input_opts}, output: {:message, _output_opts}} ->
-        raise ArgumentError, ":message on both input and output is not supported"
+      %{input: {:writer, _input_opts}, output: {:reader, _output_opts}} ->
+        raise ArgumentError, "using both :reader and :writer is not supported"
 
-      %{input: {:message, _input_opts}} ->
+      %{input: {:writer, _input_opts}} ->
         :consuming
 
-      %{output: {:message, _output_opts}} ->
+      %{output: {:reader, _output_opts}} ->
         :producing
 
       _neither_input_or_output ->
