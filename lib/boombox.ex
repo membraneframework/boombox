@@ -156,7 +156,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | :player
 
-  @type elixir_output :: {:stream | :writer, out_raw_data_opts()}
+  @type elixir_output :: {:stream | :reader, out_raw_data_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
@@ -177,13 +177,13 @@ defmodule Boombox do
   See `t:input/0` and `t:output/0` for available inputs and outputs and
   [examples.livemd](examples.livemd) for examples.
 
-  If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
+  If the input is a `:stream` endpoint, a `Stream` or other `Enumerable` is expected
   as the first argument.
 
-  If the input is `{:writer, opts}` this function will return a `Boombox.Writer` struct,
+  If the input is a `:writer` endpoint this function will return a `Boombox.Writer` struct,
   which is used to write media packets to boombox with `write/2` and to finish writing with `close/1`.
 
-  If the output is `{:reader, opts}` this function will return a `Boombox.Reader` struct,
+  If the output is a `:reader` endpoint this function will return a `Boombox.Reader` struct,
   which is used to read media packets from boombox with `read/1`.
 
   ```
@@ -237,7 +237,7 @@ defmodule Boombox do
   Boombox.play("rtmp://localhost:5432")
   ```
   """
-  @spec play(Enumerable.t() | nil, input() | stream_input()) :: :ok
+  @spec play(Enumerable.t() | nil, input() | elixir_input()) :: :ok
   def play(stream \\ nil, input) do
     stream |> run(input: input, output: :player)
   end
@@ -249,7 +249,8 @@ defmodule Boombox do
 
   It returns a `Task.t()` that can be awaited later.
 
-  If the output is a `Stream` the behaviour is identical to `run/2`.
+  If the output is a `:stream` or `:reader` endpoint, or the input is a `:writer` endpoint,
+  the behaviour is identical to `run/2`.
   """
   @spec async(Enumerable.t() | nil,
           input: input(),
@@ -272,6 +273,14 @@ defmodule Boombox do
         procs = start_pipeline(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
+
+      %{input: {:writer, _writer_opts}} ->
+        pid = start_server(opts)
+        %Writer{server_reference: pid}
+
+      %{output: {:reader, _reader_opts}} ->
+        pid = start_server(opts)
+        %Reader{server_reference: pid}
 
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
