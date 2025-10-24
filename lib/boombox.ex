@@ -12,6 +12,32 @@ defmodule Boombox do
   alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
 
+  defmodule Writer do
+    @moduledoc """
+    Defines a struct to be used when interacting with boombox when using `:writer` endpoint.
+    """
+    @opaque t :: %__MODULE__{
+              server_reference: GenServer.server()
+            }
+
+    @enforce_keys [:server_reference]
+    defstruct @enforce_keys
+  end
+
+  defmodule Reader do
+    @moduledoc """
+    Defines a struct to be used when interacting with boombox when using `:reader` endpoint.
+    """
+    @opaque t :: %__MODULE__{
+              server_reference: GenServer.server()
+            }
+
+    @enforce_keys [:server_reference]
+    defstruct @enforce_keys
+  end
+
+  @opaque boombox_server :: Boombox.Server.t()
+
   @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
   @typedoc """
   If true the incoming streams will be passed to the output according to their
@@ -27,12 +53,12 @@ defmodule Boombox do
           {:stream_id, String.t()}
           | {:password, String.t()}
         ]
-  @type in_stream_opts :: [
+  @type in_raw_data_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
           | {:is_live, boolean()}
         ]
-  @type out_stream_opts :: [
+  @type out_raw_data_opts :: [
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
           | {:audio_format, Membrane.RawAudio.SampleFormat.t()}
@@ -111,7 +137,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
-  @type stream_input :: {:stream, in_stream_opts()}
+  @type elixir_input :: {:stream | :writer, in_raw_data_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
@@ -130,12 +156,12 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | :player
 
-  @type stream_output :: {:stream, out_stream_opts()}
+  @type elixir_output :: {:stream | :reader, out_raw_data_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
-           input: input() | stream_input(),
-           output: output() | stream_output(),
+           input: input() | elixir_input(),
+           output: output() | elixir_output(),
            parent: pid()
          }
 
@@ -151,8 +177,15 @@ defmodule Boombox do
   See `t:input/0` and `t:output/0` for available inputs and outputs and
   [examples.livemd](examples.livemd) for examples.
 
-  If the input is `{:stream, opts}`, a `Stream` or other `Enumerable` is expected
+  If the input is a `:stream` endpoint, a `Stream` or other `Enumerable` is expected
   as the first argument.
+
+  If the input is a `:writer` endpoint this function will return a `Boombox.Writer` struct,
+  which is used to write media packets to boombox with `write/2` and to finish writing with `close/1`.
+
+  If the output is a `:reader` endpoint this function will return a `Boombox.Reader` struct,
+  which is used to read media packets from boombox with `read/1`.
+
   ```
   Boombox.run(
     input: "path/to/file.mp4",
@@ -161,9 +194,9 @@ defmodule Boombox do
   ```
   """
   @spec run(Enumerable.t() | nil,
-          input: input() | stream_input(),
-          output: output() | stream_output()
-        ) :: :ok | Enumerable.t()
+          input: input() | elixir_input(),
+          output: output() | elixir_output()
+        ) :: :ok | Enumerable.t() | Writer.t() | Reader.t()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
 
@@ -177,6 +210,14 @@ defmodule Boombox do
         procs = start_pipeline(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
+
+      %{input: {:writer, _writer_opts}} ->
+        pid = start_server(opts)
+        %Writer{server_reference: pid}
+
+      %{output: {:reader, _reader_opts}} ->
+        pid = start_server(opts)
+        %Reader{server_reference: pid}
 
       opts ->
         opts
@@ -196,7 +237,7 @@ defmodule Boombox do
   Boombox.play("rtmp://localhost:5432")
   ```
   """
-  @spec play(Enumerable.t() | nil, input() | stream_input()) :: :ok
+  @spec play(Enumerable.t() | nil, input() | elixir_input()) :: :ok
   def play(stream \\ nil, input) do
     stream |> run(input: input, output: :player)
   end
@@ -208,7 +249,8 @@ defmodule Boombox do
 
   It returns a `Task.t()` that can be awaited later.
 
-  If the output is a `Stream` the behaviour is identical to `run/2`.
+  If the output is a `:stream` or `:reader` endpoint, or the input is a `:writer` endpoint,
+  the behaviour is identical to `run/2`.
   """
   @spec async(Enumerable.t() | nil,
           input: input(),
@@ -231,6 +273,14 @@ defmodule Boombox do
         procs = start_pipeline(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
+
+      %{input: {:writer, _writer_opts}} ->
+        pid = start_server(opts)
+        %Writer{server_reference: pid}
+
+      %{output: {:reader, _reader_opts}} ->
+        pid = start_server(opts)
+        %Reader{server_reference: pid}
 
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
@@ -256,31 +306,6 @@ defmodule Boombox do
     end
   end
 
-  @endpoint_opts [:input, :output]
-  defp validate_opts!(stream, opts) do
-    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
-
-    cond do
-      Map.keys(opts) -- @endpoint_opts != [] ->
-        raise ArgumentError,
-              "Both input and output are required. #{@endpoint_opts -- Map.keys(opts)} were not provided"
-
-      stream?(opts[:input]) && !Enumerable.impl_for(stream) ->
-        raise ArgumentError,
-              "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
-
-      stream?(opts[:input]) && stream?(opts[:output]) ->
-        raise ArgumentError,
-              ":stream on both input and output is not supported"
-
-      true ->
-        opts
-    end
-  end
-
-  defp stream?({:stream, _opts}), do: true
-  defp stream?(_io), do: false
-
   @doc """
   Runs boombox with CLI arguments.
 
@@ -301,6 +326,81 @@ defmodule Boombox do
       {:args, args} -> run(args)
       {:script, script} -> Code.eval_file(script)
     end
+  end
+
+  @doc """
+  Reads a packet from Boombox.
+
+  If returned with `:ok`, then this function can be called
+  again to request the next packet, and if returned with `:finished`, then Boombox finished it's
+  operation and will not produce any more packets.
+
+  Can be called only when using `:reader` endpoint on output.
+  """
+  @spec read(Reader.t()) ::
+          {:ok | :finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
+  def read(reader) do
+    Boombox.Server.produce_packet(reader.server_reference)
+  end
+
+  @doc """
+  Writes provided packet to Boombox.
+
+  Returns `:ok` if more packets can be provided, and
+  `:finished` when Boombox finished consuming and will not accept any more packets. Returns
+  synchronously once the packet has been processed by Boombox.
+
+  Can be called only when using `:writer` endpoint on input.
+  """
+  @spec write(Writer.t(), Boombox.Packet.t()) ::
+          :ok | :finished | {:error, :incompatible_mode}
+  def write(writer, packet) do
+    Boombox.Server.consume_packet(writer.server_reference, packet)
+  end
+
+  @doc """
+  Informs Boombox that it will not be provided any more packets with `write/2` and should terminate
+  accordingly.
+
+  Can be called only when using `:writer` endpoint on input.
+  """
+  @spec close(Writer.t()) :: :finished | {:error, :incompatible_mode}
+  def close(writer) do
+    Boombox.Server.finish_consuming(writer.server_reference)
+  end
+
+  @endpoint_opts [:input, :output]
+  defp validate_opts!(stream, opts) do
+    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
+
+    cond do
+      Map.keys(opts) -- @endpoint_opts != [] ->
+        raise ArgumentError,
+              "Both input and output are required. #{@endpoint_opts -- Map.keys(opts)} were not provided"
+
+      match?({:stream, _opts}, opts.input) && !Enumerable.impl_for(stream) ->
+        raise ArgumentError,
+              "Expected Enumerable.t() to be passed as the first argument, got #{inspect(stream)}"
+
+      elixir_endpoint?(opts.input) and elixir_endpoint?(opts.output) ->
+        raise ArgumentError,
+              ":stream, :writer or :reader on both input and output is not supported"
+
+      true ->
+        opts
+    end
+  end
+
+  defp elixir_endpoint?({:reader, _opts}), do: true
+  defp elixir_endpoint?({:writer, _opts}), do: true
+  defp elixir_endpoint?({:stream, _opts}), do: true
+  defp elixir_endpoint?(_io), do: false
+
+  @spec start_server(opts_map()) :: boombox_server()
+  defp start_server(opts) do
+    {:ok, pid} = Boombox.Server.start(packet_serialization: false, stop_application: false)
+    Boombox.Server.run(pid, Map.to_list(opts))
+    pid
   end
 
   @spec consume_stream(Enumerable.t(), pid(), procs()) :: term()

@@ -11,12 +11,12 @@ defmodule Boombox.InternalBin do
 
   @type input ::
           Boombox.input()
-          | {:stream, pid(), Boombox.in_stream_opts()}
+          | {:stream, pid(), Boombox.in_raw_data_opts()}
           | :membrane_pad
 
   @type output ::
           Boombox.output()
-          | {:stream, pid(), Boombox.out_stream_opts()}
+          | {:stream, pid(), Boombox.out_raw_data_opts()}
           | :membrane_pad
 
   @type track_builders :: %{

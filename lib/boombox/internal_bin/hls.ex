@@ -63,6 +63,12 @@ defmodule Boombox.InternalBin.HLS do
     transcoding_policy = opts |> Keyword.get(:transcoding_policy, :if_needed)
     mode = opts |> Keyword.get(:mode, :vod)
 
+    target_window_duration =
+      case mode do
+        :vod -> :infinity
+        :live -> Time.seconds(20)
+      end
+
     {directory, manifest_name} =
       if Path.extname(location) == ".m3u8" do
         {Path.dirname(location), Path.basename(location, ".m3u8")}
@@ -87,7 +93,7 @@ defmodule Boombox.InternalBin.HLS do
             hls_mode: hls_mode,
             mode: mode,
             mp4_parameters_in_band?: true,
-            target_window_duration: Time.seconds(20)
+            target_window_duration: target_window_duration
           }
         ),
         Enum.map(track_builders, fn

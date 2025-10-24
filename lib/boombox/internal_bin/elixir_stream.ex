@@ -14,7 +14,7 @@ defmodule Boombox.InternalBin.ElixirStream do
   # the burst of packets from one segment of Live HLS stream
   @realtimer_toilet_capacity 10_000
 
-  @spec create_input(producer :: pid, options :: Boombox.in_stream_opts()) :: Ready.t()
+  @spec create_input(producer :: pid, options :: Boombox.in_raw_data_opts()) :: Ready.t()
   def create_input(producer, options) do
     options = parse_options(options, :input)
 
@@ -42,7 +42,7 @@ defmodule Boombox.InternalBin.ElixirStream do
 
   @spec link_output(
           consumer :: pid,
-          options :: Boombox.out_stream_opts(),
+          options :: Boombox.out_raw_data_opts(),
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           boolean()
@@ -98,9 +98,8 @@ defmodule Boombox.InternalBin.ElixirStream do
   end
 
   defp maybe_plug_realtimer(builder, _kind, _pace_control, _is_input_realtime), do: builder
-
-  @spec parse_options(Boombox.in_stream_opts(), :input) :: map()
-  @spec parse_options(Boombox.out_stream_opts(), :output) :: map()
+  @spec parse_options(Boombox.in_raw_data_opts(), :input) :: map()
+  @spec parse_options(Boombox.out_raw_data_opts(), :output) :: map()
   defp parse_options(options, direction) do
     audio = Keyword.get(options, :audio)
 
