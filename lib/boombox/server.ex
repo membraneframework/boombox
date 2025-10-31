@@ -27,6 +27,8 @@ defmodule Boombox.Server do
 
   @type communication_medium :: :calls | :messages
 
+  @type communication_medium :: :calls | :messages
+
   @type opts :: [
           name: GenServer.name(),
           packet_serialization: boolean(),
@@ -427,20 +429,25 @@ defmodule Boombox.Server do
 
   @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
   defp get_boombox_mode(boombox_opts) do
-    case Map.new(boombox_opts) do
-      %{input: {:stream, _input_opts}, output: {:stream, _output_opts}} ->
-        raise ArgumentError, "Elixir endpoint on both input and output is not supported"
+    cond do
+      elixir_endpoint?(boombox_opts[:input]) and elixir_endpoint?(boombox_opts[:output]) ->
+        raise ArgumentError, "Using an elixir endpoint on both input and output is not supported"
 
-      %{input: {:stream, _input_opts}} ->
+      elixir_endpoint?(boombox_opts[:input]) ->
         :consuming
 
-      %{output: {:stream, _output_opts}} ->
+      elixir_endpoint?(boombox_opts[:output]) ->
         :producing
 
-      _other ->
+      true ->
         :standalone
     end
   end
+
+  defp elixir_endpoint?({type, _opts}) when type in [:reader, :writer, :message],
+    do: true
+
+  defp elixir_endpoint?(_io), do: false
 
   @spec consuming_boombox_run(boombox_opts(), pid()) :: :ok
   defp consuming_boombox_run(boombox_opts, server_pid) do
