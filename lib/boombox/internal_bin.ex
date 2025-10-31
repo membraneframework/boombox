@@ -453,7 +453,7 @@ defmodule Boombox.InternalBin do
   end
 
   defp create_input({:stream, stream_process, params}, _ctx, _state) do
-    Boombox.InternalBin.ElixirStream.create_input(stream_process, params)
+    Boombox.InternalBin.ElixirEndpoints.create_input(stream_process, params, :pull)
   end
 
   defp create_input({:h264, location, opts}, _ctx, _state) do
@@ -687,9 +687,10 @@ defmodule Boombox.InternalBin do
     is_input_realtime = input_realtime?(state.input)
 
     result =
-      Boombox.InternalBin.ElixirStream.link_output(
+      Boombox.InternalBin.ElixirEndpoints.link_output(
         stream_process,
         params,
+        :pull,
         track_builders,
         spec_builder,
         is_input_realtime

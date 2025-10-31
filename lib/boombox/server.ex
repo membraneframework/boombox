@@ -37,8 +37,8 @@ defmodule Boombox.Server do
         ]
 
   @type boombox_opts :: [
-          input: Boombox.input() | {:writer, Boombox.in_raw_data_opts()},
-          output: Boombox.output() | {:reader, Boombox.out_raw_data_opts()}
+          input: Boombox.input() | {:writer | :message, Boombox.in_raw_data_opts()},
+          output: Boombox.output() | {:reader | :message, Boombox.out_raw_data_opts()}
         ]
 
   @typedoc """
