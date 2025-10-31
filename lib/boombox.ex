@@ -11,6 +11,9 @@ defmodule Boombox do
 
   alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
+  alias Boombox.Pipeline
+
+  @elixir_endpoints [:stream, :message, :writer, :reader]
 
   defmodule Writer do
     @moduledoc """
@@ -159,12 +162,6 @@ defmodule Boombox do
   @type elixir_output :: {:stream | :reader | :message, out_raw_data_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
-  @typep opts_map :: %{
-           input: input() | elixir_input(),
-           output: output() | elixir_output(),
-           parent: pid()
-         }
-
   @doc """
   Runs boombox with given input and output.
 
@@ -217,13 +214,13 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = start_pipeline(opts)
-        source = await_source_ready()
+        procs = Pipeline.start_pipeline(opts)
+        source = Pipeline.await_source_ready()
         consume_stream(stream, source, procs)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = start_pipeline(opts)
-        sink = await_sink_ready()
+        procs = Pipeline.start_pipeline(opts)
+        sink = Pipeline.await_sink_ready()
         produce_stream(sink, procs)
 
       %{input: {:writer, _writer_opts}} ->
@@ -242,8 +239,8 @@ defmodule Boombox do
 
       opts ->
         opts
-        |> start_pipeline()
-        |> await_pipeline()
+        |> Pipeline.start_pipeline()
+        |> Pipeline.await_pipeline()
     end
   end
 
@@ -282,8 +279,8 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = start_pipeline(opts)
-        source = await_source_ready()
+        procs = Pipeline.start_pipeline(opts)
+        source = Pipeline.await_source_ready()
 
         Task.async(fn ->
           Process.monitor(procs.supervisor)
@@ -291,8 +288,8 @@ defmodule Boombox do
         end)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = start_pipeline(opts)
-        sink = await_sink_ready()
+        procs = Pipeline.start_pipeline(opts)
+        sink = Pipeline.await_sink_ready()
         produce_stream(sink, procs)
 
       %{input: {:writer, _writer_opts}} ->
@@ -312,23 +309,23 @@ defmodule Boombox do
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
       %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp, :srt] ->
-        procs = start_pipeline(opts)
+        procs = Pipeline.start_pipeline(opts)
 
         task =
           Task.async(fn ->
             Process.monitor(procs.supervisor)
-            await_pipeline(procs)
+            Pipeline.await_pipeline(procs)
           end)
 
         await_external_resource_ready()
         task
 
       opts ->
-        procs = start_pipeline(opts)
+        procs = Pipeline.start_pipeline(opts)
 
         Task.async(fn ->
           Process.monitor(procs.supervisor)
-          await_pipeline(procs)
+          Pipeline.await_pipeline(procs)
         end)
     end
   end
@@ -429,7 +426,7 @@ defmodule Boombox do
     end
   end
 
-  defp elixir_endpoint?({type, _opts}) when type in [:reader, :writer, :stream, :message],
+  defp elixir_endpoint?({type, _opts}) when type in @elixir_endpoints,
     do: true
 
   defp elixir_endpoint?(_io), do: false
@@ -479,7 +476,7 @@ defmodule Boombox do
 
       _state ->
         send(source, :boombox_eos)
-        await_pipeline(procs)
+        Pipeline.await_pipeline(procs)
     end
   end
 
@@ -503,52 +500,10 @@ defmodule Boombox do
         end
       end,
       fn
-        %{procs: procs} -> terminate_pipeline(procs)
+        %{procs: procs} -> Pipeline.terminate_pipeline(procs)
         :eos -> :ok
       end
     )
-  end
-
-  @spec start_pipeline(opts_map()) :: procs()
-  defp start_pipeline(opts) do
-    opts =
-      opts
-      |> Map.update!(:input, &resolve_stream_endpoint(&1, self()))
-      |> Map.update!(:output, &resolve_stream_endpoint(&1, self()))
-      |> Map.put(:parent, self())
-
-    {:ok, supervisor, pipeline} =
-      Membrane.Pipeline.start_link(Boombox.Pipeline, opts)
-
-    Process.monitor(supervisor)
-    %{supervisor: supervisor, pipeline: pipeline}
-  end
-
-  @spec terminate_pipeline(procs) :: :ok
-  defp terminate_pipeline(procs) do
-    Membrane.Pipeline.terminate(procs.pipeline)
-    await_pipeline(procs)
-  end
-
-  @spec await_pipeline(procs) :: :ok
-  defp await_pipeline(%{supervisor: supervisor}) do
-    receive do
-      {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
-    end
-  end
-
-  @spec await_source_ready() :: pid()
-  defp await_source_ready() do
-    receive do
-      {:boombox_ex_stream_source, source} -> source
-    end
-  end
-
-  @spec await_sink_ready() :: pid()
-  defp await_sink_ready() do
-    receive do
-      {:boombox_ex_stream_sink, sink} -> sink
-    end
   end
 
   # Waits for the external resource to be ready.
@@ -580,9 +535,4 @@ defmodule Boombox do
 
     :ok
   end
-
-  defp resolve_stream_endpoint({:stream, stream_options}, parent),
-    do: {:stream, parent, stream_options}
-
-  defp resolve_stream_endpoint(endpoint, _parent), do: endpoint
 end
