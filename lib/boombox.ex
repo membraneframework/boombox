@@ -414,8 +414,7 @@ defmodule Boombox do
       Boombox.Server.start(
         packet_serialization: false,
         stop_application: false,
-        communication_medium: server_communication_medium,
-        parent_pid: self()
+        communication_medium: server_communication_medium
       )
 
     Boombox.Server.run(pid, Map.to_list(opts))
