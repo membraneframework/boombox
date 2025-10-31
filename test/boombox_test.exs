@@ -474,6 +474,7 @@ defmodule BoomboxTest do
 
   [:stream, :writer, :message]
   |> Enum.each(fn elixir_endpoint ->
+    @tag :bouncing_bubble_elixir_webrtc_mp4
     @tag String.to_atom("bouncing_bubble_#{elixir_endpoint}_webrtc_mp4")
     async_test "bouncing bubble -> #{elixir_endpoint} -> webrtc -> mp4", %{tmp_dir: tmp} do
       signaling = Membrane.WebRTC.Signaling.new()
@@ -548,6 +549,7 @@ defmodule BoomboxTest do
 
   [:stream, :reader, :message]
   |> Enum.each(fn elixir_endpoint ->
+    @tag :mp4_elixir_resampled_pcm
     @tag String.to_atom("mp4_#{elixir_endpoint}_resampled_pcm")
     async_test "mp4 -> #{elixir_endpoint} -> resampled PCM" do
       boombox =
