@@ -137,7 +137,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
-  @type elixir_input :: {:stream | :writer, in_raw_data_opts()}
+  @type elixir_input :: {:stream | :writer | :message, in_raw_data_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
@@ -156,7 +156,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | :player
 
-  @type elixir_output :: {:stream | :reader, out_raw_data_opts()}
+  @type elixir_output :: {:stream | :reader | :message, out_raw_data_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
@@ -212,12 +212,18 @@ defmodule Boombox do
         produce_stream(sink, procs)
 
       %{input: {:writer, _writer_opts}} ->
-        pid = start_server(opts)
+        pid = start_server(opts, :calls)
         %Writer{server_reference: pid}
 
+      %{input: {:message, _message_opts}} ->
+        start_server(opts, :messages)
+
       %{output: {:reader, _reader_opts}} ->
-        pid = start_server(opts)
+        pid = start_server(opts, :calls)
         %Reader{server_reference: pid}
+
+      %{output: {:message, _message_opts}} ->
+        start_server(opts, :messages)
 
       opts ->
         opts
@@ -275,12 +281,18 @@ defmodule Boombox do
         produce_stream(sink, procs)
 
       %{input: {:writer, _writer_opts}} ->
-        pid = start_server(opts)
+        pid = start_server(opts, :calls)
         %Writer{server_reference: pid}
 
+      %{input: {:message, _message_opts}} ->
+        start_server(opts, :messages)
+
       %{output: {:reader, _reader_opts}} ->
-        pid = start_server(opts)
+        pid = start_server(opts, :calls)
         %Reader{server_reference: pid}
+
+      %{output: {:message, _message_opts}} ->
+        start_server(opts, :messages)
 
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
@@ -384,21 +396,28 @@ defmodule Boombox do
 
       elixir_endpoint?(opts.input) and elixir_endpoint?(opts.output) ->
         raise ArgumentError,
-              ":stream, :writer or :reader on both input and output is not supported"
+              "Using an elixir endpoint (:reader, :writer, :message, :stream) on both input and output is not supported"
 
       true ->
         opts
     end
   end
 
-  defp elixir_endpoint?({:reader, _opts}), do: true
-  defp elixir_endpoint?({:writer, _opts}), do: true
-  defp elixir_endpoint?({:stream, _opts}), do: true
+  defp elixir_endpoint?({type, _opts}) when type in [:reader, :writer, :stream, :message],
+    do: true
+
   defp elixir_endpoint?(_io), do: false
 
-  @spec start_server(opts_map()) :: boombox_server()
-  defp start_server(opts) do
-    {:ok, pid} = Boombox.Server.start(packet_serialization: false, stop_application: false)
+  @spec start_server(opts_map(), :messages | :calls) :: boombox_server()
+  defp start_server(opts, server_communication_medium) do
+    {:ok, pid} =
+      Boombox.Server.start(
+        packet_serialization: false,
+        stop_application: false,
+        communication_medium: server_communication_medium,
+        parent_pid: self()
+      )
+
     Boombox.Server.run(pid, Map.to_list(opts))
     pid
   end

@@ -25,10 +25,13 @@ defmodule Boombox.Server do
 
   @type t :: pid()
 
+  @type communication_medium :: :calls | :messages
+
   @type opts :: [
           name: GenServer.name(),
           packet_serialization: boolean(),
-          stop_application: boolean()
+          stop_application: boolean(),
+          communication_medium: communication_medium()
         ]
 
   @type boombox_opts :: [
@@ -92,10 +95,12 @@ defmodule Boombox.Server do
             packet_serialization: boolean(),
             stop_application: boolean(),
             boombox_pid: pid() | nil,
-            boombox_mode: Boombox.Server.boombox_mode() | nil
+            boombox_mode: Boombox.Server.boombox_mode() | nil,
+            communication_medium: Boombox.Server.communication_medium(),
+            parent_pid: pid()
           }
 
-    @enforce_keys [:packet_serialization, :stop_application]
+    @enforce_keys [:packet_serialization, :stop_application, :communication_medium, :parent_pid]
 
     defstruct @enforce_keys ++ [boombox_pid: nil, boombox_mode: nil]
   end
@@ -106,7 +111,7 @@ defmodule Boombox.Server do
   @spec start_link(opts()) :: {:ok, t()} | {:error, {:already_started, t()}}
   def start_link(opts) do
     genserver_opts = Keyword.take(opts, [:name])
-
+    opts = Keyword.put(opts, :parent_pid, self())
     GenServer.start_link(__MODULE__, opts, genserver_opts)
   end
 
@@ -116,7 +121,7 @@ defmodule Boombox.Server do
   @spec start(opts()) :: {:ok, t()} | {:error, {:already_started, t()}}
   def start(opts) do
     genserver_opts = Keyword.take(opts, [:name])
-
+    opts = Keyword.put(opts, :parent_pid, self())
     GenServer.start(__MODULE__, opts, genserver_opts)
   end
 
@@ -175,7 +180,9 @@ defmodule Boombox.Server do
     {:ok,
      %State{
        packet_serialization: Keyword.get(opts, :packet_serialization, false),
-       stop_application: Keyword.get(opts, :stop_application, false)
+       stop_application: Keyword.get(opts, :stop_application, false),
+       communication_medium: Keyword.get(opts, :communication_medium, :calls),
+       parent_pid: Keyword.fetch!(opts, :parent_pid)
      }}
   end
 
@@ -189,6 +196,41 @@ defmodule Boombox.Server do
   def handle_info({:call, sender, request}, state) do
     {response, state} = handle_request(request, state)
     send(sender, {:response, response})
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(
+        {:boombox_packet, sender_pid, %Boombox.Packet{} = packet},
+        %State{communication_medium: :messages} = state
+      ) do
+    {response, state} = handle_request({:consume_packet, packet}, state)
+    if response == :finished, do: send(sender_pid, :boombox_finished)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:boombox_close, sender_pid}, %State{communication_medium: :messages} = state) do
+    handle_request(:finish_consuming, state)
+    send(sender_pid, :boombox_finished)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(
+        {:packet_produced, packet, boombox_pid},
+        %State{communication_medium: :messages, boombox_pid: boombox_pid} = state
+      ) do
+    send(state.parent_pid, {:boombox_packet, self(), packet})
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(
+        {:finished, boombox_pid},
+        %State{communication_medium: :messages, boombox_pid: boombox_pid} = state
+      ) do
+    send(state.parent_pid, {:boombox_finished, self()})
     {:noreply, state}
   end
 
@@ -243,9 +285,14 @@ defmodule Boombox.Server do
 
     boombox_process_fun =
       case boombox_mode do
-        :consuming -> fn -> consuming_boombox_run(boombox_opts, server_pid) end
-        :producing -> fn -> producing_boombox_run(boombox_opts, server_pid) end
-        :standalone -> fn -> standalone_boombox_run(boombox_opts) end
+        :consuming ->
+          fn -> consuming_boombox_run(boombox_opts, server_pid) end
+
+        :producing ->
+          fn -> producing_boombox_run(boombox_opts, server_pid, state.communication_medium) end
+
+        :standalone ->
+          fn -> standalone_boombox_run(boombox_opts) end
       end
 
     boombox_pid = spawn(boombox_process_fun)
@@ -358,10 +405,15 @@ defmodule Boombox.Server do
       %{output: {:stream, _output_opts}} ->
         :producing
 
-      _neither_input_or_output ->
+      _other ->
         :standalone
     end
   end
+
+  defp elixir_endpoint?({type, _opts}) when type in [:reader, :writer, :message],
+    do: true
+
+  defp elixir_endpoint?(_io), do: false
 
   @spec consuming_boombox_run(boombox_opts(), pid()) :: :ok
   defp consuming_boombox_run(boombox_opts, server_pid) do
@@ -385,8 +437,8 @@ defmodule Boombox.Server do
     |> Boombox.run(boombox_opts)
   end
 
-  @spec producing_boombox_run(boombox_opts(), pid()) :: :ok
-  defp producing_boombox_run(boombox_opts, server_pid) do
+  @spec producing_boombox_run(boombox_opts(), pid(), communication_medium()) :: :ok
+  defp producing_boombox_run(boombox_opts, server_pid, communication_medium) do
     last_packet =
       Boombox.run(boombox_opts)
       |> Enum.reduce(nil, fn new_packet, last_produced_packet ->
@@ -394,8 +446,10 @@ defmodule Boombox.Server do
           send(server_pid, {:packet_produced, last_produced_packet, self()})
         end
 
-        receive do
-          :produce_packet -> :ok
+        if communication_medium == :calls do
+          receive do
+            :produce_packet -> :ok
+          end
         end
 
         new_packet
