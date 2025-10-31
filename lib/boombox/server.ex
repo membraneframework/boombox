@@ -212,7 +212,7 @@ defmodule Boombox.Server do
   @impl true
   def handle_info({:boombox_close, sender_pid}, %State{communication_medium: :messages} = state) do
     handle_request(:finish_consuming, state)
-    send(sender_pid, :boombox_finished)
+    send(sender_pid, {:boombox_finished, self()})
     {:noreply, state}
   end
 
@@ -227,9 +227,10 @@ defmodule Boombox.Server do
 
   @impl true
   def handle_info(
-        {:finished, boombox_pid},
+        {:finished, packet, boombox_pid},
         %State{communication_medium: :messages, boombox_pid: boombox_pid} = state
       ) do
+    send(state.parent_pid, {:boombox_packet, packet, self()})
     send(state.parent_pid, {:boombox_finished, self()})
     {:noreply, state}
   end
@@ -274,6 +275,7 @@ defmodule Boombox.Server do
     boombox_opts =
       boombox_opts
       |> Enum.map(fn
+        {direction, {:message, opts}} -> {direction, {:stream, opts}}
         {direction, {:writer, opts}} -> {direction, {:stream, opts}}
         {direction, {:reader, opts}} -> {direction, {:stream, opts}}
         other -> other
