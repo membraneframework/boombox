@@ -180,7 +180,7 @@ class RawData(BoomboxEndpoint):
 
     @override
     def get_endpoint_name(self) -> Atom:
-        return Atom("message")
+        return Atom("stream")
 
     @override
     def get_atom_fields(self) -> set[str]:

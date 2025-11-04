@@ -118,7 +118,6 @@ class Boombox(process.Process):
             "RELEASE_DISTRIBUTION": "name",
         }
 
-        self._server_release_path = os.path.join(self._data_dir, "bin", "server")
         self._download_elixir_boombox_release()
 
         self._erlang_process = subprocess.Popen([self._server_release_path, "start"], env=env)
@@ -330,6 +329,7 @@ class Boombox(process.Process):
         self._data_dir = platformdirs.user_data_dir(
             appname=PACKAGE_NAME, ensure_exists=True, version=self._version
         )
+        self._server_release_path = os.path.join(self._data_dir, "bin", "server")
 
         if os.path.exists(self._server_release_path):
             logging.info("Elixir boombox release already present.")
