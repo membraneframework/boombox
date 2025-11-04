@@ -49,9 +49,12 @@ commands:
                 name: Install erlang and elixir
                 command: |
                   brew install asdf openssl
-                  asdf plugin add elixir || true
                   asdf plugin add erlang || true
-                  asdf install
+                  asdf plugin add elixir || true
+                  asdf install erlang 27.3
+                  asdf install elixir 1.18.3-otp-27
+                  asdf set -u erlang 27.3
+                  asdf set -u elixir 1.18.3-otp-27
                   echo 'export PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"' >> $BASH_ENV
             - run:
                 name: Install hex and rebar
