@@ -229,8 +229,6 @@ defmodule Boombox.Server do
 
   @spec handle_request({:run, boombox_opts()}, State.t()) :: {boombox_mode(), State.t()}
   defp handle_request({:run, boombox_opts}, state) do
-    boombox_mode = get_boombox_mode(boombox_opts)
-
     boombox_opts =
       boombox_opts
       |> Enum.map(fn
@@ -238,6 +236,8 @@ defmodule Boombox.Server do
         {direction, {:reader, opts}} -> {direction, {:stream, opts}}
         other -> other
       end)
+
+    boombox_mode = get_boombox_mode(boombox_opts)
 
     server_pid = self()
 
@@ -349,13 +349,13 @@ defmodule Boombox.Server do
   @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
   defp get_boombox_mode(boombox_opts) do
     case Map.new(boombox_opts) do
-      %{input: {:writer, _input_opts}, output: {:reader, _output_opts}} ->
-        raise ArgumentError, "using both :reader and :writer is not supported"
+      %{input: {:stream, _input_opts}, output: {:stream, _output_opts}} ->
+        raise ArgumentError, "Elixir endpoint on both input and output is not supported"
 
-      %{input: {:writer, _input_opts}} ->
+      %{input: {:stream, _input_opts}} ->
         :consuming
 
-      %{output: {:reader, _output_opts}} ->
+      %{output: {:stream, _output_opts}} ->
         :producing
 
       _neither_input_or_output ->
