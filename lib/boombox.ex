@@ -431,7 +431,7 @@ defmodule Boombox do
 
   defp elixir_endpoint?(_io), do: false
 
-  @spec start_server(opts_map(), :messages | :calls) :: boombox_server()
+  @spec start_server(Pipeline.opts_map(), :messages | :calls) :: boombox_server()
   defp start_server(opts, server_communication_medium) do
     {:ok, pid} =
       Boombox.Server.start(

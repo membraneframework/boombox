@@ -27,8 +27,6 @@ defmodule Boombox.Server do
 
   @type communication_medium :: :calls | :messages
 
-  @type communication_medium :: :calls | :messages
-
   @type opts :: [
           name: GenServer.name(),
           packet_serialization: boolean(),
@@ -99,12 +97,31 @@ defmodule Boombox.Server do
             boombox_pid: pid() | nil,
             boombox_mode: Boombox.Server.boombox_mode() | nil,
             communication_medium: Boombox.Server.communication_medium(),
-            parent_pid: pid()
+            parent_pid: pid(),
+            membrane_source_pid: pid() | nil,
+            membrane_source_demand: non_neg_integer(),
+            membrane_sink_pid: pid() | nil,
+            pipeline_supervisor_pid: pid() | nil,
+            pid_to_reply_to: pid() | nil
           }
 
-    @enforce_keys [:packet_serialization, :stop_application, :communication_medium, :parent_pid]
+    @enforce_keys [
+      :packet_serialization,
+      :stop_application,
+      :communication_medium,
+      :parent_pid
+    ]
 
-    defstruct @enforce_keys ++ [boombox_pid: nil, boombox_mode: nil]
+    defstruct @enforce_keys ++
+                [
+                  boombox_pid: nil,
+                  boombox_mode: nil,
+                  membrane_source_pid: nil,
+                  membrane_source_demand: 0,
+                  membrane_sink_pid: nil,
+                  pipeline_supervisor_pid: nil,
+                  pid_to_reply_to: nil
+                ]
   end
 
   @doc """
@@ -200,8 +217,8 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_call(request, _from, state) do
-    {response, state} = handle_request(request, state)
+  def handle_call(request, from, state) do
+    {response, state} = handle_request(request, from, state)
     {:reply, response, state}
   end
 
@@ -249,7 +266,36 @@ defmodule Boombox.Server do
   end
 
   @impl true
+  def handle_info({:boombox_ex_stream_source, source}, state) do
+    {:noreply, %State{state | membrane_source_pid: source}}
+  end
+
+  @impl true
+  def handle_info({:boombox_ex_stream_sink, sink}, state) do
+    {:noreply, %State{state | membrane_sink_pid: sink}}
+  end
+
+  @impl true
+  def handle_info({:boombox_demand, demand}, state) do
+    {:noreply, %State{state | membrane_source_demand: state.membrane_source_demand + demand}}
+  end
+
+  @impl true
   def handle_info({:DOWN, _ref, :process, pid, reason}, %State{boombox_pid: pid} = state) do
+    reason =
+      case reason do
+        :normal -> :normal
+        reason -> {:boombox_crash, reason}
+      end
+
+    {:stop, reason, state}
+  end
+
+  @impl true
+  def handle_info(
+        {:DOWN, _ref, :process, pid, reason},
+        %State{pipeline_supervisor_pid: pid} = state
+      ) do
     reason =
       case reason do
         :normal -> :normal
@@ -283,8 +329,13 @@ defmodule Boombox.Server do
     end
   end
 
-  @spec handle_request({:run, boombox_opts()}, State.t()) :: {boombox_mode(), State.t()}
-  defp handle_request({:run, boombox_opts}, %State{} = state) do
+  defp handle_request(request, from \\ nil, state)
+
+  @spec handle_request({:run, boombox_opts()}, GenServer.from() | nil, State.t()) ::
+          {boombox_mode(), State.t()}
+  defp handle_request({:run, boombox_opts}, _from, state) do
+    boombox_mode = get_boombox_mode(boombox_opts)
+
     boombox_opts =
       boombox_opts
       |> Enum.map(fn
@@ -294,9 +345,8 @@ defmodule Boombox.Server do
         other -> other
       end)
 
-    boombox_mode = get_boombox_mode(boombox_opts)
-
     server_pid = self()
+    procs = Boombox.Pipeline.start_pipeline(Map.new(boombox_opts))
 
     boombox_process_fun =
       case boombox_mode do
@@ -313,25 +363,33 @@ defmodule Boombox.Server do
     boombox_pid = spawn(boombox_process_fun)
     Process.monitor(boombox_pid)
 
-    {boombox_mode, %State{state | boombox_pid: boombox_pid, boombox_mode: boombox_mode}}
+    {boombox_mode,
+     %State{
+       state
+       | boombox_pid: boombox_pid,
+         boombox_mode: boombox_mode,
+         pipeline_supervisor_pid: procs.supervisor
+     }}
   end
 
-  @spec handle_request(:get_pid, State.t()) :: {pid(), State.t()}
-  defp handle_request(:get_pid, state) do
+  @spec handle_request(:get_pid, GenServer.from() | nil, State.t()) :: {pid(), State.t()}
+  defp handle_request(:get_pid, _from, state) do
     {self(), state}
   end
 
-  defp handle_request(_request, %State{boombox_pid: nil} = state) do
+  defp handle_request(_request, _from, %State{boombox_pid: nil} = state) do
     {{:error, :boombox_not_running}, state}
   end
 
   @spec handle_request(
           {:consume_packet, serialized_boombox_packet() | Boombox.Packet.t()},
+          GenServer.from() | nil,
           State.t()
         ) ::
           {:ok | :finished | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
   defp handle_request(
          {:consume_packet, packet},
+         from,
          %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
        ) do
     packet =
@@ -339,6 +397,12 @@ defmodule Boombox.Server do
         deserialize_packet(packet)
       else
         packet
+      end
+
+    demand =
+      if state.membrane_source_demand == 1 do
+        send(state.membrane_source_pid, packet)
+        {:noreply, %State{state | membrane_source_demand: 0}}
       end
 
     send(boombox_pid, {:consume_packet, packet})
@@ -352,14 +416,19 @@ defmodule Boombox.Server do
     end
   end
 
-  defp handle_request({:consume_packet, _packet}, %State{boombox_mode: _other_mode} = state) do
+  defp handle_request(
+         {:consume_packet, _packet},
+         _from,
+         %State{boombox_mode: _other_mode} = state
+       ) do
     {{:error, :incompatible_mode}, state}
   end
 
-  @spec handle_request(:finish_consuming, State.t()) ::
+  @spec handle_request(:finish_consuming, GenServer.from() | nil, State.t()) ::
           {:finished | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
   defp handle_request(
          :finish_consuming,
+         _from,
          %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
        ) do
     send(boombox_pid, :finish_consuming)
@@ -370,15 +439,16 @@ defmodule Boombox.Server do
     end
   end
 
-  defp handle_request(:finish_consuming, %State{boombox_mode: _other_mode} = state) do
+  defp handle_request(:finish_consuming, _from, %State{boombox_mode: _other_mode} = state) do
     {{:error, :incompatible_mode}, state}
   end
 
-  @spec handle_request(:produce_packet, State.t()) ::
+  @spec handle_request(:produce_packet, GenServer.from() | nil, State.t()) ::
           {{:ok | :finished, serialized_boombox_packet() | Boombox.Packet.t()}
            | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
   defp handle_request(
          :produce_packet,
+         _from,
          %State{boombox_mode: :producing, boombox_pid: boombox_pid} = state
        ) do
     send(boombox_pid, :produce_packet)
@@ -399,15 +469,16 @@ defmodule Boombox.Server do
     {{response_type, packet}, state}
   end
 
-  defp handle_request(:produce_packet, %State{boombox_mode: _other_mode} = state) do
+  defp handle_request(:produce_packet, _from, %State{boombox_mode: _other_mode} = state) do
     {{:error, :incompatible_mode}, state}
   end
 
-  @spec handle_request(:finish_producing, State.t()) ::
+  @spec handle_request(:finish_producing, GenServer.from() | nil, State.t()) ::
           {{:finished, serialized_boombox_packet() | Boombox.Packet.t()}
            | {:error, :incompatible_mode}, State.t()}
   defp handle_request(
          :finish_producing,
+         _from,
          %State{boombox_mode: :producing, boombox_pid: boombox_pid} = state
        ) do
     send(boombox_pid, :finish_producing)
@@ -418,12 +489,13 @@ defmodule Boombox.Server do
     end
   end
 
-  defp handle_request(:finish_producing, %State{boombox_mode: _other_mode} = state) do
+  defp handle_request(:finish_producing, _from, %State{boombox_mode: _other_mode} = state) do
     {{:error, :incompatible_mode}, state}
   end
 
-  @spec handle_request(term(), State.t()) :: {{:error, :invalid_request}, State.t()}
-  defp handle_request(_invalid_request, state) do
+  @spec handle_request(term(), GenServer.from() | nil, State.t()) ::
+          {{:error, :invalid_request}, State.t()}
+  defp handle_request(_invalid_request, _from, state) do
     {{:error, :invalid_request}, state}
   end
 

@@ -24,7 +24,7 @@ from ._vendor.pyrlang import process, node
 from ._vendor.term import Atom, Pid
 from .endpoints import BoomboxEndpoint, AudioSampleFormat
 
-from typing import Generator, ClassVar, Optional, Any, get_args
+from typing import Generator, ClassVar, Literal, Optional, Any, get_args
 from typing_extensions import override
 
 
@@ -120,7 +120,9 @@ class Boombox(process.Process):
 
         self._download_elixir_boombox_release()
 
-        self._erlang_process = subprocess.Popen([self._server_release_path, "start"], env=env)
+        self._erlang_process = subprocess.Popen(
+            [self._server_release_path, "start"], env=env
+        )
         atexit.register(lambda: self._erlang_process.kill())
 
         super().__init__(True)
@@ -132,8 +134,8 @@ class Boombox(process.Process):
         self.get_node().monitor_process(self.pid_, self._receiver)
 
         boombox_arg = [
-            (Atom("input"), self._serialize_endpoint(input)),
-            (Atom("output"), self._serialize_endpoint(output)),
+            (Atom("input"), self._serialize_endpoint(input, "input")),
+            (Atom("output"), self._serialize_endpoint(output, "output")),
         ]
         self._call((Atom("run"), boombox_arg))
 
@@ -507,11 +509,13 @@ class Boombox(process.Process):
         }
 
     @staticmethod
-    def _serialize_endpoint(endpoint: BoomboxEndpoint | str) -> Any:
+    def _serialize_endpoint(
+        endpoint: BoomboxEndpoint | str, direction: Literal["input", "output"]
+    ) -> Any:
         if isinstance(endpoint, str):
             return endpoint.encode()
         else:
-            return endpoint.serialize()
+            return endpoint.serialize(direction)
 
 
 @dataclasses.dataclass
