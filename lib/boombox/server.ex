@@ -230,7 +230,7 @@ defmodule Boombox.Server do
         {:finished, packet, boombox_pid},
         %State{communication_medium: :messages, boombox_pid: boombox_pid} = state
       ) do
-    send(state.parent_pid, {:boombox_packet, packet, self()})
+    send(state.parent_pid, {:boombox_packet, self(), packet})
     send(state.parent_pid, {:boombox_finished, self()})
     {:noreply, state}
   end
