@@ -371,7 +371,8 @@ defmodule Boombox do
   end
 
   @doc """
-  Gracefully terminates Boombox when using `:reader` or `:writer` endpoints.
+  Gracefully terminates Boombox when using `:reader` or `:writer` endpoints before a response
+  of type `:finished` has been received.
 
   When using `:reader` endpoint on output informs Boombox that no more packets will be read
   from it with `read/1` and that it should terminate accordingly.

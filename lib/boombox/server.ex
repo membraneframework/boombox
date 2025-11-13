@@ -442,11 +442,6 @@ defmodule Boombox.Server do
     end
   end
 
-  defp elixir_endpoint?({type, _opts}) when type in [:reader, :writer, :message],
-    do: true
-
-  defp elixir_endpoint?(_io), do: false
-
   @spec consuming_boombox_run(boombox_opts(), pid()) :: :ok
   defp consuming_boombox_run(boombox_opts, server_pid) do
     Stream.resource(
