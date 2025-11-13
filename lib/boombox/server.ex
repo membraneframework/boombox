@@ -443,18 +443,22 @@ defmodule Boombox.Server do
   defp producing_boombox_run(boombox_opts, server_pid, communication_medium) do
     last_packet =
       Boombox.run(boombox_opts)
-      |> Enum.reduce(nil, fn new_packet, last_produced_packet ->
+      |> Enum.reduce_while(nil, fn new_packet, last_produced_packet ->
         if last_produced_packet != nil do
           send(server_pid, {:packet_produced, last_produced_packet, self()})
         end
 
-        if communication_medium == :calls do
-          receive do
-            :produce_packet -> :ok
+        action =
+          if communication_medium == :calls do
+            receive do
+              :produce_packet -> :cont
+              :finish_producing -> :halt
+            end
+          else
+            :cont
           end
-        end
 
-        new_packet
+        {action, new_packet}
       end)
 
     send(server_pid, {:finished, last_packet, self()})
