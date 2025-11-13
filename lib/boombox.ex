@@ -371,14 +371,22 @@ defmodule Boombox do
   end
 
   @doc """
-  Informs Boombox that it will not be provided any more packets with `write/2` and should terminate
-  accordingly.
+  Gracefully terminates Boombox when using `:reader` or `:writer` endpoints.
 
-  Can be called only when using `:writer` endpoint on input.
+  When using `:reader` endpoint on output informs Boombox that no more packets will be read
+  from it with `read/1` and that it should terminate accordingly.
+
+  When using `:writer` endpoint on input informs Boombox that it will not be provided
+  any more packets with `write/2` and should terminate accordingly.
+
   """
-  @spec close(Writer.t()) :: :finished | {:error, :incompatible_mode}
-  def close(writer) do
+  @spec close(Writer.t() | Reader.t()) :: :finished | {:error, :incompatible_mode}
+  def close(%Writer{} = writer) do
     Boombox.Server.finish_consuming(writer.server_reference)
+  end
+
+  def close(%Reader{} = reader) do
+    Boombox.Server.finish_producing(reader.server_reference)
   end
 
   @endpoint_opts [:input, :output]
