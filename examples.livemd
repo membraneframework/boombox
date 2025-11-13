@@ -590,6 +590,10 @@ Stream.unfold(%{}, fn _state ->
   Boombox.write(writer, packet)
 
   if :finished in [result1, result2] do
+    if result1 == :ok, do:
+      Boombox.close(writer1)
+    if result2 == :ok, do:
+      Boombox.close(writer2)
     nil
   else
     {nil, %{}}
