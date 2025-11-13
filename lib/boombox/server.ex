@@ -175,6 +175,17 @@ defmodule Boombox.Server do
     GenServer.call(server, :produce_packet)
   end
 
+  @doc """
+  Informs Boombox that no more packets will be read and shouldn't be produced.
+  Can be called only when Boombox is in `:producing` mode.
+  """
+  @spec finish_producing(t()) ::
+          {:finished, serialized_boombox_packet() | Boombox.Packet.t()}
+          | {:error, :incompatible_mode}
+  def finish_producing(server) do
+    GenServer.call(server, :finish_producing)
+  end
+
   @impl true
   def init(opts) do
     {:ok,
@@ -387,6 +398,25 @@ defmodule Boombox.Server do
   end
 
   defp handle_request(:produce_packet, %State{boombox_mode: _other_mode} = state) do
+    {{:error, :incompatible_mode}, state}
+  end
+
+  @spec handle_request(:finish_producing, State.t()) ::
+          {{:finished, serialized_boombox_packet() | Boombox.Packet.t()}
+           | {:error, :incompatible_mode}, State.t()}
+  defp handle_request(
+         :finish_producing,
+         %State{boombox_mode: :producing, boombox_pid: boombox_pid} = state
+       ) do
+    send(boombox_pid, :finish_producing)
+
+    receive do
+      {:finished, packet, ^boombox_pid} ->
+        {{:finished, packet}, state}
+    end
+  end
+
+  defp handle_request(:finish_producing, %State{boombox_mode: _other_mode} = state) do
     {{:error, :incompatible_mode}, state}
   end
 
