@@ -88,7 +88,7 @@ defmodule Boombox.InternalBin.ElixirEndpoints.Source do
     end
   end
 
-  def handle_info({:boombox_close, producer}, ctx, %{producer: producer} = state) do
+  def handle_info({:boombox_eos, producer}, ctx, %{producer: producer} = state) do
     actions = Enum.map(ctx.pads, fn {ref, _data} -> {:end_of_stream, ref} end)
     {actions, state}
   end

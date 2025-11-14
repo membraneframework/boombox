@@ -103,16 +103,17 @@ defmodule Boombox.Server do
     @type t :: %__MODULE__{
             packet_serialization: boolean(),
             stop_application: boolean(),
-            boombox_pid: pid() | nil,
             boombox_mode: Boombox.Server.boombox_mode() | nil,
             communication_medium: Boombox.Server.communication_medium(),
             parent_pid: pid(),
             membrane_source_pid: pid() | nil,
             membrane_source_demand: non_neg_integer(),
             membrane_sink_pid: pid() | nil,
+            procs: Boombox.Pipeline.procs() | nil,
             pipeline_supervisor_pid: pid() | nil,
             pipeline_pid: pid() | nil,
-            pid_to_reply_to: pid() | nil
+            ghosted_client: GenServer.from() | pid() | nil,
+            limbo_packet: Boombox.Packet.t() | Boombox.Server.serialized_boombox_packet() | nil
           }
 
     @enforce_keys [
@@ -124,14 +125,15 @@ defmodule Boombox.Server do
 
     defstruct @enforce_keys ++
                 [
-                  boombox_pid: nil,
                   boombox_mode: nil,
                   membrane_source_pid: nil,
                   membrane_source_demand: 0,
                   membrane_sink_pid: nil,
+                  procs: nil,
                   pipeline_supervisor_pid: nil,
                   pipeline_pid: nil,
-                  pid_to_reply_to: nil
+                  ghosted_client: nil,
+                  limbo_packet: nil
                 ]
   end
 
@@ -199,7 +201,8 @@ defmodule Boombox.Server do
   Can be called only when Boombox is in `:producing` mode.
   """
   @spec produce_packet(t()) ::
-          {:ok | :finished, serialized_boombox_packet() | Boombox.Packet.t()}
+          {:ok, serialized_boombox_packet() | Boombox.Packet.t()}
+          | :finished
           | {:error, :incompatible_mode}
   def produce_packet(server) do
     GenServer.call(server, :produce_packet)
@@ -209,9 +212,7 @@ defmodule Boombox.Server do
   Informs Boombox that no more packets will be read and shouldn't be produced.
   Can be called only when Boombox is in `:producing` mode.
   """
-  @spec finish_producing(t()) ::
-          {:finished, serialized_boombox_packet() | Boombox.Packet.t()}
-          | {:error, :incompatible_mode}
+  @spec finish_producing(t()) :: :finished | {:error, :incompatible_mode}
   def finish_producing(server) do
     GenServer.call(server, :finish_producing)
   end
@@ -229,26 +230,29 @@ defmodule Boombox.Server do
 
   @impl true
   def handle_call(request, from, state) do
-    {response, state} = handle_request(request, from, state)
-    {:reply, response, state}
+    handle_request(request, from, state)
   end
 
   @impl true
   def handle_info({:call, sender, request}, state) do
-    {response, state} = handle_request(request, state)
-    send(sender, {:response, response})
+    {reply_action, response, state} = handle_request(request, sender, state)
+
+    if reply_action == :reply do
+      reply(sender, response)
+    end
+
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info(
-        {:boombox_packet, sender_pid, %Boombox.Packet{} = packet},
-        %State{communication_medium: :messages} = state
-      ) do
-    {response, state} = handle_request({:consume_packet, packet}, state)
-    if response == :finished, do: send(sender_pid, :boombox_finished)
-    {:noreply, state}
-  end
+  # @impl true
+  # def handle_info(
+  # {:boombox_packet, sender_pid, %Boombox.Packet{} = packet},
+  # %State{communication_medium: :messages} = state
+  # ) do
+  # {response, state} = handle_request({:consume_packet, packet}, state)
+  # if response == :finished, do: send(sender_pid, :boombox_finished)
+  # {:noreply, state}
+  # end
 
   @impl true
   def handle_info({:boombox_close, sender_pid}, %State{communication_medium: :messages} = state) do
@@ -257,56 +261,100 @@ defmodule Boombox.Server do
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info(
-        {:packet_produced, packet, boombox_pid},
-        %State{communication_medium: :messages, boombox_pid: boombox_pid} = state
-      ) do
-    send(state.parent_pid, {:boombox_packet, self(), packet})
-    {:noreply, state}
-  end
+  # @impl true
+  # def handle_info(
+  # {:packet_produced, packet, boombox_pid},
+  # %State{communication_medium: :messages, boombox_pid: boombox_pid} = state
+  # ) do
+  # send(state.parent_pid, {:boombox_packet, self(), packet})
+  # {:noreply, state}
+  # end
 
-  @impl true
-  def handle_info(
-        {:finished, packet, boombox_pid},
-        %State{communication_medium: :messages, boombox_pid: boombox_pid} = state
-      ) do
-    send(state.parent_pid, {:boombox_packet, self(), packet})
-    send(state.parent_pid, {:boombox_finished, self()})
-    {:noreply, state}
-  end
+  # @impl true
+  # def handle_info(
+  # {:finished, packet, boombox_pid},
+  # %State{communication_medium: :messages, boombox_pid: boombox_pid} = state
+  # ) do
+  # send(state.parent_pid, {:boombox_packet, self(), packet})
+  # send(state.parent_pid, {:boombox_finished, self()})
+  # {:noreply, state}
+  # end
 
   @impl true
   def handle_info({:boombox_elixir_source, source}, state) do
+    state =
+      if state.ghosted_client != nil do
+        send(source, {:boombox_packet, self(), state.limbo_packet})
+        reply(state.ghosted_client, :ok)
+
+        %State{state | ghosted_client: nil, limbo_packet: nil}
+      else
+        state
+      end
+
     {:noreply, %State{state | membrane_source_pid: source}}
   end
 
   @impl true
   def handle_info({:boombox_elixir_sink, sink}, state) do
+    if state.ghosted_client != nil do
+      send(sink, {:boombox_demand, self()})
+    end
+
     {:noreply, %State{state | membrane_sink_pid: sink}}
   end
 
   @impl true
-  def handle_info({:boombox_demand, demand}, state) do
+  def handle_info({:boombox_demand, source, demand}, %State{membrane_source_pid: source} = state) do
+    state =
+      if state.ghosted_client != nil do
+        send(state.membrane_source_pid, {:boombox_packet, self(), state.limbo_packet})
+        reply(state.ghosted_client, :ok)
+        %State{state | ghosted_client: nil, limbo_packet: nil}
+      else
+        state
+      end
+
     {:noreply, %State{state | membrane_source_demand: state.membrane_source_demand + demand}}
   end
 
   @impl true
-  def handle_info({:DOWN, _ref, :process, pid, reason}, %State{boombox_pid: pid} = state) do
-    reason =
-      case reason do
-        :normal -> :normal
-        reason -> {:boombox_crash, reason}
-      end
+  def handle_info({:boombox_packet, sink, packet}, %State{membrane_sink_pid: sink} = state) do
+    if state.ghosted_client != nil do
+      packet =
+        if state.packet_serialization do
+          serialize_packet(packet)
+        else
+          packet
+        end
 
-    {:stop, reason, state}
+      reply(state.ghosted_client, {:ok, packet})
+      {:noreply, %State{state | ghosted_client: nil}}
+    else
+      {:noreply, state}
+    end
   end
+
+  # @impl true
+  # def handle_info({:DOWN, _ref, :process, pid, reason}, %State{boombox_pid: pid} = state) do
+  # reason =
+  # case reason do
+  # :normal -> :normal
+  # reason -> {:boombox_crash, reason}
+  # end
+
+  # {:stop, reason, state}
+  # end
 
   @impl true
   def handle_info(
         {:DOWN, _ref, :process, pid, reason},
         %State{pipeline_supervisor_pid: pid} = state
       ) do
+    if state.ghosted_client != nil do
+      GenServer.reply(state.ghosted_client, :finished)
+    end
+
     reason =
       case reason do
         :normal -> :normal
@@ -342,67 +390,80 @@ defmodule Boombox.Server do
 
   defp handle_request(request, from \\ nil, state)
 
-  @spec handle_request({:run, boombox_opts()}, GenServer.from() | nil, State.t()) ::
-          {boombox_mode(), State.t()}
+  @spec handle_request({:run, boombox_opts()}, GenServer.from() | pid() | nil, State.t()) ::
+          {:reply, boombox_mode(), State.t()}
   defp handle_request({:run, boombox_opts}, _from, state) do
     boombox_mode = get_boombox_mode(boombox_opts)
 
-    boombox_opts =
-      boombox_opts
-      |> Enum.map(fn
-        {direction, {:message, opts}} -> {direction, {:stream, opts}}
-        {direction, {:writer, opts}} -> {direction, {:stream, opts}}
-        {direction, {:reader, opts}} -> {direction, {:stream, opts}}
-        other -> other
-      end)
+    # boombox_opts =
+    # boombox_opts
+    # |> Enum.map(fn
+    # {direction, {:message, opts}} -> {direction, {:stream, opts}}
+    # {direction, {:writer, opts}} -> {direction, {:stream, opts}}
+    # {direction, {:reader, opts}} -> {direction, {:stream, opts}}
+    # other -> other
+    # end)
 
-    server_pid = self()
-    # procs = Boombox.Pipeline.start_pipeline(Map.new(boombox_opts))
-    procs = %{supervisor: nil, pipeline: nil}
+    # server_pid = self()
+    procs = Boombox.Pipeline.start_pipeline(Map.new(boombox_opts))
+    # procs = %{supervisor: nil, pipeline: nil}
 
-    boombox_process_fun =
-      case boombox_mode do
-        :consuming ->
-          fn -> consuming_boombox_run(boombox_opts, server_pid) end
+    # boombox_process_fun =
+    # state =
+    # case boombox_mode do
+    # :consuming ->
+    # IO.inspect("aaa")
 
-        :producing ->
-          fn -> producing_boombox_run(boombox_opts, server_pid, state.communication_medium) end
+    # receive do
+    # {:boombox_elixir_source, source} -> %State{state | membrane_source_pid: source}
+    # end
 
-        :standalone ->
-          fn -> standalone_boombox_run(boombox_opts) end
-      end
+    # IO.inspect(state)
 
-    boombox_pid = spawn(boombox_process_fun)
-    Process.monitor(boombox_pid)
+    # :producing ->
+    # receive do
+    # {:boombox_elixir_sink, sink} -> %State{state | membrane_sink_pid: sink}
+    # end
 
-    {boombox_mode,
+    # :standalone ->
+    # state
+    # end
+
+    # boombox_pid = spawn(boombox_process_fun)
+    # Process.monitor(boombox_pid)
+
+    {:reply, boombox_mode,
      %State{
        state
-       | boombox_pid: boombox_pid,
-         boombox_mode: boombox_mode,
+       | boombox_mode: boombox_mode,
          pipeline_supervisor_pid: procs.supervisor,
-         pipeline_pid: procs.pipeline
+         pipeline_pid: procs.pipeline,
+         procs: procs
      }}
   end
 
-  @spec handle_request(:get_pid, GenServer.from() | nil, State.t()) :: {pid(), State.t()}
+  @spec handle_request(:get_pid, GenServer.from() | pid() | nil, State.t()) ::
+          {:reply, pid(), State.t()}
   defp handle_request(:get_pid, _from, state) do
-    {self(), state}
+    {:reply, self(), state}
   end
 
-  defp handle_request(_request, _from, %State{boombox_pid: nil} = state) do
-    {{:error, :boombox_not_running}, state}
+  defp handle_request(_request, _from, %State{procs: nil} = state) do
+    {:reply, {:error, :boombox_not_running}, state}
   end
 
   @spec handle_request(
           {:consume_packet, serialized_boombox_packet() | Boombox.Packet.t()},
           GenServer.from() | nil,
           State.t()
-        ) :: {:ok | :finished | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
+        ) ::
+          {:reply, :ok | :finished | {:error, :incompatible_mode | :boombox_not_running},
+           State.t()}
+          | {:noreply, State.t()}
   defp handle_request(
          {:consume_packet, packet},
          from,
-         %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
+         %State{boombox_mode: :consuming} = state
        ) do
     packet =
       if state.packet_serialization do
@@ -411,21 +472,33 @@ defmodule Boombox.Server do
         packet
       end
 
-    # demand =
+    cond do
+      state.membrane_source_pid == nil ->
+        {:noreply, %State{state | ghosted_client: from, limbo_packet: packet}}
+
+      state.membrane_source_demand == 0 ->
+        {:noreply, %State{state | ghosted_client: from, limbo_packet: packet}}
+
+      true ->
+        send(state.membrane_source_pid, {:boombox_packet, self(), packet})
+        {:reply, :ok, %State{state | membrane_source_demand: state.membrane_source_demand - 1}}
+    end
+
     # if state.membrane_source_demand == 1 do
-    # send(state.membrane_source_pid, packet)
-    # {:noreply, %State{state | membrane_source_demand: 0}}
+    # {:noreply, %State{state | membrane_source_demand: 0, ghosted_client: from}}
+    # else
+    # {:reply, :ok, %State{state | membrane_source_demand: state.membrane_source_demand - 1}}
     # end
 
-    send(boombox_pid, {:consume_packet, packet})
+    # send(boombox_pid, {:consume_packet, packet})
 
-    receive do
-      {:packet_consumed, ^boombox_pid} ->
-        {:ok, state}
+    # receive do
+    # {:packet_consumed, ^boombox_pid} ->
+    # {:ok, state}
 
-      {:finished, ^boombox_pid} ->
-        {:finished, state}
-    end
+    # {:finished, ^boombox_pid} ->
+    # {:finished, state}
+    # end
   end
 
   defp handle_request(
@@ -433,82 +506,104 @@ defmodule Boombox.Server do
          _from,
          %State{boombox_mode: _other_mode} = state
        ) do
-    {{:error, :incompatible_mode}, state}
+    {:reply, {:error, :incompatible_mode}, state}
   end
 
-  @spec handle_request(:finish_consuming, GenServer.from() | nil, State.t()) ::
-          {:finished | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
+  @spec handle_request(:finish_consuming, GenServer.from() | pid() | nil, State.t()) ::
+          {:reply, :finished | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
   defp handle_request(
          :finish_consuming,
-         _from,
-         %State{boombox_mode: :consuming, boombox_pid: boombox_pid} = state
+         from,
+         %State{boombox_mode: :consuming} = state
        ) do
-    send(boombox_pid, :finish_consuming)
+    send(state.membrane_source_pid, {:boombox_eos, self()})
+    reply(from, :finished)
+    Boombox.Pipeline.await_pipeline(state.procs)
+    # Boombox.Pipeline.terminate_pipeline(state.procs)
+    # send(boombox_pid, :finish_consuming)
 
-    receive do
-      {:finished, ^boombox_pid} ->
-        {:finished, state}
-    end
+    # receive do
+    # {:finished, ^boombox_pid} ->
+    # {:finished, state}
+    # end
+    {:noreply, state}
   end
 
   defp handle_request(:finish_consuming, _from, %State{boombox_mode: _other_mode} = state) do
-    {{:error, :incompatible_mode}, state}
+    {:reply, {:error, :incompatible_mode}, state}
   end
 
-  @spec handle_request(:produce_packet, GenServer.from() | nil, State.t()) ::
-          {{:ok | :finished, serialized_boombox_packet() | Boombox.Packet.t()}
-           | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
+  @spec handle_request(:produce_packet, GenServer.from() | pid() | nil, State.t()) ::
+          {:reply, {:error, :incompatible_mode | :boombox_not_running}, State.t()}
+          | {:noreply, State.t()}
   defp handle_request(
          :produce_packet,
-         _from,
-         %State{boombox_mode: :producing, boombox_pid: boombox_pid} = state
+         from,
+         %State{boombox_mode: :producing} = state
        ) do
-    send(boombox_pid, :produce_packet)
+    if state.membrane_sink_pid != nil do
+      send(state.membrane_sink_pid, {:boombox_demand, self()})
+    end
 
-    {response_type, packet} =
-      receive do
-        {:packet_produced, packet, ^boombox_pid} -> {:ok, packet}
-        {:finished, packet, ^boombox_pid} -> {:finished, packet}
-      end
+    # send(boombox_pid, :produce_packet)
 
-    packet =
-      if state.packet_serialization do
-        serialize_packet(packet)
-      else
-        packet
-      end
+    # {response_type, packet} =
+    # receive do
+    # {:packet_produced, packet, ^boombox_pid} -> {:ok, packet}
+    # {:finished, packet, ^boombox_pid} -> {:finished, packet}
+    # end
 
-    {{response_type, packet}, state}
+    # packet =
+    # if state.packet_serialization do
+    # serialize_packet(packet)
+    # else
+    # packet
+    # end
+
+    # {{response_type, packet}, state}
+
+    {:noreply, %State{state | ghosted_client: from}}
   end
 
   defp handle_request(:produce_packet, _from, %State{boombox_mode: _other_mode} = state) do
-    {{:error, :incompatible_mode}, state}
+    {:reply, {:error, :incompatible_mode}, state}
   end
 
-  @spec handle_request(:finish_producing, GenServer.from() | nil, State.t()) ::
-          {{:finished, serialized_boombox_packet() | Boombox.Packet.t()}
-           | {:error, :incompatible_mode}, State.t()}
+  @spec handle_request(:finish_producing, GenServer.from() | pid() | nil, State.t()) ::
+          {:reply, :finished | {:error, :incompatible_mode}, State.t()}
   defp handle_request(
          :finish_producing,
-         _from,
-         %State{boombox_mode: :producing, boombox_pid: boombox_pid} = state
+         from,
+         %State{boombox_mode: :producing} = state
        ) do
-    send(boombox_pid, :finish_producing)
+    reply(from, :finished)
+    Boombox.Pipeline.terminate_pipeline(state.procs)
+    # send(boombox_pid, :finish_producing)
 
-    receive do
-      {:finished, packet, ^boombox_pid} ->
-        {{:finished, packet}, state}
-    end
+    # receive do
+    # {:finished, packet, ^boombox_pid} ->
+    # {{:finished, packet}, state}
+    # end
+    {:noreply, :finished, state}
   end
 
   defp handle_request(:finish_producing, _from, %State{boombox_mode: _other_mode} = state) do
-    {{:error, :incompatible_mode}, state}
+    {:reply, {:error, :incompatible_mode}, state}
   end
 
-  @spec handle_request(term(), GenServer.from() | nil, State.t()) ::
-          {{:error, :invalid_request}, State.t()}
+  @spec handle_request(term(), GenServer.from() | pid() | nil, State.t()) ::
+          {:reply, {:error, :invalid_request}, State.t()}
   defp handle_request(_invalid_request, _from, state) do
-    {{:error, :invalid_request}, state}
+    {:reply, {:error, :invalid_request}, state}
+  end
+
+  @spec reply(GenServer.from() | pid(), term()) :: :ok
+  defp reply(pid, reply_content) when is_pid(pid) do
+    send(pid, {:response, reply_content})
+  end
+
+  defp reply({pid, _tag} = client, reply_content) when is_pid(pid) do
+    GenServer.reply(client, reply_content)
   end
 
   @spec get_boombox_mode(boombox_opts()) :: boombox_mode()
@@ -528,62 +623,62 @@ defmodule Boombox.Server do
     end
   end
 
-  defp elixir_endpoint?({type, _opts}) when type in [:reader, :writer, :message],
+  defp elixir_endpoint?({type, _opts}) when type in [:stream, :reader, :writer, :message],
     do: true
 
   defp elixir_endpoint?(_io), do: false
 
-  @spec consuming_boombox_run(boombox_opts(), pid()) :: :ok
-  defp consuming_boombox_run(boombox_opts, server_pid) do
-    Stream.resource(
-      fn -> true end,
-      fn is_first_iteration ->
-        if not is_first_iteration do
-          send(server_pid, {:packet_consumed, self()})
-        end
+  # @spec consuming_boombox_run(boombox_opts(), pid()) :: :ok
+  # defp consuming_boombox_run(boombox_opts, server_pid) do
+  # Stream.resource(
+  # fn -> true end,
+  # fn is_first_iteration ->
+  # if not is_first_iteration do
+  # send(server_pid, {:packet_consumed, self()})
+  # end
 
-        receive do
-          {:consume_packet, packet} ->
-            {[packet], false}
+  # receive do
+  # {:consume_packet, packet} ->
+  # {[packet], false}
 
-          :finish_consuming ->
-            {:halt, false}
-        end
-      end,
-      fn _is_first_iteration -> send(server_pid, {:finished, self()}) end
-    )
-    |> Boombox.run(boombox_opts)
-  end
+  # :finish_consuming ->
+  # {:halt, false}
+  # end
+  # end,
+  # fn _is_first_iteration -> send(server_pid, {:finished, self()}) end
+  # )
+  # |> Boombox.run(boombox_opts)
+  # end
 
-  @spec producing_boombox_run(boombox_opts(), pid(), communication_medium()) :: :ok
-  defp producing_boombox_run(boombox_opts, server_pid, communication_medium) do
-    last_packet =
-      Boombox.run(boombox_opts)
-      |> Enum.reduce_while(nil, fn new_packet, last_produced_packet ->
-        if last_produced_packet != nil do
-          send(server_pid, {:packet_produced, last_produced_packet, self()})
-        end
+  # @spec producing_boombox_run(boombox_opts(), pid(), communication_medium()) :: :ok
+  # defp producing_boombox_run(boombox_opts, server_pid, communication_medium) do
+  # last_packet =
+  # Boombox.run(boombox_opts)
+  # |> Enum.reduce_while(nil, fn new_packet, last_produced_packet ->
+  # if last_produced_packet != nil do
+  # send(server_pid, {:packet_produced, last_produced_packet, self()})
+  # end
 
-        action =
-          if communication_medium == :calls do
-            receive do
-              :produce_packet -> :cont
-              :finish_producing -> :halt
-            end
-          else
-            :cont
-          end
+  # action =
+  # if communication_medium == :calls do
+  # receive do
+  # :produce_packet -> :cont
+  # :finish_producing -> :halt
+  # end
+  # else
+  # :cont
+  # end
 
-        {action, new_packet}
-      end)
+  # {action, new_packet}
+  # end)
 
-    send(server_pid, {:finished, last_packet, self()})
-  end
+  # send(server_pid, {:finished, last_packet, self()})
+  # end
 
-  @spec standalone_boombox_run(boombox_opts()) :: :ok
-  defp standalone_boombox_run(boombox_opts) do
-    Boombox.run(boombox_opts)
-  end
+  # @spec standalone_boombox_run(boombox_opts()) :: :ok
+  # defp standalone_boombox_run(boombox_opts) do
+  # Boombox.run(boombox_opts)
+  # end
 
   @spec deserialize_packet(serialized_boombox_packet()) :: Packet.t()
   defp deserialize_packet(%{payload: {:audio, payload}} = serialized_packet) do

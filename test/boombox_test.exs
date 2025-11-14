@@ -572,11 +572,10 @@ defmodule BoomboxTest do
           :reader ->
             Stream.unfold(:ok, fn
               :ok ->
-                {result, packet} = Boombox.read(boombox)
-                {packet, result}
-
-              :finished ->
-                nil
+                case Boombox.read(boombox) do
+                  {:ok, packet} -> {packet, :ok}
+                  :finished -> nil
+                end
             end)
 
           :message ->
