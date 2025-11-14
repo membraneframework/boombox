@@ -177,14 +177,29 @@ defmodule Boombox do
   See `t:input/0` and `t:output/0` for available inputs and outputs and
   [examples.livemd](examples.livemd) for examples.
 
-  If the input is a `:stream` endpoint, a `Stream` or other `Enumerable` is expected
-  as the first argument.
+  Input endpoints with special behaviours:
+    * `:stream` - a `Stream` or other `Enumerable` containing `Boombox.Packet`s is expected as the first argument.
+    * `:writer` - this function will return a `Boombox.Writer` struct, which is used to
+    write media packets to boombox with `write/2` and to finish writing with `close/1`.
+    * `:message` - this function returns a PID of a process to communicate with. The process accepts
+    the following types of messages:
+      - `{:boombox_packet, sender_pid :: pid(), packet :: Boombox.Packet.t()}` - provides boombox
+      with a media packet. The process will a `{:boombox_finished, boombox_pid :: pid()}` message to
+      `sender_pid` if it has finished processing packets and should not be provided any more.
+      - `{:boombox_close, sender_pid :: pid()}` - tells boombox that no more packets will be
+      provided and that it should terminate. The process will reply by sending
+      `{:boombox_finished, boombox_pid :: pid()}` to `sender_pid`
 
-  If the input is a `:writer` endpoint this function will return a `Boombox.Writer` struct,
-  which is used to write media packets to boombox with `write/2` and to finish writing with `close/1`.
-
-  If the output is a `:reader` endpoint this function will return a `Boombox.Reader` struct,
-  which is used to read media packets from boombox with `read/1`.
+  Output endpoints with special behaviours:
+    * `:stream` - this function will return a `Stream` that contains `Boombox.Packet`s
+    * `:reader` - this function will return a `Boombox.Reader` struct, which is used to read media packets from
+    boombox with `read/1` and to stop reading with `close/1`.
+    * `:message` - this function returns a PID of a process to communicate with. The process will
+    send the following types of messages to the process that called this function:
+      - `{:boombox_packet, boombox_pid :: pid(), packet :: Boombox.Packet.t()}` - contains a packet
+      produced by boombox.
+      - `{:boombox_finished, boombox_pid :: pid()}` - informs that boombox has finished producing
+      packets and will begin terminating. No more messages will be sent.
 
   ```
   Boombox.run(
@@ -255,8 +270,8 @@ defmodule Boombox do
 
   It returns a `Task.t()` that can be awaited later.
 
-  If the output is a `:stream` or `:reader` endpoint, or the input is a `:writer` endpoint,
-  the behaviour is identical to `run/2`.
+  If the output is a `:stream`, `:reader` or `:message` endpoint, or the input
+  is a `:writer` or `:message` endpoint, the behaviour is identical to `run/2`.
   """
   @spec async(Enumerable.t() | nil,
           input: input(),
@@ -375,13 +390,15 @@ defmodule Boombox do
   of type `:finished` has been received.
 
   When using `:reader` endpoint on output informs Boombox that no more packets will be read
-  from it with `read/1` and that it should terminate accordingly.
+  from it with `read/1` and that it should terminate accordingly. This function will then
+  return one last packet.
 
   When using `:writer` endpoint on input informs Boombox that it will not be provided
   any more packets with `write/2` and should terminate accordingly.
 
   """
-  @spec close(Writer.t() | Reader.t()) :: :finished | {:error, :incompatible_mode}
+  @spec close(Writer.t()) :: :finished | {:error, :incompatible_mode}
+  @spec close(Reader.t()) :: {:finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
   def close(%Writer{} = writer) do
     Boombox.Server.finish_consuming(writer.server_reference)
   end
