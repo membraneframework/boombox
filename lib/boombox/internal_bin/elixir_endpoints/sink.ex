@@ -27,12 +27,6 @@ defmodule Boombox.InternalBin.ElixirEndpoints.Sink do
     end
   end
 
-  def handle_info(info, _ctx, state) do
-    dbg(info)
-    dbg(state)
-    raise "aaaaa"
-  end
-
   def handle_stream_format(Pad.ref(:input, :audio), stream_format, _ctx, state) do
     audio_format = %{
       audio_format: stream_format.sample_format,

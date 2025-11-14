@@ -161,7 +161,6 @@ defmodule Boombox do
 
   @type elixir_output :: {:stream | :reader | :message, out_raw_data_opts()}
 
-  @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @doc """
   Runs boombox with given input and output.
 
@@ -362,7 +361,7 @@ defmodule Boombox do
   Can be called only when using `:reader` endpoint on output.
   """
   @spec read(Reader.t()) ::
-          {:ok | :finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
+          {:ok, Boombox.Packet.t()} | :finished | {:error, :incompatible_mode}
   def read(reader) do
     Boombox.Server.produce_packet(reader.server_reference)
   end
@@ -387,15 +386,13 @@ defmodule Boombox do
   of type `:finished` has been received.
 
   When using `:reader` endpoint on output informs Boombox that no more packets will be read
-  from it with `read/1` and that it should terminate accordingly. This function will then
-  return one last packet.
+  from it with `read/1` and that it should terminate accordingly.
 
   When using `:writer` endpoint on input informs Boombox that it will not be provided
   any more packets with `write/2` and should terminate accordingly.
 
   """
-  @spec close(Writer.t()) :: :finished | {:error, :incompatible_mode}
-  @spec close(Reader.t()) :: {:finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
+  @spec close(Writer.t() | Reader.t()) :: :finished | {:error, :incompatible_mode}
   def close(%Writer{} = writer) do
     Boombox.Server.finish_consuming(writer.server_reference)
   end
@@ -445,7 +442,7 @@ defmodule Boombox do
     pid
   end
 
-  @spec consume_stream(Enumerable.t(), pid(), procs()) :: term()
+  @spec consume_stream(Enumerable.t(), pid(), Pipeline.procs()) :: term()
   defp consume_stream(stream, source, procs) do
     Enum.reduce_while(
       stream,
@@ -475,12 +472,12 @@ defmodule Boombox do
         :ok
 
       _state ->
-        send(source, {:boombox_close, self()})
+        send(source, {:boombox_eos, self()})
         Pipeline.await_pipeline(procs)
     end
   end
 
-  @spec produce_stream(pid(), procs()) :: Enumerable.t()
+  @spec produce_stream(pid(), Pipeline.procs()) :: Enumerable.t()
   defp produce_stream(sink, procs) do
     Stream.resource(
       fn ->

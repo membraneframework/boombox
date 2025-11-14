@@ -7,8 +7,9 @@ defmodule Boombox.Pipeline do
           input: Boombox.input() | Boombox.elixir_input(),
           output: Boombox.output() | Boombox.elixir_output()
         }
+  @type procs :: %{pipeline: pid(), supervisor: pid()}
 
-  @spec start_pipeline(opts_map()) :: Boombox.procs()
+  @spec start_pipeline(opts_map()) :: procs()
   def start_pipeline(opts) do
     opts =
       opts
@@ -23,13 +24,13 @@ defmodule Boombox.Pipeline do
     %{supervisor: supervisor, pipeline: pipeline}
   end
 
-  @spec terminate_pipeline(Boombox.procs()) :: :ok
+  @spec terminate_pipeline(procs()) :: :ok
   def terminate_pipeline(procs) do
     Membrane.Pipeline.terminate(procs.pipeline)
     await_pipeline(procs)
   end
 
-  @spec await_pipeline(Boombox.procs()) :: :ok
+  @spec await_pipeline(procs()) :: :ok
   def await_pipeline(%{supervisor: supervisor}) do
     receive do
       {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
