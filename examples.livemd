@@ -24,8 +24,7 @@ Mix.install([
   :exla,
   :bumblebee,
   :websockex,
-  :membrane_simple_rtsp_server,
-  {:coerce, github: "ypconstante/elixir-coerce", override: true}
+  :membrane_simple_rtsp_server
 ])
 
 Nx.global_default_backend(EXLA.Backend)
@@ -61,7 +60,7 @@ unless File.exists?("#{input_dir}/ffmpeg-testsrc.h264") do
   File.write!("#{input_dir}/ffmpeg-testsrc.h264", testsrc_h264)
 end
 
-unless File.exists?("#{input_dir}/test-audio.aac") do
+unless File.exists?("#{input_dir}/ffmpeg-testsrc.mp4") do
   %{status: 200, body: testsrc_mp4} = Req.get!("#{samples_url}/ffmpeg-testsrc-480x270.mp4")
   File.write!("#{input_dir}/ffmpeg-testsrc.mp4", testsrc_mp4)
 end
@@ -591,9 +590,9 @@ Stream.unfold(%{}, fn _state ->
 
   if :finished in [result1, result2] do
     if result1 == :ok, do:
-      Boombox.close(writer1)
+      Boombox.close(reader1)
     if result2 == :ok, do:
-      Boombox.close(writer2)
+      Boombox.close(reader2)
     nil
   else
     {nil, %{}}

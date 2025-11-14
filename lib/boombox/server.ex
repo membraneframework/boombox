@@ -23,7 +23,7 @@ defmodule Boombox.Server do
 
   alias Boombox.Packet
 
-  @type t :: pid()
+  @type t :: GenServer.server()
 
   @type communication_medium :: :calls | :messages
 
