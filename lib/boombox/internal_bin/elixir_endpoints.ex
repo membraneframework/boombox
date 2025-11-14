@@ -1,10 +1,10 @@
-defmodule Boombox.InternalBin.ElixirStream do
+defmodule Boombox.InternalBin.ElixirEndpoints do
   @moduledoc false
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
 
-  alias __MODULE__.{Sink, Source}
+  alias __MODULE__.{PullSink, PushSink, PullSource, PushSource}
   alias Boombox.InternalBin.Ready
   alias Membrane.FFmpeg.SWScale
 
@@ -14,8 +14,10 @@ defmodule Boombox.InternalBin.ElixirStream do
   # the burst of packets from one segment of Live HLS stream
   @realtimer_toilet_capacity 10_000
 
-  @spec create_input(producer :: pid, options :: Boombox.in_raw_data_opts()) :: Ready.t()
-  def create_input(producer, options) do
+  @type flow_control_mode :: :push | :pull
+
+  @spec create_input(pid(), Boombox.in_raw_data_opts(), flow_control_mode()) :: Ready.t()
+  def create_input(producer, options, flow_control_mode) do
     options = parse_options(options, :input)
 
     builders =
@@ -35,29 +37,49 @@ defmodule Boombox.InternalBin.ElixirStream do
            |> via_out(Pad.ref(:output, :audio))}
       end)
 
-    spec_builder = child(:elixir_stream_source, %Source{producer: producer})
+    source_definition =
+      case flow_control_mode do
+        :push -> %PushSource{producer: producer}
+        :pull -> %PullSource{producer: producer}
+      end
+
+    spec_builder = child(:elixir_stream_source, source_definition)
 
     %Ready{track_builders: builders, spec_builder: spec_builder}
   end
 
   @spec link_output(
-          consumer :: pid,
-          options :: Boombox.out_raw_data_opts(),
+          pid(),
+          Boombox.out_raw_data_opts(),
+          flow_control_mode(),
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           boolean()
         ) :: Ready.t()
-  def link_output(consumer, options, track_builders, spec_builder, is_input_realtime) do
+  def link_output(
+        consumer,
+        options,
+        flow_control_mode,
+        track_builders,
+        spec_builder,
+        is_input_realtime
+      ) do
     options = parse_options(options, :output)
     pace_control = Map.get(options, :pace_control, true)
 
     {track_builders, to_ignore} =
       Map.split_with(track_builders, fn {kind, _builder} -> options[kind] != false end)
 
+    sink_definition =
+      case flow_control_mode do
+        :push -> %PushSink{consumer: consumer}
+        :pull -> %PullSink{consumer: consumer}
+      end
+
     spec =
       [
         spec_builder,
-        child(:elixir_stream_sink, %Sink{consumer: consumer}),
+        child(:elixir_stream_sink, sink_definition),
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
