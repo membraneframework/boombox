@@ -16,9 +16,9 @@ defmodule Boombox do
     @moduledoc """
     Defines a struct to be used when interacting with boombox when using `:writer` endpoint.
     """
-    @opaque t :: %__MODULE__{
-              server_reference: GenServer.server()
-            }
+    @type t :: %__MODULE__{
+            server_reference: GenServer.server()
+          }
 
     @enforce_keys [:server_reference]
     defstruct @enforce_keys
@@ -28,9 +28,9 @@ defmodule Boombox do
     @moduledoc """
     Defines a struct to be used when interacting with boombox when using `:reader` endpoint.
     """
-    @opaque t :: %__MODULE__{
-              server_reference: GenServer.server()
-            }
+    @type t :: %__MODULE__{
+            server_reference: GenServer.server()
+          }
 
     @enforce_keys [:server_reference]
     defstruct @enforce_keys
