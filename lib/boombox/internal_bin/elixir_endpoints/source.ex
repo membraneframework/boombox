@@ -1,18 +1,8 @@
-defmodule Boombox.InternalBin.ElixirStream.Source do
+defmodule Boombox.InternalBin.ElixirEndpoints.Source do
   @moduledoc false
-  use Membrane.Source
+  alias Membrane.Pad
+  require Membrane.Pad
 
-  def_output_pad :output,
-    accepted_format: any_of(Membrane.RawVideo, Membrane.RawAudio),
-    availability: :on_request,
-    flow_control: :manual,
-    demand_unit: :buffers
-
-  def_options producer: [
-                spec: pid()
-              ]
-
-  @impl true
   def handle_init(_ctx, opts) do
     state = %{
       producer: opts.producer,
@@ -23,13 +13,11 @@ defmodule Boombox.InternalBin.ElixirStream.Source do
     {[], state}
   end
 
-  @impl true
   def handle_playing(_ctx, state) do
     send(state.producer, {:boombox_elixir_source, self()})
     {[], state}
   end
 
-  @impl true
   def handle_demand(Pad.ref(:output, _id), _size, _unit, ctx, state) do
     demands = Enum.map(ctx.pads, fn {_pad, %{demand: demand}} -> demand end)
 
@@ -40,7 +28,6 @@ defmodule Boombox.InternalBin.ElixirStream.Source do
     {[], state}
   end
 
-  @impl true
   def handle_info(
         {:boombox_packet, producer, %Boombox.Packet{kind: :video} = packet},
         _ctx,
@@ -69,7 +56,6 @@ defmodule Boombox.InternalBin.ElixirStream.Source do
     end
   end
 
-  @impl true
   def handle_info(
         {:boombox_packet, producer, %Boombox.Packet{kind: :audio} = packet},
         _ctx,
@@ -102,7 +88,6 @@ defmodule Boombox.InternalBin.ElixirStream.Source do
     end
   end
 
-  @impl true
   def handle_info({:boombox_close, producer}, ctx, %{producer: producer} = state) do
     actions = Enum.map(ctx.pads, fn {ref, _data} -> {:end_of_stream, ref} end)
     {actions, state}

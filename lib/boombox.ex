@@ -453,8 +453,8 @@ defmodule Boombox do
       fn
         %Boombox.Packet{} = packet, %{demand: 0} = state ->
           receive do
-            {:boombox_demand, demand} ->
-              send(source, packet)
+            {:boombox_demand, ^source, demand} ->
+              send(source, {:boombox_packet, self(), packet})
               {:cont, %{state | demand: demand - 1}}
 
             {:DOWN, _monitor, :process, supervisor, _reason}
@@ -463,7 +463,7 @@ defmodule Boombox do
           end
 
         %Boombox.Packet{} = packet, %{demand: demand} = state ->
-          send(source, packet)
+          send(source, {:boombox_packet, self(), packet})
           {:cont, %{state | demand: demand - 1}}
 
         value, _state ->
@@ -475,7 +475,7 @@ defmodule Boombox do
         :ok
 
       _state ->
-        send(source, :boombox_eos)
+        send(source, {:boombox_close, self()})
         Pipeline.await_pipeline(procs)
     end
   end
@@ -487,10 +487,10 @@ defmodule Boombox do
         %{sink: sink, procs: procs}
       end,
       fn %{sink: sink, procs: procs} = state ->
-        send(sink, :boombox_demand)
+        send(sink, {:boombox_demand, self()})
 
         receive do
-          %Boombox.Packet{} = packet ->
+          {:boombox_packet, ^sink, %Boombox.Packet{} = packet} ->
             verify_packet!(packet)
             {[packet], state}
 
