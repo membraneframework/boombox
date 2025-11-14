@@ -1,32 +1,21 @@
-defmodule Boombox.InternalBin.ElixirStream.Sink do
+defmodule Boombox.InternalBin.ElixirEndpoints.Sink do
   @moduledoc false
-  use Membrane.Sink
+  alias Membrane.Pad
+  require Membrane.Pad
 
-  def_input_pad :input,
-    accepted_format: any_of(Membrane.RawAudio, Membrane.RawVideo),
-    availability: :on_request,
-    flow_control: :manual,
-    demand_unit: :buffers
-
-  def_options consumer: [spec: pid()]
-
-  @impl true
   def handle_init(_ctx, opts) do
     {[], Map.merge(Map.from_struct(opts), %{last_pts: %{}, audio_format: nil})}
   end
 
-  @impl true
   def handle_pad_added(Pad.ref(:input, kind), _ctx, state) do
     {[], %{state | last_pts: Map.put(state.last_pts, kind, 0)}}
   end
 
-  @impl true
   def handle_playing(_ctx, state) do
-    send(state.consumer, {:boombox_ex_stream_sink, self()})
+    send(state.consumer, {:boombox_elixir_sink, self()})
     {[], state}
   end
 
-  @impl true
   def handle_info({:boombox_demand, consumer}, _ctx, %{consumer: consumer} = state) do
     if state.last_pts == %{} do
       {[], state}
@@ -38,14 +27,12 @@ defmodule Boombox.InternalBin.ElixirStream.Sink do
     end
   end
 
-  @impl true
   def handle_info(info, _ctx, state) do
     dbg(info)
     dbg(state)
     raise "aaaaa"
   end
 
-  @impl true
   def handle_stream_format(Pad.ref(:input, :audio), stream_format, _ctx, state) do
     audio_format = %{
       audio_format: stream_format.sample_format,
@@ -56,12 +43,10 @@ defmodule Boombox.InternalBin.ElixirStream.Sink do
     {[], %{state | audio_format: audio_format}}
   end
 
-  @impl true
   def handle_stream_format(_pad, _stream_format, _ctx, state) do
     {[], state}
   end
 
-  @impl true
   def handle_buffer(Pad.ref(:input, :video), buffer, ctx, state) do
     state = %{state | last_pts: %{state.last_pts | video: buffer.pts}}
     %{width: width, height: height} = ctx.pads[Pad.ref(:input, :video)].stream_format
@@ -78,7 +63,6 @@ defmodule Boombox.InternalBin.ElixirStream.Sink do
     {[], state}
   end
 
-  @impl true
   def handle_buffer(Pad.ref(:input, :audio), buffer, _ctx, state) do
     state = %{state | last_pts: %{state.last_pts | audio: buffer.pts}}
 
@@ -94,7 +78,6 @@ defmodule Boombox.InternalBin.ElixirStream.Sink do
     {[], state}
   end
 
-  @impl true
   def handle_end_of_stream(Pad.ref(:input, kind), _ctx, state) do
     {[], %{state | last_pts: Map.delete(state.last_pts, kind)}}
   end

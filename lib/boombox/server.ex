@@ -16,6 +16,14 @@ defmodule Boombox.Server do
   #                tuple to the `sender` when finished.
   # The packets that Boombox is consuming and producing are in the form of
   # `t:serialized_boombox_packet/0` or `t:Boombox.Packet.t/0`, depending on set options.
+  #
+  # Avaliable actions:
+  # write buffer to boombox synchronously
+  # write buffer to boombox asynchronously
+  # read buffer from boombox synchronously
+  # receive buffer from boombox asynchronously (message)
+  # close boombox for wrtiting
+  # close boombox for reading
 
   use GenServer
 
@@ -26,6 +34,7 @@ defmodule Boombox.Server do
   @type t :: GenServer.server()
 
   @type communication_medium :: :calls | :messages
+  @type flow_control :: :push | :pull
 
   @type opts :: [
           name: GenServer.name(),
@@ -102,6 +111,7 @@ defmodule Boombox.Server do
             membrane_source_demand: non_neg_integer(),
             membrane_sink_pid: pid() | nil,
             pipeline_supervisor_pid: pid() | nil,
+            pipeline_pid: pid() | nil,
             pid_to_reply_to: pid() | nil
           }
 
@@ -120,6 +130,7 @@ defmodule Boombox.Server do
                   membrane_source_demand: 0,
                   membrane_sink_pid: nil,
                   pipeline_supervisor_pid: nil,
+                  pipeline_pid: nil,
                   pid_to_reply_to: nil
                 ]
   end
@@ -266,12 +277,12 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_info({:boombox_ex_stream_source, source}, state) do
+  def handle_info({:boombox_elixir_source, source}, state) do
     {:noreply, %State{state | membrane_source_pid: source}}
   end
 
   @impl true
-  def handle_info({:boombox_ex_stream_sink, sink}, state) do
+  def handle_info({:boombox_elixir_sink, sink}, state) do
     {:noreply, %State{state | membrane_sink_pid: sink}}
   end
 
@@ -346,7 +357,8 @@ defmodule Boombox.Server do
       end)
 
     server_pid = self()
-    procs = Boombox.Pipeline.start_pipeline(Map.new(boombox_opts))
+    # procs = Boombox.Pipeline.start_pipeline(Map.new(boombox_opts))
+    procs = %{supervisor: nil, pipeline: nil}
 
     boombox_process_fun =
       case boombox_mode do
@@ -368,7 +380,8 @@ defmodule Boombox.Server do
        state
        | boombox_pid: boombox_pid,
          boombox_mode: boombox_mode,
-         pipeline_supervisor_pid: procs.supervisor
+         pipeline_supervisor_pid: procs.supervisor,
+         pipeline_pid: procs.pipeline
      }}
   end
 
@@ -385,8 +398,7 @@ defmodule Boombox.Server do
           {:consume_packet, serialized_boombox_packet() | Boombox.Packet.t()},
           GenServer.from() | nil,
           State.t()
-        ) ::
-          {:ok | :finished | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
+        ) :: {:ok | :finished | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
   defp handle_request(
          {:consume_packet, packet},
          from,
@@ -399,11 +411,11 @@ defmodule Boombox.Server do
         packet
       end
 
-    demand =
-      if state.membrane_source_demand == 1 do
-        send(state.membrane_source_pid, packet)
-        {:noreply, %State{state | membrane_source_demand: 0}}
-      end
+    # demand =
+    # if state.membrane_source_demand == 1 do
+    # send(state.membrane_source_pid, packet)
+    # {:noreply, %State{state | membrane_source_demand: 0}}
+    # end
 
     send(boombox_pid, {:consume_packet, packet})
 

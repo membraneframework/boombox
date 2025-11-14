@@ -39,14 +39,14 @@ defmodule Boombox.Pipeline do
   @spec await_source_ready() :: pid()
   def await_source_ready() do
     receive do
-      {:boombox_ex_stream_source, source} -> source
+      {:boombox_elixir_source, source} -> source
     end
   end
 
   @spec await_sink_ready() :: pid()
   def await_sink_ready() do
     receive do
-      {:boombox_ex_stream_sink, sink} -> sink
+      {:boombox_elixir_sink, sink} -> sink
     end
   end
 
