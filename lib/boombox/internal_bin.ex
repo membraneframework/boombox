@@ -9,6 +9,8 @@ defmodule Boombox.InternalBin do
 
   alias Membrane.Transcoder
 
+  @elixir_endpoint_types [:stream, :message, :reader, :writer]
+
   @type input ::
           Boombox.input()
           | {:stream, pid(), Boombox.in_raw_data_opts()}
@@ -427,12 +429,15 @@ defmodule Boombox.InternalBin do
 
     case result do
       %Ready{actions: actions} = result when ready_status != nil ->
-        proceed(ctx, %{
-          state
-          | status: ready_status,
-            last_result: result,
-            actions_acc: actions_acc ++ actions
-        })
+        proceed(
+          ctx,
+          %{
+            state
+            | status: ready_status,
+              last_result: result,
+              actions_acc: actions_acc ++ actions
+          }
+        )
 
       %Wait{actions: actions} when wait_status != nil ->
         {actions_acc ++ actions, %{state | actions_acc: [], status: wait_status}}
@@ -452,8 +457,12 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.RTSP.create_input(uri)
   end
 
-  defp create_input({:stream, stream_process, params}, _ctx, _state) do
-    Boombox.InternalBin.ElixirEndpoints.create_input(stream_process, params, :pull)
+  defp create_input({type, process, params}, _ctx, _state) when type in @elixir_endpoint_types do
+    Boombox.InternalBin.ElixirEndpoints.create_input(
+      process,
+      params,
+      elixir_endpoint_flow_control(type)
+    )
   end
 
   defp create_input({:h264, location, opts}, _ctx, _state) do
@@ -683,14 +692,15 @@ defmodule Boombox.InternalBin do
     {result, state}
   end
 
-  defp link_output({:stream, stream_process, params}, track_builders, spec_builder, _ctx, state) do
+  defp link_output({type, process, params}, track_builders, spec_builder, _ctx, state)
+       when type in @elixir_endpoint_types do
     is_input_realtime = input_realtime?(state.input)
 
     result =
       Boombox.InternalBin.ElixirEndpoints.link_output(
-        stream_process,
+        process,
         params,
-        :pull,
+        elixir_endpoint_flow_control(type),
         track_builders,
         spec_builder,
         is_input_realtime
@@ -840,7 +850,8 @@ defmodule Boombox.InternalBin do
       {:rtp, opts} ->
         if Keyword.keyword?(opts), do: value
 
-      {:stream, stream_process, opts} when is_pid(stream_process) ->
+      {elixir_endpoint, process, opts}
+      when is_pid(process) and elixir_endpoint in @elixir_endpoint_types ->
         if Keyword.keyword?(opts), do: value
 
       {:srt, server_awaiting_accept}
@@ -947,6 +958,14 @@ defmodule Boombox.InternalBin do
   @spec stream?(input() | output()) :: boolean()
   defp stream?({:stream, _pid, _opts}), do: true
   defp stream?(_endpoint), do: false
+
+  @spec elixir_endpoint_flow_control(:stream | :message | :reader | :writer) :: :pull | :push
+  defp elixir_endpoint_flow_control(type) do
+    cond do
+      type in [:stream, :writer, :reader] -> :pull
+      type == :message -> :push
+    end
+  end
 
   @spec handles_keyframe_requests?(input()) :: boolean()
   defp handles_keyframe_requests?(input) do
