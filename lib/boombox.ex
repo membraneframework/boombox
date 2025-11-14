@@ -16,9 +16,9 @@ defmodule Boombox do
     @moduledoc """
     Defines a struct to be used when interacting with boombox when using `:writer` endpoint.
     """
-    @opaque t :: %__MODULE__{
-              server_reference: GenServer.server()
-            }
+    @type t :: %__MODULE__{
+            server_reference: GenServer.server()
+          }
 
     @enforce_keys [:server_reference]
     defstruct @enforce_keys
@@ -28,9 +28,9 @@ defmodule Boombox do
     @moduledoc """
     Defines a struct to be used when interacting with boombox when using `:reader` endpoint.
     """
-    @opaque t :: %__MODULE__{
-              server_reference: GenServer.server()
-            }
+    @type t :: %__MODULE__{
+            server_reference: GenServer.server()
+          }
 
     @enforce_keys [:server_reference]
     defstruct @enforce_keys
@@ -137,7 +137,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
-  @type elixir_input :: {:stream | :writer, in_raw_data_opts()}
+  @type elixir_input :: {:stream | :writer | :message, in_raw_data_opts()}
 
   @type output ::
           (path_or_uri :: String.t())
@@ -156,7 +156,7 @@ defmodule Boombox do
           | {:srt, url :: String.t(), srt_auth_opts()}
           | :player
 
-  @type elixir_output :: {:stream | :reader, out_raw_data_opts()}
+  @type elixir_output :: {:stream | :reader | :message, out_raw_data_opts()}
 
   @typep procs :: %{pipeline: pid(), supervisor: pid()}
   @typep opts_map :: %{
@@ -177,14 +177,29 @@ defmodule Boombox do
   See `t:input/0` and `t:output/0` for available inputs and outputs and
   [examples.livemd](examples.livemd) for examples.
 
-  If the input is a `:stream` endpoint, a `Stream` or other `Enumerable` is expected
-  as the first argument.
+  Input endpoints with special behaviours:
+    * `:stream` - a `Stream` or other `Enumerable` containing `Boombox.Packet`s is expected as the first argument.
+    * `:writer` - this function will return a `Boombox.Writer` struct, which is used to
+    write media packets to boombox with `write/2` and to finish writing with `close/1`.
+    * `:message` - this function returns a PID of a process to communicate with. The process accepts
+    the following types of messages:
+      - `{:boombox_packet, sender_pid :: pid(), packet :: Boombox.Packet.t()}` - provides boombox
+      with a media packet. The process will a `{:boombox_finished, boombox_pid :: pid()}` message to
+      `sender_pid` if it has finished processing packets and should not be provided any more.
+      - `{:boombox_close, sender_pid :: pid()}` - tells boombox that no more packets will be
+      provided and that it should terminate. The process will reply by sending
+      `{:boombox_finished, boombox_pid :: pid()}` to `sender_pid`
 
-  If the input is a `:writer` endpoint this function will return a `Boombox.Writer` struct,
-  which is used to write media packets to boombox with `write/2` and to finish writing with `close/1`.
-
-  If the output is a `:reader` endpoint this function will return a `Boombox.Reader` struct,
-  which is used to read media packets from boombox with `read/1`.
+  Output endpoints with special behaviours:
+    * `:stream` - this function will return a `Stream` that contains `Boombox.Packet`s
+    * `:reader` - this function will return a `Boombox.Reader` struct, which is used to read media packets from
+    boombox with `read/1` and to stop reading with `close/1`.
+    * `:message` - this function returns a PID of a process to communicate with. The process will
+    send the following types of messages to the process that called this function:
+      - `{:boombox_packet, boombox_pid :: pid(), packet :: Boombox.Packet.t()}` - contains a packet
+      produced by boombox.
+      - `{:boombox_finished, boombox_pid :: pid()}` - informs that boombox has finished producing
+      packets and will begin terminating. No more messages will be sent.
 
   ```
   Boombox.run(
@@ -212,12 +227,18 @@ defmodule Boombox do
         produce_stream(sink, procs)
 
       %{input: {:writer, _writer_opts}} ->
-        pid = start_server(opts)
+        pid = start_server(opts, :calls)
         %Writer{server_reference: pid}
 
+      %{input: {:message, _message_opts}} ->
+        start_server(opts, :messages)
+
       %{output: {:reader, _reader_opts}} ->
-        pid = start_server(opts)
+        pid = start_server(opts, :calls)
         %Reader{server_reference: pid}
+
+      %{output: {:message, _message_opts}} ->
+        start_server(opts, :messages)
 
       opts ->
         opts
@@ -249,8 +270,8 @@ defmodule Boombox do
 
   It returns a `Task.t()` that can be awaited later.
 
-  If the output is a `:stream` or `:reader` endpoint, or the input is a `:writer` endpoint,
-  the behaviour is identical to `run/2`.
+  If the output is a `:stream`, `:reader` or `:message` endpoint, or the input
+  is a `:writer` or `:message` endpoint, the behaviour is identical to `run/2`.
   """
   @spec async(Enumerable.t() | nil,
           input: input(),
@@ -275,12 +296,18 @@ defmodule Boombox do
         produce_stream(sink, procs)
 
       %{input: {:writer, _writer_opts}} ->
-        pid = start_server(opts)
+        pid = start_server(opts, :calls)
         %Writer{server_reference: pid}
 
+      %{input: {:message, _message_opts}} ->
+        start_server(opts, :messages)
+
       %{output: {:reader, _reader_opts}} ->
-        pid = start_server(opts)
+        pid = start_server(opts, :calls)
         %Reader{server_reference: pid}
+
+      %{output: {:message, _message_opts}} ->
+        start_server(opts, :messages)
 
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
@@ -359,14 +386,25 @@ defmodule Boombox do
   end
 
   @doc """
-  Informs Boombox that it will not be provided any more packets with `write/2` and should terminate
-  accordingly.
+  Gracefully terminates Boombox when using `:reader` or `:writer` endpoints before a response
+  of type `:finished` has been received.
 
-  Can be called only when using `:writer` endpoint on input.
+  When using `:reader` endpoint on output informs Boombox that no more packets will be read
+  from it with `read/1` and that it should terminate accordingly. This function will then
+  return one last packet.
+
+  When using `:writer` endpoint on input informs Boombox that it will not be provided
+  any more packets with `write/2` and should terminate accordingly.
+
   """
   @spec close(Writer.t()) :: :finished | {:error, :incompatible_mode}
-  def close(writer) do
+  @spec close(Reader.t()) :: {:finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
+  def close(%Writer{} = writer) do
     Boombox.Server.finish_consuming(writer.server_reference)
+  end
+
+  def close(%Reader{} = reader) do
+    Boombox.Server.finish_producing(reader.server_reference)
   end
 
   @endpoint_opts [:input, :output]
@@ -384,21 +422,27 @@ defmodule Boombox do
 
       elixir_endpoint?(opts.input) and elixir_endpoint?(opts.output) ->
         raise ArgumentError,
-              ":stream, :writer or :reader on both input and output is not supported"
+              "Using an elixir endpoint (:reader, :writer, :message, :stream) on both input and output is not supported"
 
       true ->
         opts
     end
   end
 
-  defp elixir_endpoint?({:reader, _opts}), do: true
-  defp elixir_endpoint?({:writer, _opts}), do: true
-  defp elixir_endpoint?({:stream, _opts}), do: true
+  defp elixir_endpoint?({type, _opts}) when type in [:reader, :writer, :stream, :message],
+    do: true
+
   defp elixir_endpoint?(_io), do: false
 
-  @spec start_server(opts_map()) :: boombox_server()
-  defp start_server(opts) do
-    {:ok, pid} = Boombox.Server.start(packet_serialization: false, stop_application: false)
+  @spec start_server(opts_map(), :messages | :calls) :: boombox_server()
+  defp start_server(opts, server_communication_medium) do
+    {:ok, pid} =
+      Boombox.Server.start(
+        packet_serialization: false,
+        stop_application: false,
+        communication_medium: server_communication_medium
+      )
+
     Boombox.Server.run(pid, Map.to_list(opts))
     pid
   end
