@@ -612,7 +612,10 @@ defmodule BoomboxTest do
       t = Boombox.async(input: {:srt, server}, output: output)
       Task.await(t, 30_000)
       Testing.Pipeline.terminate(p)
-      Compare.compare(output, input, kinds: get_kinds(input))
+
+      # we need subject_terminated_early as SRT write function does not immediately write a frame, but instead
+      # puts the frame in a buffer, and SRT API does not support flushing of that buffer
+      Compare.compare(output, input, kinds: get_kinds(input), subject_terminated_early: true)
     end
   end)
 
