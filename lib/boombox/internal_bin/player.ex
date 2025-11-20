@@ -4,6 +4,7 @@ defmodule Boombox.InternalBin.Player do
   import Membrane.ChildrenSpec
 
   alias Boombox.InternalBin.Ready
+  alias Membrane.FFmpeg.SWScale
   alias Membrane.{RawAudio, RawVideo}
 
   # the size of the toilet capacity is supposed to handle more or less
@@ -43,6 +44,7 @@ defmodule Boombox.InternalBin.Player do
             |> child(:player_video_transcoder, %Membrane.Transcoder{
               output_stream_format: RawVideo
             })
+            |> child(:player_video_swscale_converter, %SWScale.Converter{format: :I420})
             |> maybe_plug_realtimer(:video, is_input_realtime)
             |> child(:player_video_sink, Membrane.SDL.Player)
 
