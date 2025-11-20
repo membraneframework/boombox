@@ -24,5 +24,8 @@ defmodule Boombox.InternalBin.ElixirEndpoints.PushSink do
   defdelegate handle_stream_format(pad, stream_format, ctx, state), to: Sink
 
   @impl true
+  defdelegate handle_buffer(pad, buffer, ctx, state), to: Sink
+
+  @impl true
   defdelegate handle_end_of_stream(pad, ctx, state), to: Sink
 end

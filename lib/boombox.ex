@@ -179,12 +179,10 @@ defmodule Boombox do
     write media packets to boombox with `write/2` and to finish writing with `close/1`.
     * `:message` - this function returns a PID of a process to communicate with. The process accepts
     the following types of messages:
-      - `{:boombox_packet, sender_pid :: pid(), packet :: Boombox.Packet.t()}` - provides boombox
+      - `{:boombox_packet, packet :: Boombox.Packet.t()}` - provides boombox
       with a media packet. The process will a `{:boombox_finished, boombox_pid :: pid()}` message to
       `sender_pid` if it has finished processing packets and should not be provided any more.
-      - `{:boombox_close, sender_pid :: pid()}` - tells boombox that no more packets will be
-      provided and that it should terminate. The process will reply by sending
-      `{:boombox_finished, boombox_pid :: pid()}` to `sender_pid`
+      - `:boombox_close` - tells boombox that no more packets will be provided and that it should terminate.
 
   Output endpoints with special behaviours:
     * `:stream` - this function will return a `Stream` that contains `Boombox.Packet`s
@@ -207,7 +205,7 @@ defmodule Boombox do
   @spec run(Enumerable.t() | nil,
           input: input() | elixir_input(),
           output: output() | elixir_output()
-        ) :: :ok | Enumerable.t() | Writer.t() | Reader.t()
+        ) :: :ok | Enumerable.t() | Writer.t() | Reader.t() | pid()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
 

@@ -488,10 +488,10 @@ defmodule BoomboxTest do
       max_y = Image.height(bg) - Image.height(overlay)
       fps = 60
 
-      image_sink =
+      image_sink = fn stream ->
         case unquote(elixir_endpoint) do
           :stream ->
-            &Boombox.run(&1,
+            Boombox.run(stream,
               input: {:stream, video: :image, audio: false},
               output: {:webrtc, signaling}
             )
@@ -503,10 +503,8 @@ defmodule BoomboxTest do
                 output: {:webrtc, signaling}
               )
 
-            fn stream ->
-              Enum.each(stream, &Boombox.write(writer, &1))
-              Boombox.close(writer)
-            end
+            Enum.each(stream, &Boombox.write(writer, &1))
+            Boombox.close(writer)
 
           :message ->
             server =
@@ -515,16 +513,10 @@ defmodule BoomboxTest do
                 output: {:webrtc, signaling}
               )
 
-            fn stream ->
-              Enum.each(stream, &send(server, {:boombox_packet, self(), &1}))
-              send(server, {:boombox_close, self()})
-
-              receive do
-                {:boombox_finished, ^server} ->
-                  :ok
-              end
-            end
+            Enum.each(stream, &send(server, {:boombox_packet, &1}))
+            send(server, :boombox_close)
         end
+      end
 
       Task.async(fn ->
         Stream.iterate({_x = 300, _y = 0, _dx = 1, _dy = 2, _pts = 0}, fn {x, y, dx, dy, pts} ->
@@ -543,6 +535,7 @@ defmodule BoomboxTest do
 
       output = Path.join(tmp, "output.mp4")
       Boombox.run(input: {:webrtc, signaling}, output: output)
+
       Compare.compare(output, "test/fixtures/ref_bouncing_bubble.mp4", kinds: [:video])
     end
   end)
