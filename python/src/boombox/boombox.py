@@ -100,6 +100,7 @@ class Boombox(process.Process):
     _terminated: asyncio.Future
     _finished: bool
     _erlang_process: subprocess.Popen
+    _boombox_mode: Atom
 
     _python_node_name = f"{uuid.uuid4()}@127.0.0.1"
     _cookie = str(uuid.uuid4())
@@ -137,7 +138,7 @@ class Boombox(process.Process):
             (Atom("input"), self._serialize_endpoint(input, "input")),
             (Atom("output"), self._serialize_endpoint(output, "output")),
         ]
-        self._call((Atom("run"), boombox_arg))
+        self._boombox_mode = self._call((Atom("run"), boombox_arg))
 
     def read(self) -> Generator[AudioPacket | VideoPacket, None, None]:
         """Read media packets produced by Boombox.
@@ -161,8 +162,7 @@ class Boombox(process.Process):
             match self._call(Atom("produce_packet")):
                 case (Atom("ok"), packet):
                     yield self._deserialize_packet(packet)
-                case (Atom("finished"), packet):
-                    yield self._deserialize_packet(packet)
+                case Atom("finished"):
                     return
                 case (Atom("error"), Atom("incompatible_mode")):
                     raise RuntimeError("Output not defined with an RawData endpoint.")
@@ -214,12 +214,12 @@ class Boombox(process.Process):
                 raise RuntimeError(f"Unknown response: {other}")
 
     def close(self, wait: bool = True, kill: bool = False) -> None:
-        """Closes Boombox for writing.
+        """Closes Boombox for writing or reading.
 
-        Enabled only if Boombox has been initialized with input defined with an
-        :py:class:`.RawData` endpoint.
+        Enabled only if Boombox has been initialized with input or output defined
+        with a :py:class:`.RawData` endpoint.
 
-        This method informs Boombox that it shouldn't expect any more packets.
+        This method informs Boombox that it shouldn't expect or produce any more packets.
 
         Parameters
         ----------
@@ -236,17 +236,25 @@ class Boombox(process.Process):
         Raises
         ------
         RuntimeError
-            If Boombox's input was not defined with an :py:class:`.RawData`
-            endpoint.
+            If neither of Boombox's input or output was defined with a
+            :py:class:`.RawData` endpoint.
         """
-        match self._call(Atom("finish_consuming")):
-            case Atom("finished"):
+        match self._boombox_mode:
+            case Atom("consuming"):
+                request = Atom("finish_consuming")
+            case Atom("producing"):
+                request = Atom("finish_producing")
+            case other:
+                raise RuntimeError(
+                    "Can't close boombox if not using a RawData endpoint"
+                )
+
+        match self._call(request):
+            case Atom("ok"):
                 if kill:
                     self.kill()
                 elif wait:
                     self.wait()
-            case (Atom("error"), Atom("incompatible_mode")):
-                raise RuntimeError("Input should be defined with an RawData endpoint.")
             case other:
                 raise RuntimeError(f"Unknown response: {other}")
 

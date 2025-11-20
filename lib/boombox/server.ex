@@ -421,9 +421,9 @@ defmodule Boombox.Server do
           GenServer.from() | pid(),
           State.t()
         ) ::
-          {:reply, :ok | :finished | {:error, :incompatible_mode | :boombox_not_running},
-           State.t()}
+          {:reply, :ok | {:error, :incompatible_mode | :boombox_not_running}, State.t()}
           | {:noreply, State.t()}
+          | {:stop, term(), :finished, State.t()}
   defp handle_request(
          {:consume_packet, packet},
          from,
@@ -459,6 +459,7 @@ defmodule Boombox.Server do
 
   @spec handle_request(:finish_consuming, GenServer.from() | pid(), State.t()) ::
           {:reply, :ok | :finished | {:error, :incompatible_mode}, State.t()}
+          | {:stop, term(), :finished, State.t()}
   defp handle_request(:finish_consuming, _from, %State{boombox_mode: :consuming} = state) do
     if state.pipeline_exit_reason != nil do
       {:stop, state.pipeline_exit_reason, :finished, state}
@@ -475,6 +476,7 @@ defmodule Boombox.Server do
   @spec handle_request(:produce_packet, GenServer.from() | pid(), State.t()) ::
           {:reply, {:error, :incompatible_mode | :boombox_not_running}, State.t()}
           | {:noreply, State.t()}
+          | {:stop, term(), :finished, State.t()}
   defp handle_request(:produce_packet, from, %State{boombox_mode: :producing} = state) do
     if state.pipeline_exit_reason != nil do
       {:stop, state.pipeline_exit_reason, :finished, state}
