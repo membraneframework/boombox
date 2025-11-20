@@ -83,6 +83,9 @@ defmodule BoomboxTest do
          ]
        end, "bun_hls_webrtc.mp4", []},
     hls_mpegts_mp4: {[@bbb_hls_mpegts_url, "output.mp4"], "bun_hls_mpegts.mp4", []},
+    # we need `subject_terminated_early: true` as the `srt_send()` function from SRT API (used in
+    # `SRT Sink`) does not immediately write a frame, but instead it puts the frame in a buffer,
+    # and SRT API does not support flushing of that buffer
     mp4_srt_mp4:
       {quote do
          [
@@ -90,7 +93,7 @@ defmodule BoomboxTest do
            {:srt, get_free_local_address(:srt)},
            "output.mp4"
          ]
-       end, "bun10s.mp4", []},
+       end, "bun10s.mp4", [subject_terminated_early: true]},
     mp4_a_srt_mp4:
       {quote do
          [
@@ -98,7 +101,7 @@ defmodule BoomboxTest do
            {:srt, get_free_local_address(:srt)},
            "output.mp4"
          ]
-       end, "bun10s.mp4", [kinds: [:audio]]},
+       end, "bun10s.mp4", [kinds: [:audio], subject_terminated_early: true]},
     mp4_v_srt_mp4:
       {quote do
          [
@@ -106,7 +109,7 @@ defmodule BoomboxTest do
            {:srt, get_free_local_address(:srt)},
            "output.mp4"
          ]
-       end, "bun10s.mp4", [kinds: [:video]]},
+       end, "bun10s.mp4", [kinds: [:video], subject_terminated_early: true]},
     mp4_srt_mp4_with_auth:
       {quote do
          [
@@ -115,7 +118,7 @@ defmodule BoomboxTest do
             [stream_id: "some_stream_id", password: "some_password"]},
            "output.mp4"
          ]
-       end, "bun10s.mp4", []},
+       end, "bun10s.mp4", [subject_terminated_early: true]},
     mp4_a_srt_mp4_with_auth:
       {quote do
          [
@@ -124,7 +127,7 @@ defmodule BoomboxTest do
             [stream_id: "some_stream_id", password: "some_password"]},
            "output.mp4"
          ]
-       end, "bun10s.mp4", [kinds: [:audio]]},
+       end, "bun10s.mp4", [kinds: [:audio], subject_terminated_early: true]},
     mp4_v_srt_mp4_with_auth:
       {quote do
          [
@@ -133,7 +136,7 @@ defmodule BoomboxTest do
             [stream_id: "some_stream_id", password: "some_password"]},
            "output.mp4"
          ]
-       end, "bun10s.mp4", [kinds: [:video]]},
+       end, "bun10s.mp4", [kinds: [:video], subject_terminated_early: true]},
     live_hls_mp4:
       {quote do
          [@bbb_mp4_url, {:hls, "index.m3u8", mode: :live}, "output.mp4"]
