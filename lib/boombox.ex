@@ -352,8 +352,8 @@ defmodule Boombox do
   @doc """
   Reads a packet from Boombox.
 
-  If returned with `:ok`, then this function can be called
-  again to request the next packet, and if returned with `:finished`, then Boombox finished it's
+  If returned with `:ok`, then this function can be called again to request the
+  next packet, and if returned with `:finished`, then Boombox finished it's
   operation and will not produce any more packets.
 
   Can be called only when using `:reader` endpoint on output.
@@ -369,7 +369,7 @@ defmodule Boombox do
 
   Returns `:ok` if more packets can be provided, and
   `:finished` when Boombox finished consuming and will not accept any more packets. Returns
-  synchronously once the packet has been processed by Boombox.
+  synchronously once the packet has been ingested Boombox is ready for more packets.
 
   Can be called only when using `:writer` endpoint on input.
   """
@@ -390,7 +390,7 @@ defmodule Boombox do
   any more packets with `write/2` and should terminate accordingly.
 
   """
-  @spec close(Writer.t() | Reader.t()) :: :finished | {:error, :incompatible_mode}
+  @spec close(Writer.t() | Reader.t()) :: :ok | {:error, :incompatible_mode}
   def close(%Writer{} = writer) do
     Boombox.Server.finish_consuming(writer.server_reference)
   end
