@@ -4,8 +4,8 @@ defmodule Boombox.InternalBin.Player do
   import Membrane.ChildrenSpec
 
   alias Boombox.InternalBin.Ready
-  alias Membrane.{RawAudio, RawVideo}
   alias Membrane.FFmpeg.SWScale
+  alias Membrane.{RawAudio, RawVideo}
 
   # the size of the toilet capacity is supposed to handle more or less
   # the burst of packets from one segment of Live HLS stream
