@@ -63,6 +63,12 @@ defmodule Boombox.Pipeline do
   end
 
   @impl true
+  def handle_playing(_ctx, state) do
+    send(state.parent, {:pipeline_playing, self()})
+    {[], state}
+  end
+
+  @impl true
   def handle_child_notification(:external_resource_ready, _element, _context, state) do
     send(state.parent, :external_resource_ready)
     {[], state}
