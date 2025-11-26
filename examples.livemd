@@ -11,7 +11,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 # Examples that don't mention them should still work.
 
 # MIX_INSTALL_CONFIG_BEGIN
-boombox = {:boombox, github: "membraneframework/boombox"}
+boombox = {:boombox, github: "membraneframework/boombox", branch: "refactor-elixir-endpoints"}
 
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
 # can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
@@ -574,28 +574,31 @@ reader2 =
 writer = Boombox.run(input: {:writer, video: :image, audio: false}, output: output)
 
 Stream.unfold(%{}, fn _state ->
-  {result1, packet1} = Boombox.read(reader1)
-  {result2, packet2} = Boombox.read(reader2)
+  case {Boombox.read(reader1), Boombox.read(reader2)} do
+    {:finished, :finished} -> 
+      nil
 
-  joined_image =
-    Vix.Vips.Operation.join!(packet1.payload, packet2.payload, :VIPS_DIRECTION_HORIZONTAL)
-
-  packet = %Boombox.Packet{
-    pts: max(packet1.pts, packet2.pts),
-    payload: joined_image,
-    kind: :video
-  }
-
-  Boombox.write(writer, packet)
-
-  if :finished in [result1, result2] do
-    if result1 == :ok, do:
+    {{:ok, _packet}, :finished} -> 
       Boombox.close(reader1)
-    if result2 == :ok, do:
+      nil
+      
+    {:finished, {:ok, _packet}} -> 
       Boombox.close(reader2)
-    nil
-  else
-    {nil, %{}}
+      nil
+      
+    {{:ok, packet1}, {:ok, packet2}} -> 
+      joined_image =
+        Vix.Vips.Operation.join!(packet1.payload, packet2.payload, :VIPS_DIRECTION_HORIZONTAL)
+    
+      packet = %Boombox.Packet{
+        pts: max(packet1.pts, packet2.pts),
+        payload: joined_image,
+        kind: :video
+      }
+    
+      Boombox.write(writer, packet)
+
+      {nil, %{}}
   end
 end)
 |> Stream.run()
@@ -624,29 +627,35 @@ defmodule MyServer do
 
     {:ok,
      %{
-       input_boomboxes_states: %{
+       bb_states: %{
          bb1: %{last_packet: nil, eos: false},
          bb2: %{last_packet: nil, eos: false}
        },
-       input_boomboxes: %{bb1 => :bb1, bb2 => :bb2},
+       bbs: %{bb1 => :bb1, bb2 => :bb2},
        output_writer: output_writer
      }}
   end
 
   @impl true
-  def handle_info({:boombox_packet, bb, packet}, state) do
-    boombox_id = state.input_boomboxes[bb]
-    state = put_in(state.input_boomboxes_states[boombox_id].last_packet, packet)
+  def handle_info({:boombox_packet, bb, %Boombox.Packet{} = packet}, state) do
+    boombox_id = state.bbs[bb]
+    state = put_in(state.bb_states[boombox_id].last_packet, packet)
 
-    if Enum.all?(Map.values(state.input_boomboxes_states), &(&1.last_packet != nil)) do
+    if Enum.all?(Map.values(state.bb_states), &(&1.last_packet != nil)) do
       joined_image =
         Vix.Vips.Operation.join!(
-          state.input_boomboxes_states.bb1.last_packet.payload,
-          state.input_boomboxes_states.bb2.last_packet.payload,
+          state.bb_states.bb1.last_packet.payload,
+          state.bb_states.bb2.last_packet.payload,
           :VIPS_DIRECTION_HORIZONTAL
         )
 
-      packet = %Boombox.Packet{packet | payload: joined_image}
+      pts = 
+        max(
+          state.bb_states.bb1.last_packet.pts,
+          state.bb_states.bb2.last_packet.pts
+        )
+
+      packet = %Boombox.Packet{packet | payload: joined_image, pts: pts}
 
       Boombox.write(state.output_writer, packet)
     end
@@ -656,10 +665,10 @@ defmodule MyServer do
 
   @impl true
   def handle_info({:boombox_finished, bb}, state) do
-    boombox_id = state.input_boomboxes[bb]
-    state = put_in(state.input_boomboxes_states[boombox_id].eos, true)
+    boombox_id = state.bbs[bb]
+    state = put_in(state.bb_states[boombox_id].eos, true)
 
-    if Enum.all?(Map.values(state.input_boomboxes_states), & &1.eos) do
+    if Enum.all?(Map.values(state.bb_states), & &1.eos) do
       Boombox.close(state.output_writer)
       {:stop, :normal, state}
     else
@@ -672,7 +681,7 @@ input1 = "#{input_dir}/bun.mp4"
 input2 = "#{input_dir}/ffmpeg-testsrc.mp4"
 output = "#{out_dir}/index.m3u8"
 
-{:ok, server} = MyServer.start(%{input1: input, input2: input, output: output})
+{:ok, server} = MyServer.start(%{input1: input1, input2: input2, output: output})
 monitor = Process.monitor(server)
 
 receive do
