@@ -29,7 +29,7 @@ from typing_extensions import override
 
 
 RELEASES_URL = "https://github.com/membraneframework/boombox/releases"
-PACKAGE_NAME = "boomboxlib"
+PACKAGE_NAME = "boomboxlibb"
 
 
 class Boombox(process.Process):
@@ -85,7 +85,14 @@ class Boombox(process.Process):
         Definition of an input or output of Boombox. Can be provided explicitly
         by an appropriate :py:class:`.BoomboxEndpoint` or a string of a path to
         a file or an URL, that Boombox will attempt to interpret as an endpoint.
+
+    Attributes
+    ----------
+    logger : ClassVar[logging.Logger]
+        Logger used in this class
     """
+
+    logger: ClassVar[logging.Logger]
 
     _python_node_name: ClassVar[str]
     _cookie: ClassVar[str]
@@ -105,6 +112,7 @@ class Boombox(process.Process):
     _python_node_name = f"{uuid.uuid4()}@127.0.0.1"
     _cookie = str(uuid.uuid4())
     _node = node.Node(node_name=_python_node_name, cookie=_cookie)
+    logger = logging.getLogger(__name__)
     threading.Thread(target=_node.run, daemon=True).start()
 
     def __init__(
@@ -131,7 +139,9 @@ class Boombox(process.Process):
         self._terminated = self.get_node().get_loop().create_future()
         self._finished = False
         self._receiver = (self._erlang_node_name, Atom("boombox_server"))
+        print("a")
         self._receiver = self._call(Atom("get_pid"))
+        print("b")
         self.get_node().monitor_process(self.pid_, self._receiver)
 
         boombox_arg = [
@@ -158,16 +168,22 @@ class Boombox(process.Process):
         RuntimeError
             If Boombox's output was not defined by an :py:class:`.RawData` endpoint.
         """
-        while True:
-            match self._call(Atom("produce_packet")):
-                case (Atom("ok"), packet):
-                    yield self._deserialize_packet(packet)
-                case Atom("finished"):
-                    return
-                case (Atom("error"), Atom("incompatible_mode")):
-                    raise RuntimeError("Output not defined with an RawData endpoint.")
-                case other:
-                    raise RuntimeError(f"Unknown response: {other}")
+        try:
+            while True:
+                match self._call(Atom("produce_packet")):
+                    case (Atom("ok"), packet):
+                        yield self._deserialize_packet(packet)
+                    case Atom("finished"):
+                        return
+                    case (Atom("error"), Atom("incompatible_mode")):
+                        raise RuntimeError(
+                            "Output not defined with an RawData endpoint."
+                        )
+                    case other:
+                        raise RuntimeError(f"Unknown response: {other}")
+        finally:
+            # pass
+            self.close()
 
     def write(self, packet: AudioPacket | VideoPacket) -> bool:
         """Write packets to Boombox.
@@ -187,7 +203,7 @@ class Boombox(process.Process):
         Returns
         -------
         finished : bool
-            Informs if Boombox has finished accepting packets and closed its
+            If true then Boombox has finished accepting packets and closed its
             input for any further ones. Once it finishes processing the
             previously provided packet, it will terminate.
 
@@ -251,6 +267,7 @@ class Boombox(process.Process):
 
         match self._call(request):
             case Atom("ok"):
+                print("uuuu")
                 if kill:
                     self.kill()
                 elif wait:
@@ -284,8 +301,12 @@ class Boombox(process.Process):
                 if not self._response.done():
                     self._response.set_result(response)
             case (Atom("DOWN"), _, Atom("process"), _, Atom("normal")):
+                print(self._boombox_mode)
+                print("1")
                 self._terminated.set_result(Atom("normal"))
             case (Atom("DOWN"), _, Atom("process"), _, reason):
+                print(self._boombox_mode)
+                print("2")
                 self._terminated.set_result(reason)
                 if not self._response.done():
                     self._response.set_exception(
@@ -342,9 +363,9 @@ class Boombox(process.Process):
         self._server_release_path = os.path.join(self._data_dir, "bin", "server")
 
         if os.path.exists(self._server_release_path):
-            logging.info("Elixir boombox release already present.")
+            self.logger.info("Elixir boombox release already present.")
             return
-        logging.info("Elixir boombox release not found, downloading...")
+        self.logger.info("Elixir boombox release not found, downloading...")
 
         if self._version == "dev":
             release_url = os.path.join(RELEASES_URL, "latest/download")
@@ -369,13 +390,13 @@ class Boombox(process.Process):
             unit_scale=True,
             unit_divisor=1024,
             miniters=1,
-            desc=f"Downloading {release_tarball}",
+            desc=f"Downloading {release_tarball} from {release_url}",
         ) as t:
             urllib.request.urlretrieve(
                 download_url, filename=tarball_path, reporthook=t.update_to
             )
 
-        logging.info("Download complete. Extracting...")
+        self.logger.info("Download complete. Extracting...")
         with tarfile.open(tarball_path) as tar:
             tar.extractall(self._data_dir)
             os.remove(tarball_path)
