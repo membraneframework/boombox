@@ -168,22 +168,16 @@ class Boombox(process.Process):
         RuntimeError
             If Boombox's output was not defined by an :py:class:`.RawData` endpoint.
         """
-        try:
-            while True:
-                match self._call(Atom("produce_packet")):
-                    case (Atom("ok"), packet):
-                        yield self._deserialize_packet(packet)
-                    case Atom("finished"):
-                        return
-                    case (Atom("error"), Atom("incompatible_mode")):
-                        raise RuntimeError(
-                            "Output not defined with an RawData endpoint."
-                        )
-                    case other:
-                        raise RuntimeError(f"Unknown response: {other}")
-        finally:
-            # pass
-            self.close()
+        while True:
+            match self._call(Atom("produce_packet")):
+                case (Atom("ok"), packet):
+                    yield self._deserialize_packet(packet)
+                case Atom("finished"):
+                    return
+                case (Atom("error"), Atom("incompatible_mode")):
+                    raise RuntimeError("Output not defined with an RawData endpoint.")
+                case other:
+                    raise RuntimeError(f"Unknown response: {other}")
 
     def write(self, packet: AudioPacket | VideoPacket) -> bool:
         """Write packets to Boombox.

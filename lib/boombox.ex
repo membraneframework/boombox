@@ -211,13 +211,13 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = Pipeline.start_pipeline(opts)
-        source = Pipeline.await_source_ready()
+        procs = Pipeline.start(opts)
+        source = await_source_ready()
         consume_stream(stream, source, procs)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = Pipeline.start_pipeline(opts)
-        sink = Pipeline.await_sink_ready()
+        procs = Pipeline.start(opts)
+        sink = await_sink_ready()
         produce_stream(sink, procs)
 
       %{input: {:writer, _writer_opts}} ->
@@ -236,8 +236,8 @@ defmodule Boombox do
 
       opts ->
         opts
-        |> Pipeline.start_pipeline()
-        |> Pipeline.await_pipeline()
+        |> Pipeline.start()
+        |> await_pipeline()
     end
   end
 
@@ -276,8 +276,8 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = Pipeline.start_pipeline(opts)
-        source = Pipeline.await_source_ready()
+        procs = Pipeline.start(opts)
+        source = await_source_ready()
 
         Task.async(fn ->
           Process.monitor(procs.supervisor)
@@ -285,8 +285,8 @@ defmodule Boombox do
         end)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = Pipeline.start_pipeline(opts)
-        sink = Pipeline.await_sink_ready()
+        procs = Pipeline.start(opts)
+        sink = await_sink_ready()
         produce_stream(sink, procs)
 
       %{input: {:writer, _writer_opts}} ->
@@ -306,23 +306,23 @@ defmodule Boombox do
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
       %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp, :srt] ->
-        procs = Pipeline.start_pipeline(opts)
+        procs = Pipeline.start(opts)
 
         task =
           Task.async(fn ->
             Process.monitor(procs.supervisor)
-            Pipeline.await_pipeline(procs)
+            await_pipeline(procs)
           end)
 
         await_external_resource_ready()
         task
 
       opts ->
-        procs = Pipeline.start_pipeline(opts)
+        procs = Pipeline.start(opts)
 
         Task.async(fn ->
           Process.monitor(procs.supervisor)
-          Pipeline.await_pipeline(procs)
+          await_pipeline(procs)
         end)
     end
   end
@@ -471,7 +471,7 @@ defmodule Boombox do
 
       _state ->
         send(source, {:boombox_eos, self()})
-        Pipeline.await_pipeline(procs)
+        await_pipeline(procs)
     end
   end
 
@@ -495,10 +495,37 @@ defmodule Boombox do
         end
       end,
       fn
-        %{procs: procs} -> Pipeline.terminate_pipeline(procs)
+        %{procs: procs} -> terminate_pipeline(procs)
         :eos -> :ok
       end
     )
+  end
+
+  @spec terminate_pipeline(Pipeline.procs()) :: :ok
+  defp terminate_pipeline(procs) do
+    Membrane.Pipeline.terminate(procs.pipeline)
+    await_pipeline(procs)
+  end
+
+  @spec await_pipeline(Pipeline.procs()) :: :ok
+  defp await_pipeline(%{supervisor: supervisor}) do
+    receive do
+      {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
+    end
+  end
+
+  @spec await_source_ready() :: pid()
+  defp await_source_ready() do
+    receive do
+      {:boombox_elixir_source, source} -> source
+    end
+  end
+
+  @spec await_sink_ready() :: pid()
+  defp await_sink_ready() do
+    receive do
+      {:boombox_elixir_sink, sink} -> sink
+    end
   end
 
   # Waits for the external resource to be ready.
