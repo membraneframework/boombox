@@ -11,7 +11,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 # Examples that don't mention them should still work.
 
 # MIX_INSTALL_CONFIG_BEGIN
-boombox = {:boombox, github: "membraneframework/boombox", branch: "refactor-elixir-endpoints"}
+boombox = {:boombox, github: "membraneframework/boombox"}
 
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
 # can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
@@ -575,27 +575,27 @@ writer = Boombox.run(input: {:writer, video: :image, audio: false}, output: outp
 
 Stream.unfold(%{}, fn _state ->
   case {Boombox.read(reader1), Boombox.read(reader2)} do
-    {:finished, :finished} -> 
+    {:finished, :finished} ->
       nil
 
-    {{:ok, _packet}, :finished} -> 
+    {{:ok, _packet}, :finished} ->
       Boombox.close(reader1)
       nil
-      
-    {:finished, {:ok, _packet}} -> 
+
+    {:finished, {:ok, _packet}} ->
       Boombox.close(reader2)
       nil
-      
-    {{:ok, packet1}, {:ok, packet2}} -> 
+
+    {{:ok, packet1}, {:ok, packet2}} ->
       joined_image =
         Vix.Vips.Operation.join!(packet1.payload, packet2.payload, :VIPS_DIRECTION_HORIZONTAL)
-    
+
       packet = %Boombox.Packet{
         pts: max(packet1.pts, packet2.pts),
         payload: joined_image,
         kind: :video
       }
-    
+
       Boombox.write(writer, packet)
 
       {nil, %{}}
@@ -649,7 +649,7 @@ defmodule MyServer do
           :VIPS_DIRECTION_HORIZONTAL
         )
 
-      pts = 
+      pts =
         max(
           state.bb_states.bb1.last_packet.pts,
           state.bb_states.bb2.last_packet.pts

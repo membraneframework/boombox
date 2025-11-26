@@ -26,14 +26,14 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
       |> Map.new(fn
         :video ->
           {:video,
-           get_child(:elixir_stream_source)
+           get_child(:elixir_source)
            |> via_out(Pad.ref(:output, :video))
            |> child(%SWScale.Converter{format: :I420})
            |> child(%Membrane.H264.FFmpeg.Encoder{profile: :baseline, preset: :ultrafast})}
 
         :audio ->
           {:audio,
-           get_child(:elixir_stream_source)
+           get_child(:elixir_source)
            |> via_out(Pad.ref(:output, :audio))}
       end)
 
@@ -43,7 +43,7 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
         :pull -> %PullSource{producer: producer}
       end
 
-    spec_builder = child(:elixir_stream_source, source_definition)
+    spec_builder = child(:elixir_source, source_definition)
 
     %Ready{track_builders: builders, spec_builder: spec_builder}
   end
@@ -79,31 +79,31 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
     spec =
       [
         spec_builder,
-        child(:elixir_stream_sink, sink_definition),
+        child(:elixir_sink, sink_definition),
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:elixir_stream_audio_transcoder, %Membrane.Transcoder{
+            |> child(:elixir_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawAudio
             })
             |> maybe_plug_resampler(options)
             |> maybe_plug_realtimer(:audio, pace_control, is_input_realtime)
             |> via_in(Pad.ref(:input, :audio))
-            |> get_child(:elixir_stream_sink)
+            |> get_child(:elixir_sink)
 
           {:video, builder} ->
             builder
-            |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
+            |> child(:elixir_video_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawVideo
             })
-            |> child(:elixir_stream_rgb_converter, %SWScale.Converter{
+            |> child(:elixir_rgb_converter, %SWScale.Converter{
               format: :RGB,
               output_width: options[:video_width],
               output_height: options[:video_height]
             })
             |> maybe_plug_realtimer(:video, pace_control, is_input_realtime)
             |> via_in(Pad.ref(:input, :video))
-            |> get_child(:elixir_stream_sink)
+            |> get_child(:elixir_sink)
         end),
         Enum.map(to_ignore, fn {_track, builder} -> builder |> child(Membrane.Debug.Sink) end)
       ]
@@ -116,7 +116,7 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
   defp maybe_plug_realtimer(builder, kind, true, false) do
     builder
     |> via_in(:input, toilet_capacity: @realtimer_toilet_capacity)
-    |> child({:elixir_stream, kind, :realtimer}, Membrane.Realtimer)
+    |> child({:elixir, kind, :realtimer}, Membrane.Realtimer)
   end
 
   defp maybe_plug_realtimer(builder, _kind, _pace_control, _is_input_realtime), do: builder
