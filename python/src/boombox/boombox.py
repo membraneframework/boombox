@@ -29,7 +29,7 @@ from typing_extensions import override
 
 
 RELEASES_URL = "https://github.com/membraneframework/boombox/releases"
-PACKAGE_NAME = "boomboxlibb"
+PACKAGE_NAME = "boomboxlib"
 
 
 class Boombox(process.Process):
@@ -139,9 +139,7 @@ class Boombox(process.Process):
         self._terminated = self.get_node().get_loop().create_future()
         self._finished = False
         self._receiver = (self._erlang_node_name, Atom("boombox_server"))
-        print("a")
         self._receiver = self._call(Atom("get_pid"))
-        print("b")
         self.get_node().monitor_process(self.pid_, self._receiver)
 
         boombox_arg = [
@@ -261,7 +259,6 @@ class Boombox(process.Process):
 
         match self._call(request):
             case Atom("ok"):
-                print("uuuu")
                 if kill:
                     self.kill()
                 elif wait:
@@ -295,12 +292,8 @@ class Boombox(process.Process):
                 if not self._response.done():
                     self._response.set_result(response)
             case (Atom("DOWN"), _, Atom("process"), _, Atom("normal")):
-                print(self._boombox_mode)
-                print("1")
                 self._terminated.set_result(Atom("normal"))
             case (Atom("DOWN"), _, Atom("process"), _, reason):
-                print(self._boombox_mode)
-                print("2")
                 self._terminated.set_result(reason)
                 if not self._response.done():
                     self._response.set_exception(

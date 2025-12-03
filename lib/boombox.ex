@@ -9,9 +9,9 @@ defmodule Boombox do
   require Membrane.Time
   require Membrane.Transcoder.{Audio, Video}
 
+  alias Boombox.Pipeline
   alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
-  alias Boombox.Pipeline
 
   @elixir_endpoints [:stream, :message, :writer, :reader]
 
@@ -390,7 +390,7 @@ defmodule Boombox do
   any more packets with `write/2` and should terminate accordingly.
 
   """
-  @spec close(Writer.t() | Reader.t()) :: :ok | {:error, :incompatible_mode}
+  @spec close(Writer.t() | Reader.t()) :: :ok | {:error, :incompatible_mode | :already_finished}
   def close(%Writer{} = writer) do
     Boombox.Server.finish_consuming(writer.server_reference)
   end

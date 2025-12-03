@@ -11,7 +11,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 # Examples that don't mention them should still work.
 
 # MIX_INSTALL_CONFIG_BEGIN
-boombox = {:boombox, github: "membraneframework/boombox"}
+boombox = {:boombox, github: "membraneframework/boombox", branch: "refactor-elixir-endpoints"}
 
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
 # can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
@@ -24,7 +24,8 @@ Mix.install([
   :exla,
   :bumblebee,
   :websockex,
-  :membrane_simple_rtsp_server
+  :membrane_simple_rtsp_server,
+  {:coerce, ">= 1.0.2"}
 ])
 
 Nx.global_default_backend(EXLA.Backend)
@@ -573,19 +574,8 @@ reader2 =
 
 writer = Boombox.run(input: {:writer, video: :image, audio: false}, output: output)
 
-Stream.unfold(%{}, fn _state ->
+Stream.repeatedly(fn ->
   case {Boombox.read(reader1), Boombox.read(reader2)} do
-    {:finished, :finished} ->
-      nil
-
-    {{:ok, _packet}, :finished} ->
-      Boombox.close(reader1)
-      nil
-
-    {:finished, {:ok, _packet}} ->
-      Boombox.close(reader2)
-      nil
-
     {{:ok, packet1}, {:ok, packet2}} ->
       joined_image =
         Vix.Vips.Operation.join!(packet1.payload, packet2.payload, :VIPS_DIRECTION_HORIZONTAL)
@@ -598,12 +588,15 @@ Stream.unfold(%{}, fn _state ->
 
       Boombox.write(writer, packet)
 
-      {nil, %{}}
+    _finished ->
+      :eos
   end
 end)
-|> Stream.run()
+|> Enum.find(& &1 == :eos)
 
 Boombox.close(writer)
+Boombox.close(reader1)
+Boombox.close(reader2)
 ```
 
 The second cell uses `:message` endpoints, meaning that the server communicates with boomboxes by
@@ -620,39 +613,39 @@ defmodule MyServer do
 
   @impl true
   def init(args) do
-    bb1 = Boombox.run(input: args.input1, output: {:message, video: :image, audio: false})
-    bb2 = Boombox.run(input: args.input2, output: {:message, video: :image, audio: false})
+    boombox1 = Boombox.run(input: args.input1, output: {:message, video: :image, audio: false})
+    boombox2 = Boombox.run(input: args.input2, output: {:message, video: :image, audio: false})
     output_writer =
       Boombox.run(input: {:writer, video: :image, audio: false}, output: args.output)
 
     {:ok,
      %{
-       bb_states: %{
-         bb1: %{last_packet: nil, eos: false},
-         bb2: %{last_packet: nil, eos: false}
+       boombox_states: %{
+         boombox1: %{last_packet: nil, eos: false},
+         boombox2: %{last_packet: nil, eos: false}
        },
-       bbs: %{bb1 => :bb1, bb2 => :bb2},
+       boomboxes: %{boombox1 => :boombox1, boombox2 => :boombox2},
        output_writer: output_writer
      }}
   end
 
   @impl true
   def handle_info({:boombox_packet, bb, %Boombox.Packet{} = packet}, state) do
-    boombox_id = state.bbs[bb]
-    state = put_in(state.bb_states[boombox_id].last_packet, packet)
+    boombox_id = state.boomboxes[bb]
+    state = put_in(state.boombox_states[boombox_id].last_packet, packet)
 
-    if Enum.all?(Map.values(state.bb_states), &(&1.last_packet != nil)) do
+    if Enum.all?(Map.values(state.boombox_states), &(&1.last_packet != nil)) do
       joined_image =
         Vix.Vips.Operation.join!(
-          state.bb_states.bb1.last_packet.payload,
-          state.bb_states.bb2.last_packet.payload,
+          state.boombox_states.boombox1.last_packet.payload,
+          state.boombox_states.boombox2.last_packet.payload,
           :VIPS_DIRECTION_HORIZONTAL
         )
 
       pts =
         max(
-          state.bb_states.bb1.last_packet.pts,
-          state.bb_states.bb2.last_packet.pts
+          state.boombox_states.boombox1.last_packet.pts,
+          state.boombox_states.boombox2.last_packet.pts
         )
 
       packet = %Boombox.Packet{packet | payload: joined_image, pts: pts}
@@ -665,10 +658,10 @@ defmodule MyServer do
 
   @impl true
   def handle_info({:boombox_finished, bb}, state) do
-    boombox_id = state.bbs[bb]
-    state = put_in(state.bb_states[boombox_id].eos, true)
+    boombox_id = state.boomboxes[bb]
+    state = put_in(state.boombox_states[boombox_id].eos, true)
 
-    if Enum.all?(Map.values(state.bb_states), & &1.eos) do
+    if Enum.all?(Map.values(state.boombox_states), & &1.eos) do
       Boombox.close(state.output_writer)
       {:stop, :normal, state}
     else
@@ -686,7 +679,6 @@ monitor = Process.monitor(server)
 
 receive do
   {:DOWN, ^monitor, :process, ^server, reason} ->
-    IO.inspect(reason)
     :ok
 end
 ```

@@ -1,7 +1,6 @@
 defmodule Boombox.Pipeline do
   @moduledoc false
   use Membrane.Pipeline
-  @elixir_endpoints [:stream, :message, :writer, :reader]
 
   @type opts_map :: %{
           input: Boombox.input() | Boombox.elixir_input(),
@@ -11,11 +10,7 @@ defmodule Boombox.Pipeline do
 
   @spec start(opts_map()) :: procs()
   def start(opts) do
-    opts =
-      opts
-      |> Map.update!(:input, &resolve_elixir_endpoint(&1, self()))
-      |> Map.update!(:output, &resolve_elixir_endpoint(&1, self()))
-      |> Map.put(:parent, self())
+    opts = Map.put(opts, :parent, self())
 
     {:ok, supervisor, pipeline} =
       Membrane.Pipeline.start_link(Boombox.Pipeline, opts)
@@ -29,7 +24,8 @@ defmodule Boombox.Pipeline do
     spec =
       child(:boombox, %Boombox.InternalBin{
         input: opts.input,
-        output: opts.output
+        output: opts.output,
+        parent: opts.parent
       })
 
     {[spec: spec], %{parent: opts.parent}}
@@ -45,10 +41,4 @@ defmodule Boombox.Pipeline do
   def handle_child_notification(:processing_finished, :boombox, _ctx, state) do
     {[terminate: :normal], state}
   end
-
-  defp resolve_elixir_endpoint({endpoint_type, opts}, parent)
-       when endpoint_type in @elixir_endpoints,
-       do: {endpoint_type, parent, opts}
-
-  defp resolve_elixir_endpoint(endpoint, _parent), do: endpoint
 end

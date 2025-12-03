@@ -563,24 +563,25 @@ defmodule BoomboxTest do
             boombox
 
           :reader ->
-            Stream.unfold(:ok, fn
-              :ok ->
-                case Boombox.read(boombox) do
-                  {:ok, packet} -> {packet, :ok}
-                  :finished -> nil
-                end
-            end)
-
-          :message ->
-            Stream.unfold(:ok, fn :ok ->
-              receive do
-                {:boombox_packet, ^boombox, packet} ->
-                  {packet, :ok}
-
-                {:boombox_finished, ^boombox} ->
-                  nil
+            Stream.repeatedly(fn ->
+              case Boombox.read(boombox) do
+                {:ok, packet} -> packet
+                :finished -> :eos
               end
             end)
+            |> Stream.take_while(&(&1 != :eos))
+
+          :message ->
+            Stream.repeatedly(fn ->
+              receive do
+                {:boombox_packet, ^boombox, packet} ->
+                  packet
+
+                {:boombox_finished, ^boombox} ->
+                  :eos
+              end
+            end)
+            |> Stream.take_while(&(&1 != :eos))
         end
         |> Enum.map_join(& &1.payload)
 

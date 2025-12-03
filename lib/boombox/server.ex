@@ -111,7 +111,7 @@ defmodule Boombox.Server do
             membrane_source_demand: non_neg_integer(),
             pipeline_supervisor: pid() | nil,
             pipeline: pid() | nil,
-            ghosted_client: GenServer.from() | Process.dest() | nil,
+            current_client: GenServer.from() | Process.dest() | nil,
             pipeline_termination_reason: term(),
             termination_requested: boolean()
           }
@@ -131,7 +131,7 @@ defmodule Boombox.Server do
                   membrane_source_demand: 0,
                   pipeline_supervisor: nil,
                   pipeline: nil,
-                  ghosted_client: nil,
+                  current_client: nil,
                   pipeline_termination_reason: nil,
                   termination_requested: false
                 ]
@@ -189,9 +189,13 @@ defmodule Boombox.Server do
   accordingly.
   Can be called only when Boombox is in `:consuming` mode.
   """
-  @spec finish_consuming(t()) :: :finished | {:error, :incompatible_mode}
+  @spec finish_consuming(t()) :: :ok | {:error, :incompatible_mode | :already_finished}
   def finish_consuming(server) do
-    GenServer.call(server, :finish_consuming)
+    if Process.alive?(server) do
+      GenServer.call(server, :finish_consuming)
+    else
+      {:error, :already_finished}
+    end
   end
 
   @doc """
@@ -212,9 +216,13 @@ defmodule Boombox.Server do
   Informs Boombox that no more packets will be read and shouldn't be produced.
   Can be called only when Boombox is in `:producing` mode.
   """
-  @spec finish_producing(t()) :: :finished | {:error, :incompatible_mode}
+  @spec finish_producing(t()) :: :ok | {:error, :incompatible_mode | :already_finished}
   def finish_producing(server) do
-    GenServer.call(server, :finish_producing)
+    if Process.alive?(server) do
+      GenServer.call(server, :finish_producing)
+    else
+      {:error, :already_finished}
+    end
   end
 
   @impl true
@@ -279,9 +287,9 @@ defmodule Boombox.Server do
   @impl true
   def handle_info({boombox_elixir_element, pid}, state)
       when boombox_elixir_element in [:boombox_elixir_source, :boombox_elixir_sink] do
-    reply(state.ghosted_client, state.boombox_mode)
+    reply(state.current_client, state.boombox_mode)
 
-    state = %State{state | ghosted_client: nil}
+    state = %State{state | current_client: nil}
 
     state =
       case boombox_elixir_element do
@@ -295,9 +303,9 @@ defmodule Boombox.Server do
   @impl true
   def handle_info({:boombox_demand, source, demand}, %State{membrane_source: source} = state) do
     state =
-      if state.ghosted_client != nil do
-        reply(state.ghosted_client, :ok)
-        %State{state | ghosted_client: nil}
+      if state.current_client != nil do
+        reply(state.current_client, :ok)
+        %State{state | current_client: nil}
       else
         state
       end
@@ -310,14 +318,14 @@ defmodule Boombox.Server do
         {:boombox_packet, sink, packet},
         %State{membrane_sink: sink, communication_medium: :calls} = state
       ) do
-    if state.ghosted_client != nil do
+    if state.current_client != nil do
       packet =
         if state.packet_serialization,
           do: serialize_packet(packet),
           else: packet
 
-      reply(state.ghosted_client, {:ok, packet})
-      {:noreply, %State{state | ghosted_client: nil}}
+      reply(state.current_client, {:ok, packet})
+      {:noreply, %State{state | current_client: nil}}
     else
       {:noreply, state}
     end
@@ -352,8 +360,8 @@ defmodule Boombox.Server do
     case state.communication_medium do
       :calls ->
         cond do
-          state.ghosted_client != nil ->
-            reply(state.ghosted_client, :finished)
+          state.current_client != nil ->
+            reply(state.current_client, :finished)
             {:stop, reason, state}
 
           state.termination_requested ->
@@ -394,7 +402,7 @@ defmodule Boombox.Server do
   end
 
   @spec handle_request({:run, boombox_opts()}, GenServer.from() | Process.dest(), State.t()) ::
-          {:reply, boombox_mode(), State.t()}
+          {:noreply, State.t()}
   defp handle_request({:run, boombox_opts}, from, state) do
     boombox_mode = get_boombox_mode(boombox_opts)
 
@@ -409,7 +417,7 @@ defmodule Boombox.Server do
        | boombox_mode: boombox_mode,
          pipeline_supervisor: pipeline_supervisor,
          pipeline: pipeline,
-         ghosted_client: from
+         current_client: from
      }}
   end
 
@@ -449,7 +457,7 @@ defmodule Boombox.Server do
         {:stop, state.pipeline_termination_reason, :finished, state}
 
       state.membrane_source_demand == 0 ->
-        {:noreply, %State{state | ghosted_client: from}}
+        {:noreply, %State{state | current_client: from}}
 
       true ->
         {:reply, :ok, state}
@@ -489,7 +497,7 @@ defmodule Boombox.Server do
       {:stop, state.pipeline_termination_reason, :finished, state}
     else
       send(state.membrane_sink, {:boombox_demand, self()})
-      {:noreply, %State{state | ghosted_client: from}}
+      {:noreply, %State{state | current_client: from}}
     end
   end
 
@@ -500,8 +508,12 @@ defmodule Boombox.Server do
   @spec handle_request(:finish_producing, GenServer.from() | Process.dest(), State.t()) ::
           {:reply, :ok | {:error, :incompatible_mode}, State.t()}
   defp handle_request(:finish_producing, _from, %State{boombox_mode: :producing} = state) do
-    Membrane.Pipeline.terminate(state.pipeline, asynchronous?: true)
-    {:reply, :ok, %State{state | termination_requested: true}}
+    if state.pipeline_termination_reason != nil do
+      {:stop, state.pipeline_termination_reason, :ok, state}
+    else
+      Membrane.Pipeline.terminate(state.pipeline, asynchronous?: true)
+      {:reply, :ok, %State{state | termination_requested: true}}
+    end
   end
 
   defp handle_request(:finish_producing, _from, %State{boombox_mode: _other_mode} = state) do
