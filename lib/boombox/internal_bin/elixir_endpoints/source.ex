@@ -7,6 +7,7 @@
     def_output_pad :output,
       accepted_format: any_of(Membrane.RawVideo, Membrane.RawAudio),
       availability: :on_request,
+      max_instances: 2,
       flow_control: flow_control
 
     def_options producer: [
