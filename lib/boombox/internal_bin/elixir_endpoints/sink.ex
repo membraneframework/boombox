@@ -9,6 +9,7 @@
         def_input_pad :input,
           accepted_format: any_of(Membrane.RawAudio, Membrane.RawVideo),
           availability: :on_request,
+          max_instances: 2,
           flow_control: :manual,
           demand_unit: :buffers
 
@@ -16,6 +17,7 @@
         def_input_pad :input,
           accepted_format: any_of(Membrane.RawAudio, Membrane.RawVideo),
           availability: :on_request,
+          max_instances: 2,
           flow_control: :push
     end
 
