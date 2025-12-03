@@ -40,7 +40,8 @@ defmodule Boombox.Server do
           name: GenServer.name(),
           packet_serialization: boolean(),
           stop_application: boolean(),
-          communication_medium: communication_medium()
+          communication_medium: communication_medium(),
+          parent_pid: pid()
         ]
 
   @type boombox_opts :: [
@@ -285,7 +286,7 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_info({boombox_elixir_element, pid}, state)
+  def handle_info({boombox_elixir_element, pid}, %State{} = state)
       when boombox_elixir_element in [:boombox_elixir_source, :boombox_elixir_sink] do
     reply(state.current_client, state.boombox_mode)
 
@@ -403,7 +404,7 @@ defmodule Boombox.Server do
 
   @spec handle_request({:run, boombox_opts()}, GenServer.from() | Process.dest(), State.t()) ::
           {:noreply, State.t()}
-  defp handle_request({:run, boombox_opts}, from, state) do
+  defp handle_request({:run, boombox_opts}, from, %State{} = state) do
     boombox_mode = get_boombox_mode(boombox_opts)
 
     %{supervisor: pipeline_supervisor, pipeline: pipeline} =
