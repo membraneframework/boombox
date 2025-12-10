@@ -282,7 +282,7 @@ defmodule Boombox.Server do
   end
 
   @spec handle_request({:run, boombox_opts()}, State.t()) :: {boombox_mode(), State.t()}
-  defp handle_request({:run, boombox_opts}, state) do
+  defp handle_request({:run, boombox_opts}, %State{} = state) do
     boombox_opts =
       boombox_opts
       |> Enum.map(fn
