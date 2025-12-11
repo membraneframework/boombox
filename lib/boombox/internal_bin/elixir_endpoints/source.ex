@@ -1,4 +1,11 @@
-[{PushSource, :push}, {PullSource, :manual}]
+# This generates two variants of the Source:
+#   * PullSource - The element has `:manual` flow control on output pads and
+#     handles demands from subsequent element by demanding packets from the producer
+#     process with `{:boombox_demand, self(), demand_amount}` messages.
+#   * PushSource - The element has `:push` flow control on output pads and expects
+#     the producer process to provide it packets without demanding them.
+
+[{PullSource, :manual}, {PushSource, :push}]
 |> Enum.map(fn {module_name, flow_control} ->
   defmodule Module.concat(Boombox.InternalBin.ElixirEndpoints, module_name) do
     @moduledoc false
@@ -11,7 +18,10 @@
       flow_control: flow_control
 
     def_options producer: [
-                  spec: pid()
+                  spec: pid(),
+                  description: """
+                  PID of a process from which to demand and receive packets.
+                  """
                 ]
 
     defmodule State do
