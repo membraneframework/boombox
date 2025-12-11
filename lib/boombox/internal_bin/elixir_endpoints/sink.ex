@@ -1,4 +1,11 @@
-[{PushSink, :push}, {PullSink, :manual}]
+# This generates two variants of the Sink:
+#   * PullSink - The element has `:manual` flow control on input pads and demands the
+#     packets from the previous element when receiving `{:boombox_demand, demand}`
+#     messages from the consumer process.
+#   * PushSink - The element works has `:push` flow control on input pads and doesn't expect
+#     demands from the consumer process.
+
+[{PullSink, :manual}, {PushSink, :push}]
 |> Enum.map(fn {module_name, flow_control} ->
   defmodule Module.concat(Boombox.InternalBin.ElixirEndpoints, module_name) do
     @moduledoc false
@@ -21,11 +28,12 @@
           flow_control: :push
     end
 
-    def_options(
-      consumer: [
-        spec: pid()
-      ]
-    )
+    def_options consumer: [
+                  spec: pid(),
+                  description: """
+                  PID of a process to which send packets.
+                  """
+                ]
 
     defmodule State do
       @moduledoc false
