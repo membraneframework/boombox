@@ -26,8 +26,11 @@ defmodule Boombox.InternalBin.ElixirStream do
           {:video,
            get_child(:elixir_stream_source)
            |> via_out(Pad.ref(:output, :video))
-           |> child(%SWScale.Converter{format: :I420})
-           |> child(%Membrane.H264.FFmpeg.Encoder{profile: :baseline, preset: :ultrafast})}
+           |> child(:elixir_stream_swscale_converter, %SWScale.Converter{format: :I420})
+           |> child(:elixir_stream_h264_encoder, %Membrane.H264.FFmpeg.Encoder{
+             profile: :baseline,
+             preset: :ultrafast
+           })}
 
         :audio ->
           {:audio,
@@ -131,7 +134,9 @@ defmodule Boombox.InternalBin.ElixirStream do
     format = %Membrane.RawAudio{sample_format: format, sample_rate: rate, channels: channels}
 
     builder
-    |> child(%Membrane.FFmpeg.SWResample.Converter{output_stream_format: format})
+    |> child(:elixir_stream_resampler, %Membrane.FFmpeg.SWResample.Converter{
+      output_stream_format: format
+    })
   end
 
   defp maybe_plug_resampler(builder, _options) do
