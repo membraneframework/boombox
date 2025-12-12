@@ -288,7 +288,7 @@ class Node:
                      receiver, receiver_obj, message)
             receiver_obj.deliver_message(msg=message)
         else:
-            LOG.warning("Send to unknown %s ignored", receiver)
+            LOG.info("Send to unknown %s ignored", receiver)
 
     def _send_local(self, receiver, message) -> None:
         """ Try find a process by pid and drop a message into its ``inbox_``.

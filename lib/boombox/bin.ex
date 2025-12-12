@@ -163,7 +163,8 @@ defmodule Boombox.Bin do
     spec =
       child(:boombox, %Boombox.InternalBin{
         input: opts.input || :membrane_pad,
-        output: opts.output || :membrane_pad
+        output: opts.output || :membrane_pad,
+        parent: self()
       })
 
     {[spec: spec], Map.from_struct(opts)}

@@ -26,6 +26,7 @@ import http.server
 import queue
 import threading
 import time
+import logging
 from typing import NoReturn
 
 
@@ -66,6 +67,7 @@ def read_packets(boombox: Boombox, packet_queue: queue.Queue) -> None:
         packet_queue.put(packet)
         if packet_queue.qsize() > MAX_QUEUE_SIZE:
             packet_queue.get()
+    print("dupsko")
 
 
 def resize_frame(frame: np.ndarray, scale_factor: float) -> np.ndarray:
@@ -267,6 +269,9 @@ def main():
     SERVER_ADDRESS = "localhost"
     SERVER_PORT = 8000
 
+    logging.basicConfig()
+    Boombox.logger.setLevel(logging.INFO)
+
     threading.Thread(
         target=run_server, args=(SERVER_ADDRESS, SERVER_PORT), daemon=True
     ).start()
@@ -322,6 +327,7 @@ def main():
         args=(input_boombox, packet_queue),
         daemon=True,
     )
+    print("c")
     reading_thread.start()
     print("Input boombox initialized.")
 
@@ -363,7 +369,7 @@ def main():
             if should_anonymize:
                 packet.payload = distort_audio(packet.payload, packet.sample_rate)
 
-            output_boombox.write(packet)
+            print(output_boombox.write(packet))
 
         if isinstance(packet, VideoPacket):
             video_read_end_time = time.time() * 1000
@@ -398,7 +404,7 @@ def main():
                 render_transcription(transcription_lines, frame)
 
             packet.payload = frame
-            output_boombox.write(packet)
+            print(output_boombox.write(packet))
             video_read_start_time = time.time() * 1000
 
     output_boombox.close()

@@ -42,7 +42,7 @@ class Rex(GenServer):
 
     @info(1, lambda msg: True)
     def handle_info(self, msg):
-        LOG.error("rex unhandled info msg: %s", msg)
+        LOG.info("rex unhandled info msg: %s", msg)
 
 
 def act_on_msg(msg):

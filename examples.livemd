@@ -24,7 +24,8 @@ Mix.install([
   :exla,
   :bumblebee,
   :websockex,
-  :membrane_simple_rtsp_server
+  :membrane_simple_rtsp_server,
+  {:coerce, ">= 1.0.2"}
 ])
 
 Nx.global_default_backend(EXLA.Backend)
@@ -573,34 +574,29 @@ reader2 =
 
 writer = Boombox.run(input: {:writer, video: :image, audio: false}, output: output)
 
-Stream.unfold(%{}, fn _state ->
-  {result1, packet1} = Boombox.read(reader1)
-  {result2, packet2} = Boombox.read(reader2)
+Stream.repeatedly(fn ->
+  case {Boombox.read(reader1), Boombox.read(reader2)} do
+    {{:ok, packet1}, {:ok, packet2}} ->
+      joined_image =
+        Vix.Vips.Operation.join!(packet1.payload, packet2.payload, :VIPS_DIRECTION_HORIZONTAL)
 
-  joined_image =
-    Vix.Vips.Operation.join!(packet1.payload, packet2.payload, :VIPS_DIRECTION_HORIZONTAL)
+      packet = %Boombox.Packet{
+        pts: max(packet1.pts, packet2.pts),
+        payload: joined_image,
+        kind: :video
+      }
 
-  packet = %Boombox.Packet{
-    pts: max(packet1.pts, packet2.pts),
-    payload: joined_image,
-    kind: :video
-  }
+      Boombox.write(writer, packet)
 
-  Boombox.write(writer, packet)
-
-  if :finished in [result1, result2] do
-    if result1 == :ok, do:
-      Boombox.close(reader1)
-    if result2 == :ok, do:
-      Boombox.close(reader2)
-    nil
-  else
-    {nil, %{}}
+    _finished ->
+      :eos
   end
 end)
-|> Stream.run()
+|> Enum.find(& &1 == :eos)
 
 Boombox.close(writer)
+Boombox.close(reader1)
+Boombox.close(reader2)
 ```
 
 The second cell uses `:message` endpoints, meaning that the server communicates with boomboxes by
@@ -617,36 +613,42 @@ defmodule MyServer do
 
   @impl true
   def init(args) do
-    bb1 = Boombox.run(input: args.input1, output: {:message, video: :image, audio: false})
-    bb2 = Boombox.run(input: args.input2, output: {:message, video: :image, audio: false})
+    boombox1 = Boombox.run(input: args.input1, output: {:message, video: :image, audio: false})
+    boombox2 = Boombox.run(input: args.input2, output: {:message, video: :image, audio: false})
     output_writer =
       Boombox.run(input: {:writer, video: :image, audio: false}, output: args.output)
 
     {:ok,
      %{
-       input_boomboxes_states: %{
-         bb1: %{last_packet: nil, eos: false},
-         bb2: %{last_packet: nil, eos: false}
+       boombox_states: %{
+         boombox1: %{last_packet: nil, eos: false},
+         boombox2: %{last_packet: nil, eos: false}
        },
-       input_boomboxes: %{bb1 => :bb1, bb2 => :bb2},
+       boomboxes: %{boombox1 => :boombox1, boombox2 => :boombox2},
        output_writer: output_writer
      }}
   end
 
   @impl true
-  def handle_info({:boombox_packet, bb, packet}, state) do
-    boombox_id = state.input_boomboxes[bb]
-    state = put_in(state.input_boomboxes_states[boombox_id].last_packet, packet)
+  def handle_info({:boombox_packet, bb, %Boombox.Packet{} = packet}, state) do
+    boombox_id = state.boomboxes[bb]
+    state = put_in(state.boombox_states[boombox_id].last_packet, packet)
 
-    if Enum.all?(Map.values(state.input_boomboxes_states), &(&1.last_packet != nil)) do
+    if Enum.all?(Map.values(state.boombox_states), &(&1.last_packet != nil)) do
       joined_image =
         Vix.Vips.Operation.join!(
-          state.input_boomboxes_states.bb1.last_packet.payload,
-          state.input_boomboxes_states.bb2.last_packet.payload,
+          state.boombox_states.boombox1.last_packet.payload,
+          state.boombox_states.boombox2.last_packet.payload,
           :VIPS_DIRECTION_HORIZONTAL
         )
 
-      packet = %Boombox.Packet{packet | payload: joined_image}
+      pts =
+        max(
+          state.boombox_states.boombox1.last_packet.pts,
+          state.boombox_states.boombox2.last_packet.pts
+        )
+
+      packet = %Boombox.Packet{packet | payload: joined_image, pts: pts}
 
       Boombox.write(state.output_writer, packet)
     end
@@ -656,10 +658,10 @@ defmodule MyServer do
 
   @impl true
   def handle_info({:boombox_finished, bb}, state) do
-    boombox_id = state.input_boomboxes[bb]
-    state = put_in(state.input_boomboxes_states[boombox_id].eos, true)
+    boombox_id = state.boomboxes[bb]
+    state = put_in(state.boombox_states[boombox_id].eos, true)
 
-    if Enum.all?(Map.values(state.input_boomboxes_states), & &1.eos) do
+    if Enum.all?(Map.values(state.boombox_states), & &1.eos) do
       Boombox.close(state.output_writer)
       {:stop, :normal, state}
     else
@@ -672,12 +674,11 @@ input1 = "#{input_dir}/bun.mp4"
 input2 = "#{input_dir}/ffmpeg-testsrc.mp4"
 output = "#{out_dir}/index.m3u8"
 
-{:ok, server} = MyServer.start(%{input1: input, input2: input, output: output})
+{:ok, server} = MyServer.start(%{input1: input1, input2: input2, output: output})
 monitor = Process.monitor(server)
 
 receive do
   {:DOWN, ^monitor, :process, ^server, reason} ->
-    IO.inspect(reason)
     :ok
 end
 ```

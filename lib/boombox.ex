@@ -9,8 +9,11 @@ defmodule Boombox do
   require Membrane.Time
   require Membrane.Transcoder.{Audio, Video}
 
+  alias Boombox.Pipeline
   alias Membrane.HTTPAdaptiveStream
   alias Membrane.RTP
+
+  @elixir_endpoints [:stream, :message, :writer, :reader]
 
   defmodule Writer do
     @moduledoc """
@@ -158,13 +161,6 @@ defmodule Boombox do
 
   @type elixir_output :: {:stream | :reader | :message, out_raw_data_opts()}
 
-  @typep procs :: %{pipeline: pid(), supervisor: pid()}
-  @typep opts_map :: %{
-           input: input() | elixir_input(),
-           output: output() | elixir_output(),
-           parent: pid()
-         }
-
   @doc """
   Runs boombox with given input and output.
 
@@ -183,12 +179,10 @@ defmodule Boombox do
     write media packets to boombox with `write/2` and to finish writing with `close/1`.
     * `:message` - this function returns a PID of a process to communicate with. The process accepts
     the following types of messages:
-      - `{:boombox_packet, sender_pid :: pid(), packet :: Boombox.Packet.t()}` - provides boombox
+      - `{:boombox_packet, packet :: Boombox.Packet.t()}` - provides boombox
       with a media packet. The process will a `{:boombox_finished, boombox_pid :: pid()}` message to
       `sender_pid` if it has finished processing packets and should not be provided any more.
-      - `{:boombox_close, sender_pid :: pid()}` - tells boombox that no more packets will be
-      provided and that it should terminate. The process will reply by sending
-      `{:boombox_finished, boombox_pid :: pid()}` to `sender_pid`
+      - `:boombox_close` - tells boombox that no more packets will be provided and that it should terminate.
 
   Output endpoints with special behaviours:
     * `:stream` - this function will return a `Stream` that contains `Boombox.Packet`s
@@ -211,18 +205,18 @@ defmodule Boombox do
   @spec run(Enumerable.t() | nil,
           input: input() | elixir_input(),
           output: output() | elixir_output()
-        ) :: :ok | Enumerable.t() | Writer.t() | Reader.t()
+        ) :: :ok | Enumerable.t() | Writer.t() | Reader.t() | pid()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = start_pipeline(opts)
+        procs = Pipeline.start(opts)
         source = await_source_ready()
         consume_stream(stream, source, procs)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = start_pipeline(opts)
+        procs = Pipeline.start(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
@@ -242,7 +236,7 @@ defmodule Boombox do
 
       opts ->
         opts
-        |> start_pipeline()
+        |> Pipeline.start()
         |> await_pipeline()
     end
   end
@@ -282,7 +276,7 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = start_pipeline(opts)
+        procs = Pipeline.start(opts)
         source = await_source_ready()
 
         Task.async(fn ->
@@ -291,7 +285,7 @@ defmodule Boombox do
         end)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = start_pipeline(opts)
+        procs = Pipeline.start(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
@@ -312,7 +306,7 @@ defmodule Boombox do
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
       %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp, :srt] ->
-        procs = start_pipeline(opts)
+        procs = Pipeline.start(opts)
 
         task =
           Task.async(fn ->
@@ -324,7 +318,7 @@ defmodule Boombox do
         task
 
       opts ->
-        procs = start_pipeline(opts)
+        procs = Pipeline.start(opts)
 
         Task.async(fn ->
           Process.monitor(procs.supervisor)
@@ -358,14 +352,14 @@ defmodule Boombox do
   @doc """
   Reads a packet from Boombox.
 
-  If returned with `:ok`, then this function can be called
-  again to request the next packet, and if returned with `:finished`, then Boombox finished it's
+  If returned with `:ok`, then this function can be called again to request the
+  next packet, and if returned with `:finished`, then Boombox finished it's
   operation and will not produce any more packets.
 
   Can be called only when using `:reader` endpoint on output.
   """
   @spec read(Reader.t()) ::
-          {:ok | :finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
+          {:ok, Boombox.Packet.t()} | :finished | {:error, :incompatible_mode}
   def read(reader) do
     Boombox.Server.produce_packet(reader.server_reference)
   end
@@ -375,7 +369,7 @@ defmodule Boombox do
 
   Returns `:ok` if more packets can be provided, and
   `:finished` when Boombox finished consuming and will not accept any more packets. Returns
-  synchronously once the packet has been processed by Boombox.
+  synchronously once the packet has been ingested and Boombox is ready for more packets.
 
   Can be called only when using `:writer` endpoint on input.
   """
@@ -390,15 +384,13 @@ defmodule Boombox do
   of type `:finished` has been received.
 
   When using `:reader` endpoint on output informs Boombox that no more packets will be read
-  from it with `read/1` and that it should terminate accordingly. This function will then
-  return one last packet.
+  from it with `read/1` and that it should terminate accordingly.
 
   When using `:writer` endpoint on input informs Boombox that it will not be provided
   any more packets with `write/2` and should terminate accordingly.
 
   """
-  @spec close(Writer.t()) :: :finished | {:error, :incompatible_mode}
-  @spec close(Reader.t()) :: {:finished, Boombox.Packet.t()} | {:error, :incompatible_mode}
+  @spec close(Writer.t() | Reader.t()) :: :ok | {:error, :incompatible_mode | :already_finished}
   def close(%Writer{} = writer) do
     Boombox.Server.finish_consuming(writer.server_reference)
   end
@@ -429,44 +421,111 @@ defmodule Boombox do
     end
   end
 
-  defp elixir_endpoint?({type, _opts}) when type in [:reader, :writer, :stream, :message],
+  defp elixir_endpoint?({type, _opts}) when type in @elixir_endpoints,
     do: true
 
   defp elixir_endpoint?(_io), do: false
 
-  @spec start_server(opts_map(), :messages | :calls) :: boombox_server()
+  @spec start_server(Pipeline.opts_map(), :messages | :calls) :: boombox_server()
   defp start_server(opts, server_communication_medium) do
     {:ok, pid} =
       Boombox.Server.start(
         packet_serialization: false,
         stop_application: false,
-        communication_medium: server_communication_medium
+        communication_medium: server_communication_medium,
+        parent_pid: self()
       )
 
     Boombox.Server.run(pid, Map.to_list(opts))
     pid
   end
 
-  @spec consume_stream(Enumerable.t(), pid(), procs()) :: term()
+  # funn =
+  # fn
+  # %Boombox.Packet{kind: :video} = packet, %{video_demand: 0} = state ->
+  # receive do
+  # {:boombox_demand, ^source, :video, demand} ->
+  # send(source, {:boombox_packet, self(), packet})
+  # {:cont, %{state | video_demand: demand - 1}}
+
+  # {:DOWN, _monitor, :process, supervisor, _reason}
+  # when supervisor == procs.supervisor ->
+  # {:halt, :terminated}
+  # end
+
+  # %Boombox.Packet{kind: :audio} = packet, %{audio_demand: 0} = state ->
+  # receive do
+  # {:boombox_demand, ^source, :audio, demand} ->
+  # send(source, {:boombox_packet, self(), packet})
+  # {:cont, %{state | audio_demand: demand - 1}}
+
+  # {:DOWN, _monitor, :process, supervisor, _reason}
+  # when supervisor == procs.supervisor ->
+  # {:halt, :terminated}
+  # end
+
+  # %Boombox.Packet{} = packet, state ->
+  # audio_demand =
+  # receive do
+  # {:boombox_demand, ^source, :audio, value} -> value
+  # after
+  # 0 -> state.audio_demand
+  # end
+
+  # video_demand =
+  # receive do
+  # {:boombox_demand, ^source, :video, value} -> value
+  # after
+  # 0 -> state.video_demand
+  # end
+
+  # send(source, {:boombox_packet, self(), packet})
+
+  # state =
+  # case packet.kind do
+  # :video ->
+  # %{state | video_demand: video_demand - 1}
+
+  # :audio ->
+  # %{state | audio_demand: audio_demand - 1}
+  # end
+
+  # {:cont, state}
+
+  # value, _state ->
+  # raise ArgumentError, "Expected Boombox.Packet.t(), got: #{inspect(value)}"
+  # end
+
+  @spec consume_stream(Enumerable.t(), pid(), Pipeline.procs()) :: term()
   defp consume_stream(stream, source, procs) do
     Enum.reduce_while(
       stream,
-      %{demand: 0},
+      %{demands: %{audio: 0, video: 0}},
       fn
-        %Boombox.Packet{} = packet, %{demand: 0} = state ->
+        %Boombox.Packet{kind: kind} = packet, state ->
+          demand_timeout =
+            if state.demands[kind] == 0,
+              do: :infinity,
+              else: 0
+
           receive do
-            {:boombox_demand, demand} ->
-              send(source, packet)
-              {:cont, %{state | demand: demand - 1}}
+            {:boombox_demand, ^source, ^kind, value} ->
+              value - 1
 
             {:DOWN, _monitor, :process, supervisor, _reason}
             when supervisor == procs.supervisor ->
-              {:halt, :terminated}
+              nil
+          after
+            demand_timeout -> state.demands[kind] - 1
           end
+          |> case do
+            nil ->
+              {:halt, :terminated}
 
-        %Boombox.Packet{} = packet, %{demand: demand} = state ->
-          send(source, packet)
-          {:cont, %{state | demand: demand - 1}}
+            new_demand ->
+              send(source, {:boombox_packet, self(), packet})
+              {:cont, put_in(state.demands[kind], new_demand)}
+          end
 
         value, _state ->
           raise ArgumentError, "Expected Boombox.Packet.t(), got: #{inspect(value)}"
@@ -477,22 +536,22 @@ defmodule Boombox do
         :ok
 
       _state ->
-        send(source, :boombox_eos)
+        send(source, {:boombox_eos, self()})
         await_pipeline(procs)
     end
   end
 
-  @spec produce_stream(pid(), procs()) :: Enumerable.t()
+  @spec produce_stream(pid(), Pipeline.procs()) :: Enumerable.t()
   defp produce_stream(sink, procs) do
     Stream.resource(
       fn ->
         %{sink: sink, procs: procs}
       end,
       fn %{sink: sink, procs: procs} = state ->
-        send(sink, :boombox_demand)
+        send(sink, {:boombox_demand, self()})
 
         receive do
-          %Boombox.Packet{} = packet ->
+          {:boombox_packet, ^sink, %Boombox.Packet{} = packet} ->
             verify_packet!(packet)
             {[packet], state}
 
@@ -508,28 +567,13 @@ defmodule Boombox do
     )
   end
 
-  @spec start_pipeline(opts_map()) :: procs()
-  defp start_pipeline(opts) do
-    opts =
-      opts
-      |> Map.update!(:input, &resolve_stream_endpoint(&1, self()))
-      |> Map.update!(:output, &resolve_stream_endpoint(&1, self()))
-      |> Map.put(:parent, self())
-
-    {:ok, supervisor, pipeline} =
-      Membrane.Pipeline.start_link(Boombox.Pipeline, opts)
-
-    Process.monitor(supervisor)
-    %{supervisor: supervisor, pipeline: pipeline}
-  end
-
-  @spec terminate_pipeline(procs) :: :ok
+  @spec terminate_pipeline(Pipeline.procs()) :: :ok
   defp terminate_pipeline(procs) do
     Membrane.Pipeline.terminate(procs.pipeline)
     await_pipeline(procs)
   end
 
-  @spec await_pipeline(procs) :: :ok
+  @spec await_pipeline(Pipeline.procs()) :: :ok
   defp await_pipeline(%{supervisor: supervisor}) do
     receive do
       {:DOWN, _monitor, :process, ^supervisor, _reason} -> :ok
@@ -539,14 +583,14 @@ defmodule Boombox do
   @spec await_source_ready() :: pid()
   defp await_source_ready() do
     receive do
-      {:boombox_ex_stream_source, source} -> source
+      {:boombox_elixir_source, source} -> source
     end
   end
 
   @spec await_sink_ready() :: pid()
   defp await_sink_ready() do
     receive do
-      {:boombox_ex_stream_sink, sink} -> sink
+      {:boombox_elixir_sink, sink} -> sink
     end
   end
 
@@ -579,9 +623,4 @@ defmodule Boombox do
 
     :ok
   end
-
-  defp resolve_stream_endpoint({:stream, stream_options}, parent),
-    do: {:stream, parent, stream_options}
-
-  defp resolve_stream_endpoint(endpoint, _parent), do: endpoint
 end

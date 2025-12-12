@@ -24,7 +24,7 @@ from ._vendor.pyrlang import process, node
 from ._vendor.term import Atom, Pid
 from .endpoints import BoomboxEndpoint, AudioSampleFormat
 
-from typing import Generator, ClassVar, Optional, Any, get_args
+from typing import Generator, ClassVar, Literal, Optional, Any, get_args
 from typing_extensions import override
 
 
@@ -85,7 +85,14 @@ class Boombox(process.Process):
         Definition of an input or output of Boombox. Can be provided explicitly
         by an appropriate :py:class:`.BoomboxEndpoint` or a string of a path to
         a file or an URL, that Boombox will attempt to interpret as an endpoint.
+
+    Attributes
+    ----------
+    logger : ClassVar[logging.Logger]
+        Logger used in this class
     """
+
+    logger: ClassVar[logging.Logger]
 
     _python_node_name: ClassVar[str]
     _cookie: ClassVar[str]
@@ -100,10 +107,12 @@ class Boombox(process.Process):
     _terminated: asyncio.Future
     _finished: bool
     _erlang_process: subprocess.Popen
+    _boombox_mode: Atom
 
     _python_node_name = f"{uuid.uuid4()}@127.0.0.1"
     _cookie = str(uuid.uuid4())
     _node = node.Node(node_name=_python_node_name, cookie=_cookie)
+    logger = logging.getLogger(__name__)
     threading.Thread(target=_node.run, daemon=True).start()
 
     def __init__(
@@ -120,7 +129,9 @@ class Boombox(process.Process):
 
         self._download_elixir_boombox_release()
 
-        self._erlang_process = subprocess.Popen([self._server_release_path, "start"], env=env)
+        self._erlang_process = subprocess.Popen(
+            [self._server_release_path, "start"], env=env
+        )
         atexit.register(lambda: self._erlang_process.kill())
 
         super().__init__(True)
@@ -132,10 +143,10 @@ class Boombox(process.Process):
         self.get_node().monitor_process(self.pid_, self._receiver)
 
         boombox_arg = [
-            (Atom("input"), self._serialize_endpoint(input)),
-            (Atom("output"), self._serialize_endpoint(output)),
+            (Atom("input"), self._serialize_endpoint(input, "input")),
+            (Atom("output"), self._serialize_endpoint(output, "output")),
         ]
-        self._call((Atom("run"), boombox_arg))
+        self._boombox_mode = self._call((Atom("run"), boombox_arg))
 
     def read(self) -> Generator[AudioPacket | VideoPacket, None, None]:
         """Read media packets produced by Boombox.
@@ -159,8 +170,7 @@ class Boombox(process.Process):
             match self._call(Atom("produce_packet")):
                 case (Atom("ok"), packet):
                     yield self._deserialize_packet(packet)
-                case (Atom("finished"), packet):
-                    yield self._deserialize_packet(packet)
+                case Atom("finished"):
                     return
                 case (Atom("error"), Atom("incompatible_mode")):
                     raise RuntimeError("Output not defined with an RawData endpoint.")
@@ -185,7 +195,7 @@ class Boombox(process.Process):
         Returns
         -------
         finished : bool
-            Informs if Boombox has finished accepting packets and closed its
+            If true then Boombox has finished accepting packets and closed its
             input for any further ones. Once it finishes processing the
             previously provided packet, it will terminate.
 
@@ -212,12 +222,12 @@ class Boombox(process.Process):
                 raise RuntimeError(f"Unknown response: {other}")
 
     def close(self, wait: bool = True, kill: bool = False) -> None:
-        """Closes Boombox for writing.
+        """Closes Boombox for writing or reading.
 
-        Enabled only if Boombox has been initialized with input defined with an
-        :py:class:`.RawData` endpoint.
+        Enabled only if Boombox has been initialized with input or output defined
+        with a :py:class:`.RawData` endpoint.
 
-        This method informs Boombox that it shouldn't expect any more packets.
+        This method informs Boombox that it shouldn't expect or produce any more packets.
 
         Parameters
         ----------
@@ -234,17 +244,25 @@ class Boombox(process.Process):
         Raises
         ------
         RuntimeError
-            If Boombox's input was not defined with an :py:class:`.RawData`
-            endpoint.
+            If neither of Boombox's input or output was defined with a
+            :py:class:`.RawData` endpoint.
         """
-        match self._call(Atom("finish_consuming")):
-            case Atom("finished"):
+        match self._boombox_mode:
+            case Atom("consuming"):
+                request = Atom("finish_consuming")
+            case Atom("producing"):
+                request = Atom("finish_producing")
+            case other:
+                raise RuntimeError(
+                    "Can't close boombox if not using a RawData endpoint"
+                )
+
+        match self._call(request):
+            case Atom("ok"):
                 if kill:
                     self.kill()
                 elif wait:
                     self.wait()
-            case (Atom("error"), Atom("incompatible_mode")):
-                raise RuntimeError("Input should be defined with an RawData endpoint.")
             case other:
                 raise RuntimeError(f"Unknown response: {other}")
 
@@ -332,9 +350,9 @@ class Boombox(process.Process):
         self._server_release_path = os.path.join(self._data_dir, "bin", "server")
 
         if os.path.exists(self._server_release_path):
-            logging.info("Elixir boombox release already present.")
+            self.logger.info("Elixir boombox release already present.")
             return
-        logging.info("Elixir boombox release not found, downloading...")
+        self.logger.info("Elixir boombox release not found, downloading...")
 
         if self._version == "dev":
             release_url = os.path.join(RELEASES_URL, "latest/download")
@@ -359,13 +377,13 @@ class Boombox(process.Process):
             unit_scale=True,
             unit_divisor=1024,
             miniters=1,
-            desc=f"Downloading {release_tarball}",
+            desc=f"Downloading {release_tarball} from {release_url}",
         ) as t:
             urllib.request.urlretrieve(
                 download_url, filename=tarball_path, reporthook=t.update_to
             )
 
-        logging.info("Download complete. Extracting...")
+        self.logger.info("Download complete. Extracting...")
         with tarfile.open(tarball_path) as tar:
             tar.extractall(self._data_dir)
             os.remove(tarball_path)
@@ -507,11 +525,13 @@ class Boombox(process.Process):
         }
 
     @staticmethod
-    def _serialize_endpoint(endpoint: BoomboxEndpoint | str) -> Any:
+    def _serialize_endpoint(
+        endpoint: BoomboxEndpoint | str, direction: Literal["input", "output"]
+    ) -> Any:
         if isinstance(endpoint, str):
             return endpoint.encode()
         else:
-            return endpoint.serialize()
+            return endpoint.serialize(direction)
 
 
 @dataclasses.dataclass
