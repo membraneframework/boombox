@@ -3,7 +3,7 @@
 #     handles demands from subsequent element by demanding packets from the producer
 #     process with `{:boombox_demand, self(), demand_amount}` messages.
 #   * PushSource - The element has `:push` flow control on output pads and expects
-#     the producer process to provide it packets without demanding them.
+#     the producer process to provide it with packets without demanding them.
 
 [{PullSource, :manual}, {PushSource, :push}]
 |> Enum.map(fn {module_name, flow_control} ->
@@ -60,13 +60,8 @@
 
     if flow_control == :manual do
       @impl true
-      def handle_demand(Pad.ref(:output, _id), _size, _unit, ctx, state) do
-        demands = Enum.map(ctx.pads, fn {_pad, %{demand: demand}} -> demand end)
-
-        if Enum.all?(demands, &(&1 > 0)) do
-          send(state.producer, {:boombox_demand, self(), Enum.sum(demands)})
-        end
-
+      def handle_demand(Pad.ref(:output, id), size, _unit, _ctx, state) do
+        send(state.producer, {:boombox_demand, self(), id, size})
         {[], state}
       end
     end

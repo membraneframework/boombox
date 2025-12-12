@@ -369,7 +369,7 @@ defmodule Boombox do
 
   Returns `:ok` if more packets can be provided, and
   `:finished` when Boombox finished consuming and will not accept any more packets. Returns
-  synchronously once the packet has been ingested Boombox is ready for more packets.
+  synchronously once the packet has been ingested and Boombox is ready for more packets.
 
   Can be called only when using `:writer` endpoint on input.
   """
@@ -440,26 +440,92 @@ defmodule Boombox do
     pid
   end
 
+  # funn =
+  # fn
+  # %Boombox.Packet{kind: :video} = packet, %{video_demand: 0} = state ->
+  # receive do
+  # {:boombox_demand, ^source, :video, demand} ->
+  # send(source, {:boombox_packet, self(), packet})
+  # {:cont, %{state | video_demand: demand - 1}}
+
+  # {:DOWN, _monitor, :process, supervisor, _reason}
+  # when supervisor == procs.supervisor ->
+  # {:halt, :terminated}
+  # end
+
+  # %Boombox.Packet{kind: :audio} = packet, %{audio_demand: 0} = state ->
+  # receive do
+  # {:boombox_demand, ^source, :audio, demand} ->
+  # send(source, {:boombox_packet, self(), packet})
+  # {:cont, %{state | audio_demand: demand - 1}}
+
+  # {:DOWN, _monitor, :process, supervisor, _reason}
+  # when supervisor == procs.supervisor ->
+  # {:halt, :terminated}
+  # end
+
+  # %Boombox.Packet{} = packet, state ->
+  # audio_demand =
+  # receive do
+  # {:boombox_demand, ^source, :audio, value} -> value
+  # after
+  # 0 -> state.audio_demand
+  # end
+
+  # video_demand =
+  # receive do
+  # {:boombox_demand, ^source, :video, value} -> value
+  # after
+  # 0 -> state.video_demand
+  # end
+
+  # send(source, {:boombox_packet, self(), packet})
+
+  # state =
+  # case packet.kind do
+  # :video ->
+  # %{state | video_demand: video_demand - 1}
+
+  # :audio ->
+  # %{state | audio_demand: audio_demand - 1}
+  # end
+
+  # {:cont, state}
+
+  # value, _state ->
+  # raise ArgumentError, "Expected Boombox.Packet.t(), got: #{inspect(value)}"
+  # end
+
   @spec consume_stream(Enumerable.t(), pid(), Pipeline.procs()) :: term()
   defp consume_stream(stream, source, procs) do
     Enum.reduce_while(
       stream,
-      %{demand: 0},
+      %{demands: %{audio: 0, video: 0}},
       fn
-        %Boombox.Packet{} = packet, %{demand: 0} = state ->
+        %Boombox.Packet{kind: kind} = packet, state ->
+          demand_timeout =
+            if state.demands[kind] == 0,
+              do: :infinity,
+              else: 0
+
           receive do
-            {:boombox_demand, ^source, demand} ->
-              send(source, {:boombox_packet, self(), packet})
-              {:cont, %{state | demand: demand - 1}}
+            {:boombox_demand, ^source, ^kind, value} ->
+              value - 1
 
             {:DOWN, _monitor, :process, supervisor, _reason}
             when supervisor == procs.supervisor ->
-              {:halt, :terminated}
+              nil
+          after
+            demand_timeout -> state.demands[kind] - 1
           end
+          |> case do
+            nil ->
+              {:halt, :terminated}
 
-        %Boombox.Packet{} = packet, %{demand: demand} = state ->
-          send(source, {:boombox_packet, self(), packet})
-          {:cont, %{state | demand: demand - 1}}
+            new_demand ->
+              send(source, {:boombox_packet, self(), packet})
+              {:cont, put_in(state.demands[kind], new_demand)}
+          end
 
         value, _state ->
           raise ArgumentError, "Expected Boombox.Packet.t(), got: #{inspect(value)}"
