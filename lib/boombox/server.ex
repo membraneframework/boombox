@@ -109,7 +109,7 @@ defmodule Boombox.Server do
             parent_pid: pid(),
             membrane_sink: pid() | nil,
             membrane_source: pid() | nil,
-            membrane_source_demand: non_neg_integer(),
+            membrane_source_demands: %{audio: non_neg_integer(), video: non_neg_integer()},
             pipeline_supervisor: pid() | nil,
             pipeline: pid() | nil,
             current_client: GenServer.from() | Process.dest() | nil,
@@ -129,7 +129,7 @@ defmodule Boombox.Server do
                   boombox_mode: nil,
                   membrane_sink: nil,
                   membrane_source: nil,
-                  membrane_source_demand: 0,
+                  membrane_source_demands: %{audio: 0, video: 0},
                   pipeline_supervisor: nil,
                   pipeline: nil,
                   current_client: nil,
@@ -302,16 +302,20 @@ defmodule Boombox.Server do
   end
 
   @impl true
-  def handle_info({:boombox_demand, source, demand}, %State{membrane_source: source} = state) do
-    state =
-      if state.current_client != nil do
-        reply(state.current_client, :ok)
-        %State{state | current_client: nil}
-      else
-        state
-      end
+  def handle_info(
+        {:boombox_demand, source, kind, value},
+        %State{membrane_source: source} = state
+      ) do
+    %State{} = state = put_in(state.membrane_source_demands[kind], value)
 
-    {:noreply, %State{state | membrane_source_demand: state.membrane_source_demand + demand}}
+    if state.current_client != nil and
+         Enum.all?(state.membrane_source_demands, fn {_kind, value} -> value > 0 end) do
+      reply(state.current_client, :ok)
+
+      {:noreply, %State{state | current_client: nil}}
+    else
+      {:noreply, state}
+    end
   end
 
   @impl true
@@ -451,13 +455,13 @@ defmodule Boombox.Server do
         else: packet
 
     send(state.membrane_source, {:boombox_packet, self(), packet})
-    state = %State{state | membrane_source_demand: state.membrane_source_demand - 1}
+    %State{} = state = update_in(state.membrane_source_demands[packet.kind], &(&1 - 1))
 
     cond do
       state.pipeline_termination_reason != nil ->
         {:stop, state.pipeline_termination_reason, :finished, state}
 
-      state.membrane_source_demand == 0 ->
+      state.membrane_source_demands[packet.kind] == 0 ->
         {:noreply, %State{state | current_client: from}}
 
       true ->
