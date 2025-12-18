@@ -48,10 +48,15 @@ defmodule Boombox.InternalBin.SRT do
         |> then(
           &case type do
             :H264 ->
-              {:video, child(&1, %H264.Parser{output_stream_structure: :avc1})}
+              {:video,
+               child(&1, :srt_in_h264_parser, %H264.Parser{output_stream_structure: :avc1})}
 
             :AAC ->
-              {:audio, child(&1, %AAC.Parser{out_encapsulation: :none, output_config: :esds})}
+              {:audio,
+               child(&1, :srt_in_aac_parser, %AAC.Parser{
+                 out_encapsulation: :none,
+                 output_config: :esds
+               })}
           end
         )
       end)
