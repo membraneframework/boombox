@@ -178,9 +178,8 @@ defmodule Boombox do
   See `t:input/0` and `t:output/0` for available inputs and outputs and
   [examples.livemd](examples.livemd) for examples.
 
-  Calling this function with most inputs and outputs simply results in it blocking until the media
-  flow is finished and then returning `:ok`, but some endpoints change the behavior of this
-  function.
+  Calling this function results in it blocking until the media flow is finished and
+  then returning `:ok`, except for when an endpoint with special behavior is used.
 
   Input endpoints with special behaviours:
     * `:stream` - a `Stream` or other `Enumerable` containing `Boombox.Packet`s is expected as the first argument.
