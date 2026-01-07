@@ -1,9 +1,15 @@
 ![boombox_transparent](https://github.com/user-attachments/assets/1c5f25a2-cc27-4349-ae72-91315d43d6a1)
 
-This package is a Python API of Boombox - a high-level tool for audio & video streaming tool based on the [Membrane Framework](https://membrane.stream).
+Boombox is a high-level tool for audio & video streaming based on [Membrane Framework](https://membrane.stream).
+It's built for easy transformations between any popular media formats -
+containers and streaming protocols alike.
 
-- **Documentation:** https://boombox.readthedocs.io
-- **Source code:** https://github.com/membraneframework/boombox/tree/master/python
+You can also use it as a bridge between Python code and external media, allowing
+for seamless integration with AI pipelines and other projects that interact with
+raw media streams directly.
+
+- **Documentation:** <https://boombox.readthedocs.io>
+- **Source code:** <https://github.com/membraneframework/boombox/tree/master/python>
 
 ## Installation
 
@@ -15,11 +21,13 @@ pip install boomboxlib
 
 Because of some reliance on native libraries for encoding and decoding, the package is available for
 the following platforms:
-  - MacOS on ARM architecture
-  - Linux on x86 architecture
-  - Linux on ARM architecture
+
+- MacOS on ARM architecture
+- Linux on x86 architecture
+- Linux on ARM architecture
 
 ## Example usage
+
 The following example will read the MP4 file from the provided URL, flip the video and save it to
 `output.mp4`
 
