@@ -306,7 +306,7 @@ defmodule Boombox.Server do
         {:boombox_demand, source, kind, value},
         %State{membrane_source: source} = state
       ) do
-    %State{} = state = put_in(state.membrane_source_demands[kind], value)
+    %State{} = state = update_in(state.membrane_source_demands[kind], &(&1 + value))
 
     if state.current_client != nil and
          Enum.all?(state.membrane_source_demands, fn {_kind, value} -> value > 0 end) do

@@ -168,10 +168,19 @@ defmodule Boombox do
 
   ```
   Boombox.run(input: "rtmp://localhost:5432", output: "index.m3u8")
+
+  Boombox.run(
+    input: "path/to/file.mp4",
+    output: {:webrtc, "ws://0.0.0.0:1234"}
+  )
   ```
 
   See `t:input/0` and `t:output/0` for available inputs and outputs and
   [examples.livemd](examples.livemd) for examples.
+
+  Calling this function with most inputs and outputs simply results in it blocking until the media
+  flow is finished and then returning `:ok`, but some endpoints change the behavior of this
+  function.
 
   Input endpoints with special behaviours:
     * `:stream` - a `Stream` or other `Enumerable` containing `Boombox.Packet`s is expected as the first argument.
@@ -196,10 +205,6 @@ defmodule Boombox do
       packets and will begin terminating. No more messages will be sent.
 
   ```
-  Boombox.run(
-    input: "path/to/file.mp4",
-    output: {:webrtc, "ws://0.0.0.0:1234"}
-  )
   ```
   """
   @spec run(Enumerable.t() | nil,
@@ -440,62 +445,6 @@ defmodule Boombox do
     pid
   end
 
-  # funn =
-  # fn
-  # %Boombox.Packet{kind: :video} = packet, %{video_demand: 0} = state ->
-  # receive do
-  # {:boombox_demand, ^source, :video, demand} ->
-  # send(source, {:boombox_packet, self(), packet})
-  # {:cont, %{state | video_demand: demand - 1}}
-
-  # {:DOWN, _monitor, :process, supervisor, _reason}
-  # when supervisor == procs.supervisor ->
-  # {:halt, :terminated}
-  # end
-
-  # %Boombox.Packet{kind: :audio} = packet, %{audio_demand: 0} = state ->
-  # receive do
-  # {:boombox_demand, ^source, :audio, demand} ->
-  # send(source, {:boombox_packet, self(), packet})
-  # {:cont, %{state | audio_demand: demand - 1}}
-
-  # {:DOWN, _monitor, :process, supervisor, _reason}
-  # when supervisor == procs.supervisor ->
-  # {:halt, :terminated}
-  # end
-
-  # %Boombox.Packet{} = packet, state ->
-  # audio_demand =
-  # receive do
-  # {:boombox_demand, ^source, :audio, value} -> value
-  # after
-  # 0 -> state.audio_demand
-  # end
-
-  # video_demand =
-  # receive do
-  # {:boombox_demand, ^source, :video, value} -> value
-  # after
-  # 0 -> state.video_demand
-  # end
-
-  # send(source, {:boombox_packet, self(), packet})
-
-  # state =
-  # case packet.kind do
-  # :video ->
-  # %{state | video_demand: video_demand - 1}
-
-  # :audio ->
-  # %{state | audio_demand: audio_demand - 1}
-  # end
-
-  # {:cont, state}
-
-  # value, _state ->
-  # raise ArgumentError, "Expected Boombox.Packet.t(), got: #{inspect(value)}"
-  # end
-
   @spec consume_stream(Enumerable.t(), pid(), Pipeline.procs()) :: term()
   defp consume_stream(stream, source, procs) do
     Enum.reduce_while(
@@ -522,9 +471,9 @@ defmodule Boombox do
             nil ->
               {:halt, :terminated}
 
-            new_demand ->
+            incoming_demand ->
               send(source, {:boombox_packet, self(), packet})
-              {:cont, put_in(state.demands[kind], new_demand)}
+              {:cont, update_in(state.demands[kind], &(&1 + incoming_demand))}
           end
 
         value, _state ->

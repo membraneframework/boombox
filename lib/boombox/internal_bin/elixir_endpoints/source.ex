@@ -60,8 +60,8 @@
 
     if flow_control == :manual do
       @impl true
-      def handle_demand(Pad.ref(:output, id), size, _unit, _ctx, state) do
-        send(state.producer, {:boombox_demand, self(), id, size})
+      def handle_demand(Pad.ref(:output, id), _size, _unit, ctx, state) do
+        send(state.producer, {:boombox_demand, self(), id, ctx.incoming_demand})
         {[], state}
       end
     end
