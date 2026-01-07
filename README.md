@@ -4,9 +4,18 @@
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/boombox)
 [![CircleCI](https://circleci.com/gh/membraneframework/boombox.svg?style=svg)](https://circleci.com/gh/membraneframework/boombox)
 
-Boombox is a high-level tool for audio & video streaming tool based on the [Membrane Framework](https://membrane.stream).
+Boombox is a high-level tool for audio & video streaming based on [Membrane Framework](https://membrane.stream).
+It's built for easy transformations between any popular media formats -
+containers and streaming protocols alike.
+
+You can also use it as a bridge between Elixir and external media, allowing for seamless
+integration with AI pipelines and other projects that interact with raw media streams
+directly.
 
 See [examples.livemd](examples.livemd) for examples.
+
+We also maintain a Python package `boomboxlib` that allows for using Boombox in
+Python projects directly, for more details see the [python directory](https://github.com/membraneframework/boombox/tree/master/python).
 
 ## Usage
 
@@ -16,9 +25,15 @@ The code below receives a stream via RTMP and sends it over HLS:
 Boombox.run(input: "rtmp://localhost:5432", output: "index.m3u8")
 ```
 
-you can use CLI interface too:
+The analogous code in Python:
 
-```sh
+```python
+boombox(input="rtmp://localhost:5432", output="index.m3u8")
+```
+
+You can use CLI interface too:
+
+```bash
 boombox -i "rtmp://localhost:5432" -o "index.m3u8"
 ```
 
@@ -84,7 +99,9 @@ For more examples, see [examples.livemd](examples.livemd).
 | HLS | `"*.m3u8"` | `"*.m3u8"` |
 | SRT | `"srt://<ip>:<port>"` | `"srt://<ip>:<port>"` |
 | `Enumerable.t()` | `{:stream, opts}` | `{:stream, opts}` |
-| `:player` | _not relevant_ | `:player` |
+| function calls | `{:reader, opts}` | `{:writer, opts}` |
+| messages | `{:message, opts}` | `{:message, opts}` |
+| media player | _not relevant_ | `:player` |
 
 For the full list of input and output options, see [`Boombox.run/2`](https://hexdocs.pm/boombox/Boombox.html#run/2)
 
@@ -111,13 +128,14 @@ Make sure you have [Elixir](https://elixir-lang.org/) installed. The first call 
 ## CLI
 
 The CLI API is a direct mapping of the Elixir API:
-  * `:input` and `:output` options of `Boombox.run/2` are mapped to `-i` and `-o` CLI arguments respectively.
-  * Option names, like `:some_option`, are mapped to CLI arguments by removing the colon, adding a leading double hyphen and replacing all underscores with hyphens, like `--some-option`.
-  * Option values mappings depend on the option's type:
-    - String values, like `"some_value"`, are mapped to CLI arguments by stripping the quotes, like `some_value`.
-    - Atom values, like `:some_value`, are mapped to CLI arguments by stripping the leading colon, like `some_value`.
-    - Integer values are identical in elixir and CLI.
-    - Binary values, like `<<161, 63>>`, are represented in CLI as their representation in base 16, like `a13f`.
+
+* `:input` and `:output` options of `Boombox.run/2` are mapped to `-i` and `-o` CLI arguments respectively.
+* Option names, like `:some_option`, are mapped to CLI arguments by removing the colon, adding a leading double hyphen and replacing all underscores with hyphens, like `--some-option`.
+* Option values mappings depend on the option's type:
+  * String values, like `"some_value"`, are mapped to CLI arguments by stripping the quotes, like `some_value`.
+  * Atom values, like `:some_value`, are mapped to CLI arguments by stripping the leading colon, like `some_value`.
+  * Integer values are identical in elixir and CLI.
+  * Binary values, like `<<161, 63>>`, are represented in CLI as their representation in base 16, like `a13f`.
 
 For example:
 
