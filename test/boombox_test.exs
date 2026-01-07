@@ -456,24 +456,41 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_opus_aac.mp4")
   end
 
-  @tag :mp4_elixir_rotate_mp4
-  async_test "mp4 -> elixir rotate -> mp4", %{tmp_dir: tmp} do
-    Boombox.run(input: @bbb_mp4, output: {:stream, video: :image, audio: :binary})
-    |> Stream.map(fn
-      %Boombox.Packet{kind: :video, payload: image} = packet ->
-        image = Image.rotate!(image, 180)
-        %Boombox.Packet{packet | payload: image}
+  for(
+    output <- [:stream, :reader, :message],
+    input <- [:stream, :writer, :message],
+    do: {output, input}
+  )
+  |> Enum.each(fn {output, input} ->
+    @tag :mp4_elixir_rotate_mp4
+    @tag String.to_atom("mp4_#{output}_rotate_#{input}_mp4")
+    async_test "mp4 -> #{output} -> rotate -> #{input} -> mp4", %{tmp_dir: tmp} do
+      produce_packet_stream(
+        input: @bbb_mp4,
+        output: {unquote(output), video: :image, audio: :binary}
+      )
+      |> Stream.map(fn
+        %Boombox.Packet{kind: :video, payload: image} = packet ->
+          image = Image.rotate!(image, 180)
+          %Boombox.Packet{packet | payload: image}
 
-      %Boombox.Packet{kind: :audio} = packet ->
-        packet
-    end)
-    |> Boombox.run(input: {:stream, video: :image, audio: :binary}, output: "#{tmp}/output.mp4")
+        %Boombox.Packet{kind: :audio} = packet ->
+          packet
+      end)
+      |> consume_packet_stream(
+        input: {unquote(input), video: :image, audio: :binary},
+        output: "#{tmp}/output.mp4"
+      )
 
-    Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun_rotated.mp4")
-  end
+      Process.sleep(100)
+
+      Compare.compare("#{tmp}/output.mp4", "test/fixtures/ref_bun_rotated.mp4")
+    end
+  end)
 
   [:stream, :writer, :message]
   |> Enum.each(fn elixir_endpoint ->
+    @tag :bouncing_bubble_elixir_webrtc_mp4
     @tag String.to_atom("bouncing_bubble_#{elixir_endpoint}_webrtc_mp4")
     async_test "bouncing bubble -> #{elixir_endpoint} -> webrtc -> mp4", %{tmp_dir: tmp} do
       signaling = Membrane.WebRTC.Signaling.new()
@@ -487,44 +504,6 @@ defmodule BoomboxTest do
       max_y = Image.height(bg) - Image.height(overlay)
       fps = 60
 
-      image_sink =
-        case unquote(elixir_endpoint) do
-          :stream ->
-            &Boombox.run(&1,
-              input: {:stream, video: :image, audio: false},
-              output: {:webrtc, signaling}
-            )
-
-          :writer ->
-            writer =
-              Boombox.run(
-                input: {:writer, video: :image, audio: false},
-                output: {:webrtc, signaling}
-              )
-
-            fn stream ->
-              Enum.each(stream, &Boombox.write(writer, &1))
-              Boombox.close(writer)
-            end
-
-          :message ->
-            server =
-              Boombox.run(
-                input: {:message, video: :image, audio: false},
-                output: {:webrtc, signaling}
-              )
-
-            fn stream ->
-              Enum.each(stream, &send(server, {:boombox_packet, self(), &1}))
-              send(server, {:boombox_close, self()})
-
-              receive do
-                {:boombox_finished, ^server} ->
-                  :ok
-              end
-            end
-        end
-
       Task.async(fn ->
         Stream.iterate({_x = 300, _y = 0, _dx = 1, _dy = 2, _pts = 0}, fn {x, y, dx, dy, pts} ->
           dx = if (x + dx) in 0..max_x, do: dx, else: -dx
@@ -537,21 +516,26 @@ defmodule BoomboxTest do
           %Boombox.Packet{kind: :video, payload: img, pts: pts}
         end)
         |> Stream.take(5 * fps)
-        |> then(image_sink)
+        |> consume_packet_stream(
+          input: {unquote(elixir_endpoint), video: :image, audio: false},
+          output: {:webrtc, signaling}
+        )
       end)
 
       output = Path.join(tmp, "output.mp4")
       Boombox.run(input: {:webrtc, signaling}, output: output)
+
       Compare.compare(output, "test/fixtures/ref_bouncing_bubble.mp4", kinds: [:video])
     end
   end)
 
   [:stream, :reader, :message]
   |> Enum.each(fn elixir_endpoint ->
+    @tag :mp4_elixir_resampled_pcm
     @tag String.to_atom("mp4_#{elixir_endpoint}_resampled_pcm")
     async_test "mp4 -> #{elixir_endpoint} -> resampled PCM" do
-      boombox =
-        Boombox.run(
+      output_pcm =
+        produce_packet_stream(
           input: @bbb_mp4,
           output:
             {unquote(elixir_endpoint),
@@ -561,37 +545,10 @@ defmodule BoomboxTest do
              audio_channels: 1,
              audio_format: :s16le}
         )
-
-      pcm =
-        case unquote(elixir_endpoint) do
-          :stream ->
-            boombox
-
-          :reader ->
-            Stream.unfold(:ok, fn
-              :ok ->
-                {result, packet} = Boombox.read(boombox)
-                {packet, result}
-
-              :finished ->
-                nil
-            end)
-
-          :message ->
-            Stream.unfold(:ok, fn :ok ->
-              receive do
-                {:boombox_packet, ^boombox, packet} ->
-                  {packet, :ok}
-
-                {:boombox_finished, ^boombox} ->
-                  nil
-              end
-            end)
-        end
         |> Enum.map_join(& &1.payload)
 
       ref = File.read!("test/fixtures/ref_bun.pcm")
-      assert Compare.samples_min_squared_error(ref, pcm, 16) < 500
+      assert Compare.samples_min_squared_error(ref, output_pcm, 16) < 500
     end
   end)
 
@@ -650,6 +607,61 @@ defmodule BoomboxTest do
       Compare.compare(output, input, kinds: get_kinds(input), subject_terminated_early: true)
     end
   end)
+
+  @spec produce_packet_stream(input: Boombox.input(), output: Boombox.elixir_output()) ::
+          Enumerable.t()
+  defp produce_packet_stream([input: _input, output: {:stream, _opts}] = opts) do
+    Boombox.run(opts)
+  end
+
+  defp produce_packet_stream([input: _input, output: {:reader, _opts}] = opts) do
+    boombox = Boombox.run(opts)
+
+    Stream.repeatedly(fn ->
+      case Boombox.read(boombox) do
+        {:ok, packet} -> packet
+        :finished -> :eos
+      end
+    end)
+    |> Stream.take_while(&(&1 != :eos))
+  end
+
+  defp produce_packet_stream([input: _input, output: {:message, _opts}] = opts) do
+    boombox = Boombox.run(opts)
+
+    Stream.repeatedly(fn ->
+      receive do
+        {:boombox_packet, ^boombox, packet} ->
+          packet
+
+        {:boombox_finished, ^boombox} ->
+          :eos
+      end
+    end)
+    |> Stream.take_while(&(&1 != :eos))
+  end
+
+  @spec consume_packet_stream(Enumerable.t(),
+          input: Boombox.elixir_input(),
+          output: Boombox.output()
+        ) :: term()
+  defp consume_packet_stream(stream, [input: {:stream, _opts}, output: _output] = opts) do
+    stream |> Boombox.run(opts)
+  end
+
+  defp consume_packet_stream(stream, [input: {:writer, _opts}, output: _output] = opts) do
+    writer = Boombox.run(opts)
+
+    Enum.each(stream, &Boombox.write(writer, &1))
+    Boombox.close(writer)
+  end
+
+  defp consume_packet_stream(stream, [input: {:message, _opts}, output: _output] = opts) do
+    server = Boombox.run(opts)
+
+    Enum.each(stream, &send(server, {:boombox_packet, &1}))
+    send(server, :boombox_close)
+  end
 
   defp send_rtmp(url) do
     p =

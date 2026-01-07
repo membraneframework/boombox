@@ -1,10 +1,10 @@
-defmodule Boombox.InternalBin.ElixirStream do
+defmodule Boombox.InternalBin.ElixirEndpoints do
   @moduledoc false
 
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
 
-  alias __MODULE__.{Sink, Source}
+  alias __MODULE__.{PullSink, PushSink, PullSource, PushSource}
   alias Boombox.InternalBin.Ready
   alias Membrane.FFmpeg.SWScale
 
@@ -14,8 +14,10 @@ defmodule Boombox.InternalBin.ElixirStream do
   # the burst of packets from one segment of Live HLS stream
   @realtimer_toilet_capacity 10_000
 
-  @spec create_input(producer :: pid, options :: Boombox.in_raw_data_opts()) :: Ready.t()
-  def create_input(producer, options) do
+  @type flow_control_mode :: :push | :pull
+
+  @spec create_input(pid(), Boombox.in_raw_data_opts(), flow_control_mode()) :: Ready.t()
+  def create_input(producer, options, flow_control_mode) do
     options = parse_options(options, :input)
 
     builders =
@@ -24,7 +26,7 @@ defmodule Boombox.InternalBin.ElixirStream do
       |> Map.new(fn
         :video ->
           {:video,
-           get_child(:elixir_stream_source)
+           get_child(:elixir_source)
            |> via_out(Pad.ref(:output, :video))
            |> child(:elixir_stream_swscale_converter, %SWScale.Converter{format: :I420})
            |> child(:elixir_stream_h264_encoder, %Membrane.H264.FFmpeg.Encoder{
@@ -34,57 +36,77 @@ defmodule Boombox.InternalBin.ElixirStream do
 
         :audio ->
           {:audio,
-           get_child(:elixir_stream_source)
+           get_child(:elixir_source)
            |> via_out(Pad.ref(:output, :audio))}
       end)
 
-    spec_builder = child(:elixir_stream_source, %Source{producer: producer})
+    source_definition =
+      case flow_control_mode do
+        :push -> %PushSource{producer: producer}
+        :pull -> %PullSource{producer: producer}
+      end
+
+    spec_builder = child(:elixir_source, source_definition)
 
     %Ready{track_builders: builders, spec_builder: spec_builder}
   end
 
   @spec link_output(
-          consumer :: pid,
-          options :: Boombox.out_raw_data_opts(),
+          pid(),
+          Boombox.out_raw_data_opts(),
+          flow_control_mode(),
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           boolean()
         ) :: Ready.t()
-  def link_output(consumer, options, track_builders, spec_builder, is_input_realtime) do
+  def link_output(
+        consumer,
+        options,
+        flow_control_mode,
+        track_builders,
+        spec_builder,
+        is_input_realtime
+      ) do
     options = parse_options(options, :output)
     pace_control = Map.get(options, :pace_control, true)
 
     {track_builders, to_ignore} =
       Map.split_with(track_builders, fn {kind, _builder} -> options[kind] != false end)
 
+    sink_definition =
+      case flow_control_mode do
+        :push -> %PushSink{consumer: consumer}
+        :pull -> %PullSink{consumer: consumer}
+      end
+
     spec =
       [
         spec_builder,
-        child(:elixir_stream_sink, %Sink{consumer: consumer}),
+        child(:elixir_sink, sink_definition),
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:elixir_stream_audio_transcoder, %Membrane.Transcoder{
+            |> child(:elixir_audio_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawAudio
             })
             |> maybe_plug_resampler(options)
             |> maybe_plug_realtimer(:audio, pace_control, is_input_realtime)
             |> via_in(Pad.ref(:input, :audio))
-            |> get_child(:elixir_stream_sink)
+            |> get_child(:elixir_sink)
 
           {:video, builder} ->
             builder
-            |> child(:elixir_stream_video_transcoder, %Membrane.Transcoder{
+            |> child(:elixir_video_transcoder, %Membrane.Transcoder{
               output_stream_format: Membrane.RawVideo
             })
-            |> child(:elixir_stream_rgb_converter, %SWScale.Converter{
+            |> child(:elixir_rgb_converter, %SWScale.Converter{
               format: :RGB,
               output_width: options[:video_width],
               output_height: options[:video_height]
             })
             |> maybe_plug_realtimer(:video, pace_control, is_input_realtime)
             |> via_in(Pad.ref(:input, :video))
-            |> get_child(:elixir_stream_sink)
+            |> get_child(:elixir_sink)
         end),
         Enum.map(to_ignore, fn {_track, builder} -> builder |> child(Membrane.Debug.Sink) end)
       ]
@@ -97,7 +119,7 @@ defmodule Boombox.InternalBin.ElixirStream do
   defp maybe_plug_realtimer(builder, kind, true, false) do
     builder
     |> via_in(:input, toilet_capacity: @realtimer_toilet_capacity)
-    |> child({:elixir_stream, kind, :realtimer}, Membrane.Realtimer)
+    |> child({:elixir, kind, :realtimer}, Membrane.Realtimer)
   end
 
   defp maybe_plug_realtimer(builder, _kind, _pace_control, _is_input_realtime), do: builder

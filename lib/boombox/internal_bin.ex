@@ -9,6 +9,8 @@ defmodule Boombox.InternalBin do
 
   alias Membrane.Transcoder
 
+  @elixir_endpoint_types [:stream, :message, :reader, :writer]
+
   @type input ::
           Boombox.input()
           | {:stream, pid(), Boombox.in_raw_data_opts()}
@@ -133,7 +135,8 @@ defmodule Boombox.InternalBin do
     ]
 
   def_options input: [spec: input()],
-              output: [spec: output()]
+              output: [spec: output()],
+              parent: [spec: pid()]
 
   @impl true
   def handle_init(ctx, opts) do
@@ -145,8 +148,8 @@ defmodule Boombox.InternalBin do
 
     state =
       %State{
-        input: parse_endpoint_opt!(:input, opts.input),
-        output: parse_endpoint_opt!(:output, opts.output),
+        input: parse_endpoint_opt!(:input, opts.input, opts.parent),
+        output: parse_endpoint_opt!(:output, opts.output, opts.parent),
         status: :init
       }
 
@@ -334,7 +337,7 @@ defmodule Boombox.InternalBin do
   end
 
   @impl true
-  def handle_element_end_of_stream(:elixir_stream_sink, Pad.ref(:input, id), _ctx, state) do
+  def handle_element_end_of_stream(:elixir_sink, Pad.ref(:input, id), _ctx, state) do
     eos_info = List.delete(state.eos_info, id)
     state = %{state | eos_info: eos_info}
 
@@ -427,12 +430,15 @@ defmodule Boombox.InternalBin do
 
     case result do
       %Ready{actions: actions} = result when ready_status != nil ->
-        proceed(ctx, %{
-          state
-          | status: ready_status,
-            last_result: result,
-            actions_acc: actions_acc ++ actions
-        })
+        proceed(
+          ctx,
+          %{
+            state
+            | status: ready_status,
+              last_result: result,
+              actions_acc: actions_acc ++ actions
+          }
+        )
 
       %Wait{actions: actions} when wait_status != nil ->
         {actions_acc ++ actions, %{state | actions_acc: [], status: wait_status}}
@@ -452,8 +458,12 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.RTSP.create_input(uri)
   end
 
-  defp create_input({:stream, stream_process, params}, _ctx, _state) do
-    Boombox.InternalBin.ElixirStream.create_input(stream_process, params)
+  defp create_input({type, process, params}, _ctx, _state) when type in @elixir_endpoint_types do
+    Boombox.InternalBin.ElixirEndpoints.create_input(
+      process,
+      params,
+      elixir_endpoint_flow_control(type)
+    )
   end
 
   defp create_input({:h264, location, opts}, _ctx, _state) do
@@ -683,13 +693,15 @@ defmodule Boombox.InternalBin do
     {result, state}
   end
 
-  defp link_output({:stream, stream_process, params}, track_builders, spec_builder, _ctx, state) do
+  defp link_output({type, process, params}, track_builders, spec_builder, _ctx, state)
+       when type in @elixir_endpoint_types do
     is_input_realtime = input_realtime?(state.input)
 
     result =
-      Boombox.InternalBin.ElixirStream.link_output(
-        stream_process,
+      Boombox.InternalBin.ElixirEndpoints.link_output(
+        process,
         params,
+        elixir_endpoint_flow_control(type),
         track_builders,
         spec_builder,
         is_input_realtime
@@ -719,14 +731,14 @@ defmodule Boombox.InternalBin do
     Process.sleep(500)
   end
 
-  @spec parse_endpoint_opt!(:input, input()) :: input()
-  @spec parse_endpoint_opt!(:output, output()) :: output()
-  defp parse_endpoint_opt!(direction, value) when is_binary(value) do
-    parse_endpoint_opt!(direction, {value, []})
+  @spec parse_endpoint_opt!(:input, input(), pid()) :: input()
+  @spec parse_endpoint_opt!(:output, output(), pid()) :: output()
+  defp parse_endpoint_opt!(direction, value, parent) when is_binary(value) do
+    parse_endpoint_opt!(direction, {value, []}, parent)
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
+  defp parse_endpoint_opt!(direction, {value, opts}, parent) when is_binary(value) do
     uri = URI.parse(value)
     scheme = uri.scheme
     extension = if uri.path, do: Path.extname(uri.path)
@@ -758,16 +770,16 @@ defmodule Boombox.InternalBin do
       _other ->
         raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
-    |> then(&parse_endpoint_opt!(direction, &1))
+    |> then(&parse_endpoint_opt!(direction, &1, parent))
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_endpoint_opt!(direction, value) when is_tuple(value) or is_atom(value) do
+  defp parse_endpoint_opt!(direction, value, parent) when is_tuple(value) or is_atom(value) do
     case value do
       {endpoint_type, location}
       when is_binary(location) and direction == :input and
              StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
-        parse_endpoint_opt!(:input, {endpoint_type, location, []})
+        parse_endpoint_opt!(:input, {endpoint_type, location, []}, parent)
 
       {endpoint_type, location, opts}
       when endpoint_type in [:h264, :h265] and is_binary(location) and direction == :input ->
@@ -808,7 +820,7 @@ defmodule Boombox.InternalBin do
         value
 
       {:whip, uri} when is_binary(uri) ->
-        parse_endpoint_opt!(direction, {:whip, uri, []})
+        parse_endpoint_opt!(direction, {:whip, uri, []}, parent)
 
       {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :input ->
         if Keyword.keyword?(opts), do: {:webrtc, value}
@@ -839,8 +851,9 @@ defmodule Boombox.InternalBin do
       {:rtp, opts} ->
         if Keyword.keyword?(opts), do: value
 
-      {:stream, stream_process, opts} when is_pid(stream_process) ->
-        if Keyword.keyword?(opts), do: value
+      {elixir_endpoint, opts}
+      when elixir_endpoint in @elixir_endpoint_types ->
+        if Keyword.keyword?(opts), do: {elixir_endpoint, parent, opts}
 
       {:srt, server_awaiting_accept}
       when direction == :input and is_pid(server_awaiting_accept) ->
@@ -946,6 +959,14 @@ defmodule Boombox.InternalBin do
   @spec stream?(input() | output()) :: boolean()
   defp stream?({:stream, _pid, _opts}), do: true
   defp stream?(_endpoint), do: false
+
+  @spec elixir_endpoint_flow_control(:stream | :message | :reader | :writer) :: :pull | :push
+  defp elixir_endpoint_flow_control(type) do
+    cond do
+      type in [:stream, :writer, :reader] -> :pull
+      type == :message -> :push
+    end
+  end
 
   @spec handles_keyframe_requests?(input()) :: boolean()
   defp handles_keyframe_requests?(input) do
