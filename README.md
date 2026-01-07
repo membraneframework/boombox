@@ -15,7 +15,7 @@ directly.
 See [examples.livemd](examples.livemd) for examples.
 
 We also maintain a Python package `boomboxlib` that allows for using Boombox in
-Python projects directly, for more details see the [python directory](https://github.com/membraneframework/boombox/tree/master/python).
+Python projects directly. For more details see the [python directory](https://github.com/membraneframework/boombox/tree/master/python).
 
 ## Usage
 
@@ -37,7 +37,7 @@ You can use CLI interface too:
 boombox -i "rtmp://localhost:5432" -o "index.m3u8"
 ```
 
-And the code below generates a video with bouncing Membrane logo and sends it over WebRTC:
+The code below generates a video with bouncing Membrane logo and sends it over WebRTC:
 
 ```elixir
 Mix.install([:boombox, :req, :image])
