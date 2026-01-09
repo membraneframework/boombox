@@ -82,26 +82,25 @@ for asset <- ["hls", "webrtc_from_browser", "webrtc_to_browser", "talk_to_llm"],
 end
 
 # HTTP server for assets
-true =
-  case :inets.start() do
-    :ok -> true
-    {:error, {:already_started, :inets}} -> true
-    err -> IO.inspect(err, label: "Unexpected value returned by :inets.start/0")
-  end
+case :inets.start() do
+  :ok -> nil
+  {:error, {:already_started, :inets}} -> nil
+  err -> raise "Unexpected value returned by :inets.start/0: #{err}"
+end
 
-true =
-  case :inets.start(:httpd,
-         bind_address: ~c"localhost",
-         port: 1234,
-         document_root: ~c"#{data_dir}",
-         server_name: ~c"assets_server",
-         server_root: ~c"/tmp",
-         erl_script_nocache: true
-       ) do
-    {:ok, _server} -> true
-    {:error, {:already_started, _server}} -> true
-    err -> IO.inspect(err, label: "Unexpected value returned by :inets.start/2")
-  end
+case :inets.start(:httpd,
+       bind_address: ~c"localhost",
+       port: 1234,
+       document_root: ~c"#{data_dir}",
+       server_name: ~c"assets_server",
+       server_root: ~c"/tmp",
+       erl_script_nocache: true
+     ) do
+  {:ok, _server} -> nil
+  {:error, {:already_started, _server}} -> nil
+  err -> raise "Unexpected value returned by :inets.start/2: #{err}"
+end
+
 
 ```
 
