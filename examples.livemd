@@ -83,8 +83,8 @@ end
 
 # HTTP server for assets
 case :inets.start() do
-  :ok -> nil
-  {:error, {:already_started, :inets}} -> nil
+  :ok -> :ok
+  {:error, {:already_started, :inets}} -> :ok
   err -> raise "Unexpected value returned by :inets.start/0: #{inspect(err)}"
 end
 
@@ -96,8 +96,8 @@ case :inets.start(:httpd,
        server_root: ~c"/tmp",
        erl_script_nocache: true
      ) do
-  {:ok, _server} -> nil
-  {:error, {:already_started, _server}} -> nil
+  {:ok, _server} -> :ok
+  {:error, {:already_started, _server}} -> :ok
   err -> raise "Unexpected value returned by :inets.start/2: #{inspect(err)}"
 end
 
