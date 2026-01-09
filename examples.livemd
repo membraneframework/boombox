@@ -85,7 +85,7 @@ end
 case :inets.start() do
   :ok -> nil
   {:error, {:already_started, :inets}} -> nil
-  err -> raise "Unexpected value returned by :inets.start/0: #{err}"
+  err -> raise "Unexpected value returned by :inets.start/0: #{inspect(err)}"
 end
 
 case :inets.start(:httpd,
@@ -98,7 +98,7 @@ case :inets.start(:httpd,
      ) do
   {:ok, _server} -> nil
   {:error, {:already_started, _server}} -> nil
-  err -> raise "Unexpected value returned by :inets.start/2: #{err}"
+  err -> raise "Unexpected value returned by :inets.start/2: #{inspect(err)}"
 end
 
 
