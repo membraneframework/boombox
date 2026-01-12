@@ -29,21 +29,37 @@ Mix.install([
 ])
 
 Nx.global_default_backend(EXLA.Backend)
-```
 
-## Boombox
-
-👋 Here are some examples of using Boombox. Some of them use [ffmpeg](https://www.ffmpeg.org/) to generate stream. Some use [ffplay](https://www.ffmpeg.org/ffplay.html) to playback generated videos, but you can use any other player, for example VLC.
-
-The cell below downloads assets to be used in the examples, and runs an HTTP server on port `1234` that serves static HTML files for sending/receiving the stream in the browser.
-
-```elixir
+# HTTP server for assets
 data_dir = "/tmp/boombox_examples_data"
 input_dir = "#{data_dir}/input"
 File.mkdir_p!(input_dir)
 out_dir = "#{data_dir}/output"
 File.mkdir_p!(out_dir)
 
+# match in case a dependency already started :inets
+case :inets.start() do
+  :ok -> :ok
+  {:error, {:already_started, :inets}} -> :ok
+  err -> raise "Unexpected value returned by :inets.start/0: #{inspect(err)}"
+end
+
+{:ok, _server} = :inets.start(:httpd,
+       bind_address: ~c"localhost",
+       port: 1234,
+       document_root: ~c"#{data_dir}",
+       server_name: ~c"assets_server",
+       server_root: ~c"/tmp",
+       erl_script_nocache: true)
+```
+
+## Boombox
+
+👋 Here are some examples of using Boombox. Some of them use [ffmpeg](https://www.ffmpeg.org/) to generate stream. Some use [ffplay](https://www.ffmpeg.org/ffplay.html) to playback generated videos, but you can use any other player, for example VLC.
+
+The cell below downloads assets to be used in the examples. The setup cell started an HTTP server on port `1234` that will serve static HTML files for sending/receiving the stream in the browser.
+
+```elixir
 samples_url = "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples"
 
 unless File.exists?("#{input_dir}/bun.mp4") do
@@ -80,20 +96,6 @@ for asset <- ["hls", "webrtc_from_browser", "webrtc_to_browser", "talk_to_llm"],
   %{status: 200, body: data} = Req.get!("#{assets_url}/#{asset}.html")
   File.write!(path, data)
 end
-
-# HTTP server for assets
-:inets.stop()
-:ok = :inets.start()
-
-{:ok, _server} =
-  :inets.start(:httpd,
-    bind_address: ~c"localhost",
-    port: 1234,
-    document_root: ~c"#{data_dir}",
-    server_name: ~c"assets_server",
-    server_root: ~c"/tmp",
-    erl_script_nocache: true
-  )
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
