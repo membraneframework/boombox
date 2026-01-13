@@ -75,6 +75,7 @@ defmodule Boombox.Mixfile do
       {:image, "~> 0.54.0"},
       {:async_test, github: "software-mansion-labs/elixir_async_test", only: :test},
       {:playwright, "~> 1.49.1-alpha.2", only: :test},
+      {:cowlib, "~> 2.16", override: true, only: :test},
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},

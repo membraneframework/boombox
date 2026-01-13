@@ -25,7 +25,7 @@ defmodule Boombox.Packet do
   defstruct @enforce_keys ++ [format: %{}]
 
   @spec update_payload(t(), (payload() -> payload())) :: t()
-  def update_payload(packet, fun) do
+  def update_payload(%__MODULE__{} = packet, fun) do
     %__MODULE__{packet | payload: fun.(packet.payload)}
   end
 end
