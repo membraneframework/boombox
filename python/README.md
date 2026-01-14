@@ -8,6 +8,9 @@ You can also use it as a bridge between Python code and external media, allowing
 for seamless integration with AI pipelines and other projects that interact with
 raw media streams directly.
 
+To see examples and demos see the
+[`examples`](https://github.com/membraneframework/boombox/tree/master/python) directory.
+
 - **Documentation:** <https://boombox.readthedocs.io>
 - **Source code:** <https://github.com/membraneframework/boombox/tree/master/python>
 
