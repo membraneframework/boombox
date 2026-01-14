@@ -1,7 +1,7 @@
 defmodule Boombox.Mixfile do
   use Mix.Project
 
-  @version "0.2.8"
+  @version "0.2.9"
   @github_url "https://github.com/membraneframework/boombox"
 
   def project do
@@ -48,14 +48,14 @@ defmodule Boombox.Mixfile do
     [
       {:membrane_core, "~> 1.2"},
       {:membrane_transcoder_plugin, "~> 0.3.2"},
-      {:membrane_webrtc_plugin, "~> 0.26.0"},
+      {:membrane_webrtc_plugin, "~> 0.26.1"},
       {:membrane_mp4_plugin, "~> 0.36.0"},
       {:membrane_realtimer_plugin, "~> 0.9.0"},
       {:membrane_http_adaptive_stream_plugin, "~> 0.20.2"},
       {:membrane_rtmp_plugin, "~> 0.29.1"},
-      {:membrane_rtsp_plugin, "~> 0.6.1"},
-      {:membrane_rtp_plugin, "~> 0.30.0"},
-      {:membrane_rtp_format, "~> 0.10.0"},
+      {:membrane_rtsp_plugin, "~> 0.7.0"},
+      {:membrane_rtp_plugin, "~> 0.31.1"},
+      {:membrane_rtp_format, "~> 0.11.0"},
       {:membrane_rtp_aac_plugin, "~> 0.9.0"},
       {:membrane_rtp_h264_plugin, "~> 0.20.0"},
       {:membrane_rtp_opus_plugin, "~> 0.10.0"},
