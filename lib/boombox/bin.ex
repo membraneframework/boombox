@@ -148,11 +148,11 @@ defmodule Boombox.Bin do
     ]
 
   def_options input: [
-                spec: Boombox.input() | nil,
+                spec: Boombox.external_input() | nil,
                 default: nil
               ],
               output: [
-                spec: Boombox.output() | nil,
+                spec: Boombox.external_output() | nil,
                 default: nil
               ]
 

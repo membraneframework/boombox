@@ -52,25 +52,31 @@ defmodule Boombox do
           {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
 
   @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
-  @type srt_auth_opts :: [
+  @type srt_auth_opt ::
           {:stream_id, String.t()}
           | {:password, String.t()}
-        ]
-  @type in_raw_data_opts :: [
+
+  @type in_raw_data_opt ::
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
           | {:is_live, boolean()}
-        ]
-  @type out_raw_data_opts :: [
-          {:audio, :binary | boolean()}
-          | {:video, :image | boolean()}
-          | {:audio_format, Membrane.RawAudio.SampleFormat.t()}
-          | {:audio_rate, Membrane.RawAudio.sample_rate_t()}
-          | {:audio_channels, Membrane.RawAudio.channels_t()}
-          | {:video_width, non_neg_integer()}
+
+  @type out_raw_data_video_opt ::
+          {:video_width, non_neg_integer()}
           | {:video_height, non_neg_integer()}
           | pace_control_opt()
-        ]
+
+  @type out_raw_data_audio_opt ::
+          {:audio_format, Membrane.RawAudio.SampleFormat.t()}
+          | {:audio_rate, Membrane.RawAudio.sample_rate_t()}
+          | {:audio_channels, Membrane.RawAudio.channels_t()}
+          | pace_control_opt()
+
+  @type out_raw_data_opt ::
+          {:audio, :binary | boolean()}
+          | {:video, :image | boolean()}
+          | out_raw_data_audio_opt()
+          | out_raw_data_video_opt()
 
   @typedoc """
   When configuring a track for a media type (video or audio), the following options are used:
@@ -96,32 +102,32 @@ defmodule Boombox do
     * audio_specific_config - MUST be provided for AAC encoding. Contains crucial information about the stream and has to be obtained from a side channel.
     * vps (H265 only), pps, sps - MAY be provided for H264 or H265 encodings. Parameter sets, could be obtained from a side channel. They contain information about the encoded stream.
   """
-  @type in_rtp_opts :: [
+  @type in_rtp_opt ::
           common_rtp_opt()
           | {:port, :inet.port_number()}
           | {:audio_specific_config, binary()}
           | {:vps, binary()}
           | {:pps, binary()}
           | {:sps, binary()}
-        ]
 
   @typedoc """
   In order to configure a RTP output the target port and address MUST be provided (can be provided in `:target` option as a `<address>:<port>` string)
   and the media that will be sent MUST be configured. Media configuration is explained further in `t:common_rtp_opt/0`.
   """
-  @type out_rtp_opts :: [
+  @type out_rtp_opt ::
           common_rtp_opt()
           | {:address, :inet.ip_address() | String.t()}
           | {:port, :inet.port_number()}
           | {:target, String.t()}
           | transcoding_policy_opt()
-        ]
 
-  @type input ::
+  @type external_audio_video_input ::
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(),
-             [hls_variant_selection_policy_opt()]
-             | [{:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}]}
+             [
+               hls_variant_selection_policy_opt()
+               | {:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}
+             ]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
              transport: :file | :http}
@@ -133,16 +139,35 @@ defmodule Boombox do
           | {:whip, uri :: String.t(), token: String.t()}
           | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
           | {:rtsp, url :: String.t()}
-          | {:rtp, in_rtp_opts()}
+          | {:rtp, [in_rtp_opt()]}
           | {:hls, url :: String.t()}
           | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
           | {:srt, url :: String.t()}
-          | {:srt, url :: String.t(), srt_auth_opts()}
+          | {:srt, url :: String.t(), [srt_auth_opt()]}
           | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
 
-  @type elixir_input :: {:stream | :writer | :message, in_raw_data_opts()}
+  @type external_audio_input ::
+          {:aac | :wav | :mp3 | :ogg, location :: String.t()}
+          | {:aac | :wav | :mp3 | :ogg, location :: String.t(), transport: :file | :http}
 
-  @type output ::
+  @type external_video_input ::
+          {:ivf | :h264 | :h265, location :: String.t()}
+          | {:ivf, location :: String.t(), transport: :file | :http}
+          | {:h264 | :h265, location :: String.t(),
+             transport: :file | :http, framerate: Membrane.H264.framerate()}
+
+  @type external_input ::
+          external_audio_video_input() | external_video_input() | external_audio_input()
+
+  @type elixir_input :: {:stream | :writer | :message, [in_raw_data_opt()]}
+
+  @type video_input :: external_video_input() | elixir_input()
+
+  @type audio_input :: external_audio_input() | elixir_input()
+
+  @type input :: external_input() | elixir_input()
+
+  @type external_audio_video_output ::
           (path_or_uri :: String.t())
           | {path_or_uri :: String.t(), [transcoding_policy_opt() | hls_mode_opt()]}
           | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
@@ -154,12 +179,33 @@ defmodule Boombox do
              [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
           | {:hls, location :: String.t()}
           | {:hls, location :: String.t(), [hls_mode_opt() | transcoding_policy_opt()]}
-          | {:rtp, out_rtp_opts()}
+          | {:rtp, [out_rtp_opt()]}
           | {:srt, url :: String.t()}
-          | {:srt, url :: String.t(), srt_auth_opts()}
+          | {:srt, url :: String.t(), [srt_auth_opt()]}
           | :player
 
-  @type elixir_output :: {:stream | :reader | :message, out_raw_data_opts()}
+  @type external_audio_output ::
+          {:aac | :wav | :mp3 | :ogg, location :: String.t()}
+          | {:aac | :wav | :mp3 | :ogg, location :: String.t(), [transcoding_policy_opt()]}
+
+  @type external_video_output ::
+          {:ivf | :h264 | :h265, location :: String.t()}
+          | {:ivf | :h264 | :h265, location :: String.t(), [transcoding_policy_opt()]}
+
+  @type external_output ::
+          external_audio_video_output() | external_video_output() | external_audio_output()
+
+  @type elixir_audio_output :: {:stream, :reader, :message, [out_raw_data_audio_opt()]}
+
+  @type elixir_video_output :: {:stream, :reader, :message, [out_raw_data_video_opt()]}
+
+  @type elixir_output :: {:stream | :reader | :message, [out_raw_data_opt()]}
+
+  @type audio_output :: external_audio_output() | elixir_audio_output()
+
+  @type video_output :: external_video_output() | elixir_video_output()
+
+  @type output :: external_output() | elixir_output()
 
   @doc """
   Runs boombox with given input and output.
@@ -174,6 +220,7 @@ defmodule Boombox do
     output: {:webrtc, "ws://0.0.0.0:1234"}
   )
   ```
+
 
   See `t:input/0` and `t:output/0` for available inputs and outputs and
   [examples.livemd](examples.livemd) for examples.
@@ -203,12 +250,11 @@ defmodule Boombox do
       - `{:boombox_finished, boombox_pid :: pid()}` - informs that boombox has finished producing
       packets and will begin terminating. No more messages will be sent.
 
-  ```
-  ```
   """
+
   @spec run(Enumerable.t() | nil,
-          input: input() | elixir_input(),
-          output: output() | elixir_output()
+          input: input() | [audio: audio_input(), video: video_input()],
+          output: output() | [audio: audio_output(), video: video_output()]
         ) :: :ok | Enumerable.t() | Writer.t() | Reader.t() | pid()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
@@ -219,17 +265,17 @@ defmodule Boombox do
         source = await_source_ready()
         consume_stream(stream, source, procs)
 
-      %{output: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
-        sink = await_sink_ready()
-        produce_stream(sink, procs)
-
       %{input: {:writer, _writer_opts}} ->
         pid = start_server(opts, :calls)
         %Writer{server_reference: pid}
 
       %{input: {:message, _message_opts}} ->
         start_server(opts, :messages)
+
+      %{output: {:stream, _stream_opts}} ->
+        procs = Pipeline.start(opts)
+        sink = await_sink_ready()
+        produce_stream(sink, procs)
 
       %{output: {:reader, _reader_opts}} ->
         pid = start_server(opts, :calls)

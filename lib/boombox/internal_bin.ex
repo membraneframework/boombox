@@ -13,12 +13,10 @@ defmodule Boombox.InternalBin do
 
   @type input ::
           Boombox.input()
-          | {:stream, pid(), Boombox.in_raw_data_opts()}
           | :membrane_pad
 
   @type output ::
           Boombox.output()
-          | {:stream, pid(), Boombox.out_raw_data_opts()}
           | :membrane_pad
 
   @type track_builders :: %{
@@ -52,7 +50,7 @@ defmodule Boombox.InternalBin do
     @moduledoc false
     use Bunch.Access
 
-    @enforce_keys [:status, :input, :output]
+    @enforce_keys [:status, :input, :output, :parent]
 
     defstruct @enforce_keys ++
                 [
@@ -89,6 +87,7 @@ defmodule Boombox.InternalBin do
             status: status(),
             input: Boombox.InternalBin.input(),
             output: Boombox.InternalBin.output(),
+            parent: pid(),
             actions_acc: [Membrane.Bin.Action.t()],
             spec_builder: Membrane.ChildrenSpec.t(),
             track_builders: Boombox.InternalBin.track_builders() | nil,
@@ -148,9 +147,10 @@ defmodule Boombox.InternalBin do
 
     state =
       %State{
-        input: parse_endpoint_opt!(:input, opts.input, opts.parent),
-        output: parse_endpoint_opt!(:output, opts.output, opts.parent),
-        status: :init
+        input: parse_endpoint_opt!(:input, opts.input),
+        output: parse_endpoint_opt!(:output, opts.output),
+        status: :init,
+        parent: opts.parent
       }
 
     :ok = maybe_log_transcoding_related_warning(state.input, state.output)
@@ -458,9 +458,9 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.RTSP.create_input(uri)
   end
 
-  defp create_input({type, process, params}, _ctx, _state) when type in @elixir_endpoint_types do
+  defp create_input({type, params}, _ctx, state) when type in @elixir_endpoint_types do
     Boombox.InternalBin.ElixirEndpoints.create_input(
-      process,
+      state.parent,
       params,
       elixir_endpoint_flow_control(type)
     )
@@ -693,13 +693,13 @@ defmodule Boombox.InternalBin do
     {result, state}
   end
 
-  defp link_output({type, process, params}, track_builders, spec_builder, _ctx, state)
+  defp link_output({type, params}, track_builders, spec_builder, _ctx, state)
        when type in @elixir_endpoint_types do
     is_input_realtime = input_realtime?(state.input)
 
     result =
       Boombox.InternalBin.ElixirEndpoints.link_output(
-        process,
+        state.parent,
         params,
         elixir_endpoint_flow_control(type),
         track_builders,
@@ -731,14 +731,14 @@ defmodule Boombox.InternalBin do
     Process.sleep(500)
   end
 
-  @spec parse_endpoint_opt!(:input, input(), pid()) :: input()
-  @spec parse_endpoint_opt!(:output, output(), pid()) :: output()
-  defp parse_endpoint_opt!(direction, value, parent) when is_binary(value) do
-    parse_endpoint_opt!(direction, {value, []}, parent)
+  @spec parse_endpoint_opt!(:input, input()) :: input()
+  @spec parse_endpoint_opt!(:output, output()) :: output()
+  defp parse_endpoint_opt!(direction, value) when is_binary(value) do
+    parse_endpoint_opt!(direction, {value, []})
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_endpoint_opt!(direction, {value, opts}, parent) when is_binary(value) do
+  defp parse_endpoint_opt!(direction, {value, opts}) when is_binary(value) do
     uri = URI.parse(value)
     scheme = uri.scheme
     extension = if uri.path, do: Path.extname(uri.path)
@@ -770,16 +770,16 @@ defmodule Boombox.InternalBin do
       _other ->
         raise ArgumentError, "Unsupported URI: #{value} for direction: #{direction}"
     end
-    |> then(&parse_endpoint_opt!(direction, &1, parent))
+    |> then(&parse_endpoint_opt!(direction, &1))
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp parse_endpoint_opt!(direction, value, parent) when is_tuple(value) or is_atom(value) do
+  defp parse_endpoint_opt!(direction, value) when is_tuple(value) or is_atom(value) do
     case value do
       {endpoint_type, location}
       when is_binary(location) and direction == :input and
              StorageEndpoints.is_storage_endpoint_type(endpoint_type) ->
-        parse_endpoint_opt!(:input, {endpoint_type, location, []}, parent)
+        parse_endpoint_opt!(:input, {endpoint_type, location, []})
 
       {endpoint_type, location, opts}
       when endpoint_type in [:h264, :h265] and is_binary(location) and direction == :input ->
@@ -820,7 +820,7 @@ defmodule Boombox.InternalBin do
         value
 
       {:whip, uri} when is_binary(uri) ->
-        parse_endpoint_opt!(direction, {:whip, uri, []}, parent)
+        parse_endpoint_opt!(direction, {:whip, uri, []})
 
       {:whip, uri, opts} when is_binary(uri) and is_list(opts) and direction == :input ->
         if Keyword.keyword?(opts), do: {:webrtc, value}
@@ -853,7 +853,7 @@ defmodule Boombox.InternalBin do
 
       {elixir_endpoint, opts}
       when elixir_endpoint in @elixir_endpoint_types ->
-        if Keyword.keyword?(opts), do: {elixir_endpoint, parent, opts}
+        if Keyword.keyword?(opts), do: value
 
       {:srt, server_awaiting_accept}
       when direction == :input and is_pid(server_awaiting_accept) ->
