@@ -61,7 +61,6 @@ defmodule Boombox.InternalBin do
                   track_builders: nil,
                   last_result: nil,
                   eos_info: nil,
-                  rtsp_state: nil,
                   player_state: nil,
                   pending_new_tracks: %{input: [], output: []},
                   output_webrtc_state: nil,
@@ -94,7 +93,6 @@ defmodule Boombox.InternalBin do
             track_builders: Boombox.InternalBin.track_builders() | nil,
             last_result: Ready.t() | Wait.t() | nil,
             eos_info: term(),
-            rtsp_state: Boombox.InternalBin.RTSP.state() | nil,
             output_webrtc_state: Boombox.InternalBin.WebRTC.output_webrtc_state() | nil,
             new_tracks_notification_status:
               Boombox.InternalBin.Pad.new_tracks_notification_status()
@@ -222,12 +220,6 @@ defmodule Boombox.InternalBin do
   @impl true
   def handle_child_notification({:set_up_tracks, tracks}, :rtsp_source, ctx, state) do
     {result, state} = Boombox.InternalBin.RTSP.handle_set_up_tracks(tracks, state)
-    proceed_result(result, ctx, state)
-  end
-
-  @impl true
-  def handle_child_notification({:new_track, ssrc, track}, :rtsp_source, ctx, state) do
-    {result, state} = Boombox.InternalBin.RTSP.handle_input_track(ssrc, track, state)
     proceed_result(result, ctx, state)
   end
 
