@@ -58,7 +58,6 @@
       updateStatus("Loading...", "status-connecting");
 
       if (Hls.isSupported()) {
-        // Enable debug if you need to see exactly why it fails in console
         const hls = new Hls({ debug: false });
 
         hls.loadSource(source);
@@ -68,29 +67,6 @@
           video.play().catch(e => console.log("Autoplay blocked:", e));
           updateStatus("Playing", "status-connected");
         });
-
-        // --- NEW: Error Recovery Logic for Discontinuities ---
-        hls.on(Hls.Events.ERROR, function (event, data) {
-          if (data.fatal) {
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                console.log("fatal network error encountered, try to recover");
-                hls.startLoad();
-                break;
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                console.log("fatal media error encountered, try to recover");
-                // This is often triggered by discontinuities
-                hls.recoverMediaError();
-                break;
-              default:
-                console.log("cannot recover, destroying");
-                updateStatus("Error: Fatal Stream Error", "status-disconnected");
-                hls.destroy();
-                break;
-            }
-          }
-        });
-        // ----------------------------------------------------
 
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = source;

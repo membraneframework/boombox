@@ -1,6 +1,6 @@
 # MP4 color inversion demo
 
-This is a simple demo showcasing how to invert colors of a MP4
+This is a simple demo showcasing how to invert colors of an MP4
 with Boombox.
 
 ## Prerequisites

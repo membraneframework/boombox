@@ -9,7 +9,8 @@ for seamless integration with AI pipelines and other projects that interact with
 raw media streams directly.
 
 To see examples and demos see the
-[`examples`](https://github.com/membraneframework/boombox/tree/master/python) directory.
+[`examples`](https://github.com/membraneframework/boombox/tree/master/python/examples)
+directory.
 
 - **Documentation:** <https://boombox.readthedocs.io>
 - **Source code:** <https://github.com/membraneframework/boombox/tree/master/python>
