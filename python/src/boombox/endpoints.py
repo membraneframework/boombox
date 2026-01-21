@@ -457,24 +457,24 @@ class RTP(BoomboxEndpoint):
 
 @dataclass
 class SRT(BoomboxEndpoint):
-    """Endpoint for communication with Secure Reliable Transport (SRT).
+    """Endpoint for communication over Secure Reliable Transport (SRT) protocol.
 
-    When using ths endpoint as input, Boombox will act as a SRT server and expect
+    When using ths endpoint as input, Boombox will act as an SRT server and expect
     connections from clients at the provided address. When using as output,
-    Boombox will act as a SRT client and try to connect to a server under provided
-    address.
+    Boombox will act as an SRT client and try to connect to a server under the
+    provided address.
 
     Attributes
     ----------
     url : str
         Address of the SRT server in the form of <ip>:<port>. When using this
-        endpoint as input, this field determines in which address the server
+        endpoint as input, this field determines on which address the server
         will listen for connections. When using for output, it will determine
         to what address to connect.
     stream_id : str, optional
         ID of the stream. When using this endpoint as input, this field
         determines the ID of the stream which the server will accept. When
-        using for output, it will determine what stream ID to set.
+        using for output, it will determine ID of the stream being sent.
     password : str, optional
         Password used to authenticate the connection. When using this endpoint
         as input, this field determines the password the server will require
