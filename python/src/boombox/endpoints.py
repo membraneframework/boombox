@@ -453,3 +453,43 @@ class RTP(BoomboxEndpoint):
             "audio_encoding",
             "aac_bitrate_mode",
         } | super().get_atom_fields()
+
+
+@dataclass
+class SRT(BoomboxEndpoint):
+    """Endpoint for communication with Secure Reliable Transport (SRT).
+
+    When using ths endpoint as input, Boombox will act as a SRT server and expect
+    connections from clients at the provided address. When using as output,
+    Boombox will act as a SRT client and try to connect to a server under provided
+    address.
+
+    Attributes
+    ----------
+    url : str
+        Address of the SRT server in the form of <ip>:<port>. When using this
+        endpoint as input, this field determines in which address the server
+        will listen for connections. When using for output, it will determine
+        to what address to connect.
+    stream_id : str, optional
+        ID of the stream. When using this endpoint as input, this field
+        determines the ID of the stream which the server will accept. When
+        using for output, it will determine what stream ID to set.
+    password : str, optional
+        Password used to authenticate the connection. When using this endpoint
+        as input, this field determines the password the server will require
+        from clients when connecting. When using for output, it will determine
+        what password the client will use to authenticate.
+    """
+
+    url: str
+    _: KW_ONLY
+    stream_id: str
+    password: str
+
+
+@dataclass
+class Player(BoomboxEndpoint):
+    """Endpoint that plays the output stream with the SDL2 media player."""
+
+    pass
