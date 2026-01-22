@@ -50,7 +50,7 @@ def run_server(address: str, port: int) -> None:
     class Handler(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             directory = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "assets"
+                os.path.dirname(os.path.abspath(__file__)), "..", "assets"
             )
 
             super().__init__(*args, **kwargs, directory=directory)

@@ -81,7 +81,7 @@ class BoomboxEndpoint(abc.ABC):
     # def validate_direction(self, direction: Literal['input', 'output']) ->
     # bool: ...
 
-    def serialize(self, direction: Literal['input', 'output']) -> tuple:
+    def serialize(self, direction: Literal["input", "output"]) -> tuple:
         """Serializes itself to an Elixir-compatible term.
 
         To allow Pyrlang to send the endpoint definition to Elixir it first
@@ -111,7 +111,11 @@ class BoomboxEndpoint(abc.ABC):
             if f.kw_only and self.__dict__[f.name] is not None
         ]
         if keyword_fields:
-            return (self.get_endpoint_name(direction), *required_field_values, keyword_fields)
+            return (
+                self.get_endpoint_name(direction),
+                *required_field_values,
+                keyword_fields,
+            )
         else:
             return (self.get_endpoint_name(direction), *required_field_values)
 
@@ -181,8 +185,10 @@ class RawData(BoomboxEndpoint):
     @override
     def get_endpoint_name(self, direction) -> Atom:
         match direction:
-            case "input": return Atom("writer")
-            case "output": return Atom("reader")
+            case "input":
+                return Atom("writer")
+            case "output":
+                return Atom("reader")
 
     @override
     def get_atom_fields(self) -> set[str]:
@@ -352,6 +358,10 @@ class HLS(BoomboxEndpoint):
     location: str
     _: KW_ONLY
     mode: Literal["vod", "live"] = "vod"
+
+    @override
+    def get_atom_fields(self) -> set[str]:
+        return {"mode"} | super().get_atom_fields()
 
 
 @dataclass

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HLS Stream Player</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0"></script>
+
+  <style>
+    /* * FORCE FIX:
+     * These rules force the video element to fill the container
+     * regardless of the stream's resolution changes.
+     */
+    .video-wrapper video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain !important; /* Ensures the whole video is visible */
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>HLS Stream Player</h1>
+
+    <div class="controls">
+      <input type="text" id="url" value="hls_output/index.m3u8" />
+      <button id="playButton">Play</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="video-wrapper">
+      <video id="video" controls autoplay muted playsinline></video>
+    </div>
+  </main>
+
+  <script>
+    const video = document.getElementById('video');
+    const urlInput = document.getElementById('url');
+    const playButton = document.getElementById('playButton');
+    const statusDiv = document.getElementById('status');
+
+    const srcParam = new URLSearchParams(window.location.search).get("src");
+    if (srcParam) {
+      urlInput.value = srcParam;
+    }
+
+    const updateStatus = (message, stateClass) => {
+      statusDiv.innerText = message;
+      statusDiv.className = stateClass || '';
+    };
+
+    function play() {
+      const source = urlInput.value;
+      updateStatus("Loading...", "status-connecting");
+
+      if (Hls.isSupported()) {
+        const hls = new Hls({ debug: false });
+
+        hls.loadSource(source);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+          video.play().catch(e => console.log("Autoplay blocked:", e));
+          updateStatus("Playing", "status-connected");
+        });
+
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = source;
+        video.addEventListener('loadedmetadata', function() {
+          video.play();
+          updateStatus("Playing (Native)", "status-connected");
+        });
+        video.addEventListener('error', function() {
+           updateStatus("Error: Native Player Failed", "status-disconnected");
+        });
+      } else {
+        updateStatus("Error: HLS not supported", "status-disconnected");
+      }
+    }
+
+    playButton.onclick = play;
+    play();
+  </script>
+</body>
+</html>
