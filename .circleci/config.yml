@@ -3,6 +3,16 @@ orbs:
   elixir: membraneframework/elixir@1
 
 executors:
+  python_linux_x86_executor:
+    docker:
+      - image: cimg/python:3.11
+    resource_class: medium
+
+  python_linux_arm_executor:
+    docker:
+      - image: cimg/python:3.11
+    resource_class: arm.medium
+
   linux_x86_executor:
     docker:
       - image: membraneframeworklabs/docker_membrane
@@ -11,16 +21,6 @@ executors:
   linux_arm_executor:
     docker:
       - image: membraneframeworklabs/docker_membrane
-    resource_class: arm.medium
-
-  manylinux_x86_executor:
-    docker:
-      - image: quay.io/pypa/manylinux2014_x86_64
-    resource_class: medium
-
-  manylinux_arm_executor:
-    docker:
-      - image: quay.io/pypa/manylinux2014_aarch64
     resource_class: arm.medium
 
   macos_arm_executor:
@@ -79,21 +79,26 @@ commands:
             - artifacts
 
   publish_python_package_linux:
+    parameters:
+      arch:
+        type: string
+        default: "auto"
     steps:
       - checkout:
           path: ~/project
+      - setup_remote_docker
+
       - run:
-          name: Build wheel and repair with auditwheel
+          name: Build wheels with cibuildwheel
           command: |
-            /opt/python/cp311-cp311/bin/pip install build twine
-            /opt/python/cp311-cp311/bin/python -m build --wheel
-            auditwheel repair dist/*.whl --wheel-dir ../wheelhouse
+            pip install cibuildwheel
+            mkdir -p wheelhouse
+            CIBW_ARCHS=<< parameters.arch >> CIBW_SKIP="*musllinux*" cibuildwheel --output-dir wheelhouse
       - run:
           name: Publish to PyPI
-          working_directory: ~/project/wheelhouse
           command: |
-            /opt/python/cp311-cp311/bin/pip install twine
-            /opt/python/cp311-cp311/bin/twine upload --username __token__ --password $PYPI_API_KEY *
+            pip install twine
+            twine upload --username __token__ --password $PYPI_API_KEY wheelhouse/*
 
 jobs:
   test_exclude_browser:
@@ -189,26 +194,28 @@ jobs:
       - checkout:
           path: ~/project
       - run:
-          name: Install build and publish tools
-          command: pip install build twine
+          name: Install cibuildwheel
+          command: pip install cibuildwheel twine
       - run:
-          name: Build wheel (no sdist)
-          command: python -m build --wheel
+          name: Build wheels
+          command: CIBW_PLATFORM=macos CIBW_ARCHS=arm64 cibuildwheel --output-dir wheelhouse
       - run:
           name: Publish to PyPI
-          command: twine upload --verbose --username __token__ --password $PYPI_API_KEY dist/*
+          command: twine upload --verbose --username __token__ --password $PYPI_API_KEY wheelhouse/*
 
   publish_python_package_linux_x86:
-    executor: manylinux_x86_executor
+    executor: python_linux_x86_executor
     working_directory: ~/project/python
     steps:
-      - publish_python_package_linux
+      - publish_python_package_linux:
+          arch: x86_64
 
   publish_python_package_linux_arm:
-    executor: manylinux_arm_executor
+    executor: python_linux_arm_executor
     working_directory: ~/project/python
     steps:
-      - publish_python_package_linux
+      - publish_python_package_linux:
+          arch: aarch64
 
   build_python_docs:
     docker:
