@@ -15,12 +15,14 @@ executors:
 
   linux_x86_executor:
     docker:
-      - image: hexpm/elixir:1.19.4-erlang-28.1.1-ubuntu-jammy-20260109
+      - image: membraneframeworklabs/docker_membrane:v2.8.0
+      #- image: hexpm/elixir:1.19.4-erlang-28.1.1-ubuntu-jammy-20260109
     resource_class: medium
 
   linux_arm_executor:
     docker:
-      - image: hexpm/elixir:1.19.4-erlang-28.1.1-ubuntu-jammy-20260109
+      #- image: hexpm/elixir:1.19.4-erlang-28.1.1-ubuntu-jammy-20260109
+      - image: membraneframeworklabs/docker_membrane:v2.8.0
     resource_class: arm.medium
 
   macos_arm_executor:
@@ -57,16 +59,6 @@ commands:
                 command: |
                   mix local.hex --force
                   mix local.rebar --force
-
-      - when:
-          condition:
-              or:
-                - equal: [<< parameters.platform >>, linux-x86]
-                - equal: [<< parameters.platform >>, linux-arm]
-          steps:
-            - run: |
-                apt-get update
-                apt-get install --yes gcc git make pkg-config openssl
       - run:
           name: Get deps
           command: mix deps.get
