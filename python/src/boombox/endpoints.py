@@ -459,7 +459,7 @@ class RTP(BoomboxEndpoint):
 class SRT(BoomboxEndpoint):
     """Endpoint for communication over Secure Reliable Transport (SRT) protocol.
 
-    When using ths endpoint as input, Boombox will act as an SRT server and expect
+    When using this endpoint as input, Boombox will act as an SRT server and expect
     connections from clients at the provided address. When using as output,
     Boombox will act as an SRT client and try to connect to a server under the
     provided address.
