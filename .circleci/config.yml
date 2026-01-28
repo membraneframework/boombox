@@ -34,10 +34,6 @@ commands:
       platform:
         type: enum
         enum: [macos-arm, linux-x86, linux-arm]
-      cache-version:
-        description: "Cache version number, can be used to force cache recreation"
-        type: integer
-        default: 1
 
     steps:
       - checkout
@@ -61,10 +57,9 @@ commands:
                 command: |
                   mix local.hex --force
                   mix local.rebar --force
-      - elixir/get_mix_deps:
-          cache-version: << parameters.cache-version >>
-      - elixir/use_build_cache:
-          cache-version: << parameters.cache-version >>
+      - run:
+          name: Get deps
+          command: mix deps.get
       - run:
           name: Mix release
           command: mix release server
@@ -240,7 +235,7 @@ workflows:
           filters: *push_filters
       - compare_versions:
           filters: *push_filters
-      - elixir/hex_publish:
+      - mix_release_server_macos_arm: &mix_release_job_config
           requires:
             - elixir/build_test
             - test_exclude_browser
@@ -251,15 +246,6 @@ workflows:
               ignore: /.*/
             tags:
               only: /v.*/
-          context:
-            - Deployment
-      - mix_release_server_macos_arm: &mix_release_job_config
-          requires:
-            - elixir/build_test
-            - test_exclude_browser
-            - elixir/lint
-            - compare_versions
-          filters: *publish_filters
           context:
             - Deployment
       - mix_release_server_linux_x86: *mix_release_job_config
@@ -273,14 +259,15 @@ workflows:
           context:
             - Deployment
           version: << pipeline.git.tag >>
-      - publish_python_package_macos_arm: &publish_python_package_job_config
+      - elixir/hex_publish: &publish_job_config
           requires:
             - publish_github_release
           filters: *publish_filters
           context:
             - Deployment
-      - publish_python_package_linux_x86: *publish_python_package_job_config
-      - publish_python_package_linux_arm: *publish_python_package_job_config
+      - publish_python_package_macos_arm: *publish_job_config
+      - publish_python_package_linux_x86: *publish_job_config
+      - publish_python_package_linux_arm: *publish_job_config
       - build_python_docs:
           requires:
             - publish_python_package_macos_arm
