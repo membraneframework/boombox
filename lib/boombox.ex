@@ -342,8 +342,7 @@ defmodule Boombox do
   The returned `pid` is the pipeline supervisor. You can monitor it to detect
   when processing finishes or if Boombox crashes.
 
-  Elixir endpoints (`:stream`, `:writer`, `:reader`, `:message`) are not
-  supported — use `run/1` or `async/1` for those.
+  `:stream` endpoints (both input and output) are not supported — use `run/1` or `async/1` for those.
 
   See `start_link/1` and `child_spec/1` for supervision tree integration.
   """
