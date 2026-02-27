@@ -332,6 +332,66 @@ defmodule Boombox do
   end
 
   @doc """
+  Starts Boombox without linking it to the calling process.
+
+  Returns `{:ok, pid}` once Boombox is ready to process media.
+  For protocols that require a server socket (RTMP, RTSP, RTP, SRT), this
+  function blocks until the server is bound and ready to accept connections.
+  For all other protocols it returns immediately after the pipeline starts.
+
+  The returned `pid` is the pipeline supervisor. You can monitor it to detect
+  when processing finishes or if Boombox crashes.
+
+  Elixir endpoints (`:stream`, `:writer`, `:reader`, `:message`) are not
+  supported — use `run/1` or `async/1` for those.
+
+  See `start_link/1` and `child_spec/1` for supervision tree integration.
+  """
+  @spec start(input: input() | elixir_input(), output: output() | elixir_output()) ::
+          {:ok, pid()} | {:error, term()} | Writer.t() | Reader.t() | pid()
+  def start(opts) do
+    do_start(:start, opts)
+  end
+
+  @doc """
+  Starts Boombox linked to the calling process.
+
+  Works like `start/1` but links the pipeline to the calling process — if
+  either exits, the other is terminated as well.
+
+  This is suitable for supervision tree integration — see `child_spec/1`.
+  """
+  @spec start_link(input: input() | elixir_input(), output: output() | elixir_output()) ::
+          {:ok, pid()} | {:error, term()} | Writer.t() | Reader.t() | pid()
+  def start_link(opts) do
+    do_start(:start_link, opts)
+  end
+
+  @doc """
+  Returns a child specification for running Boombox under a supervisor.
+
+  Boombox processes are one-shot: they process media and exit normally when
+  done. The `restart: :temporary` configuration means they will not be
+  restarted after finishing.
+
+  ## Example
+
+      children = [
+        {Boombox, input: "rtmp://localhost:5432", output: "output.mp4"}
+      ]
+
+      Supervisor.start_link(children, strategy: :one_for_one)
+  """
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :temporary
+    }
+  end
+
+  @doc """
   Runs boombox with CLI arguments.
 
   ## Example
@@ -430,18 +490,75 @@ defmodule Boombox do
 
   defp elixir_endpoint?(_io), do: false
 
-  @spec start_server(Pipeline.opts_map(), :messages | :calls) :: boombox_server()
-  defp start_server(opts, server_communication_medium) do
+  @spec start_server(Pipeline.opts_map(), :messages | :calls, :start | :start_link) ::
+          boombox_server()
+  defp start_server(opts, server_communication_medium, link_method \\ :start) do
     {:ok, pid} =
-      Boombox.Server.start(
-        packet_serialization: false,
-        stop_application: false,
-        communication_medium: server_communication_medium,
-        parent_pid: self()
-      )
+      apply(Boombox.Server, link_method, [
+        [
+          packet_serialization: false,
+          stop_application: false,
+          communication_medium: server_communication_medium,
+          parent_pid: self()
+        ]
+      ])
 
     Boombox.Server.run(pid, Map.to_list(opts))
     pid
+  end
+
+  @spec do_start(:start | :start_link, keyword()) ::
+          {:ok, pid()} | {:error, term()} | Writer.t() | Reader.t() | pid()
+  defp do_start(link_method, opts) do
+    opts =
+      opts
+      |> Keyword.validate!([:input, :output])
+      |> Map.new()
+
+    if [:input, :output] -- Map.keys(opts) != [] do
+      raise ArgumentError, "Both input and output are required."
+    end
+
+    if match?({:stream, _}, opts[:input]) or match?({:stream, _}, opts[:output]) do
+      raise ArgumentError,
+            ":stream endpoints are not supported with start/1 and start_link/1. " <>
+              "Use run/1 or async/1 instead."
+    end
+
+    case opts do
+      %{input: {:writer, _writer_opts}} ->
+        pid = start_server(opts, :calls, link_method)
+        %Writer{server_reference: pid}
+
+      %{input: {:message, _message_opts}} ->
+        start_server(opts, :messages, link_method)
+
+      %{output: {:reader, _reader_opts}} ->
+        pid = start_server(opts, :calls, link_method)
+        %Reader{server_reference: pid}
+
+      %{output: {:message, _message_opts}} ->
+        start_server(opts, :messages, link_method)
+
+      _ ->
+        pipeline_opts = Map.put(opts, :parent, self())
+
+        case apply(Membrane.Pipeline, link_method, [Boombox.Pipeline, pipeline_opts]) do
+          {:ok, supervisor, _pipeline} ->
+            case opts.input do
+              {protocol, _} when protocol in [:rtmp, :rtmps, :rtp, :rtsp, :srt] ->
+                await_external_resource_ready()
+
+              _other ->
+                :ok
+            end
+
+            {:ok, supervisor}
+
+          {:error, _} = error ->
+            error
+        end
+    end
   end
 
   @spec consume_stream(Enumerable.t(), pid(), Pipeline.procs()) :: term()
