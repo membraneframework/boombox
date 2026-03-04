@@ -753,7 +753,16 @@ defmodule BoomboxTest do
   defp get_kinds(@bbb_mp4_a), do: [:audio]
   defp get_kinds(@bbb_mp4_v), do: [:video]
 
-  test "start_link/1 starts pipeline, returns pid, runs to completion", %{tmp_dir: tmp} do
+  async_test "start_link/1 starts pipeline, returns pid, runs to completion", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    {:ok, pid} = Boombox.start_link(input: @bbb_mp4, output: output)
+    ref = Process.monitor(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 30_000
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  async_test "start_link/1 with :stream input starts pipeline, returns pid, runs to completion",
+             %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
     {:ok, pid} = Boombox.start_link(input: @bbb_mp4, output: output)
     ref = Process.monitor(pid)
@@ -775,12 +784,12 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  test "child_spec/1 returns correct spec" do
+  async_test "child_spec/1 returns correct spec" do
     spec = Boombox.child_spec(input: "foo.mp4", output: "bar.mp4")
     assert %{id: Boombox, restart: :temporary, start: {Boombox, :start_link, _}} = spec
   end
 
-  test "child_spec/1 allows Boombox to run under a supervisor", %{tmp_dir: tmp} do
+  async_test "child_spec/1 allows Boombox to run under a supervisor", %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
 
     {:ok, sup} =
@@ -797,7 +806,7 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  test "start_link/1 links pipeline to calling process", %{tmp_dir: tmp} do
+  async_test "start_link/1 links pipeline to calling process", %{tmp_dir: tmp} do
     parent = self()
     port = get_free_port()
     url = "rtmp://localhost:#{port}/app/stream_key"

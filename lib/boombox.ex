@@ -214,12 +214,12 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
         source = await_source_ready()
         consume_stream(stream, source, procs)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
@@ -239,7 +239,7 @@ defmodule Boombox do
 
       opts ->
         opts
-        |> Pipeline.start()
+        |> Pipeline.start_link()
         |> await_pipeline()
     end
   end
@@ -279,7 +279,7 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
         source = await_source_ready()
 
         Task.async(fn ->
@@ -288,7 +288,7 @@ defmodule Boombox do
         end)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
@@ -309,7 +309,7 @@ defmodule Boombox do
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
       %{input: {protocol, _opts}} when protocol in @protocols_with_external_resources ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
 
         task =
           Task.async(fn ->
@@ -321,7 +321,7 @@ defmodule Boombox do
         task
 
       opts ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
 
         Task.async(fn ->
           Process.monitor(procs.supervisor)
@@ -346,9 +346,12 @@ defmodule Boombox do
 
   This is suitable for supervision tree integration — see `child_spec/1`.
   """
-  @spec start_link(input: input() | elixir_input(), output: output() | elixir_output()) ::
+  @spec start_link(Enumerable.t() | nil,
+          input: input() | elixir_input(),
+          output: output() | elixir_output()
+        ) ::
           {:ok, pid()} | {:error, term()} | Writer.t() | Reader.t() | pid()
-  def start_link(opts) do
+  def start_link(stream \\ nil, opts) do
     opts = Map.new(opts)
 
     if [:input, :output] -- Map.keys(opts) != [] do
@@ -364,10 +367,19 @@ defmodule Boombox do
       """
     end
 
-    pipeline_opts = Map.put(opts, :parent, self())
+    case opts do
+      %{input: {:stream, _stream_opts}} ->
+        procs = Pipeline.start_link(opts)
+        source = await_source_ready()
 
-    case Membrane.Pipeline.start_link(Boombox.Pipeline, pipeline_opts) do
-      {:ok, supervisor, _pipeline} ->
+        Task.async(fn ->
+          Process.monitor(procs.supervisor)
+          consume_stream(stream, source, procs)
+        end)
+
+      opts ->
+        procs = Pipeline.start_link(opts)
+
         case opts.input do
           {protocol, _} when protocol in @protocols_with_external_resources ->
             await_external_resource_ready()
@@ -376,10 +388,7 @@ defmodule Boombox do
             :ok
         end
 
-        {:ok, supervisor}
-
-      {:error, _reason} = error ->
-        error
+        {:ok, procs.supervisor}
     end
   end
 
