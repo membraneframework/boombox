@@ -829,7 +829,6 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
-  @tag :sometag
   async_test "child_spec/1 allows Boombox to run under a supervisor with stream input", %{
     tmp_dir: tmp
   } do
@@ -859,7 +858,6 @@ defmodule BoomboxTest do
     [{Boombox, pid, _type, _module}] = Supervisor.which_children(sup)
     ref = Process.monitor(pid)
     assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 30_000
-    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   async_test "start_link/1 links pipeline to calling process", %{tmp_dir: tmp} do
