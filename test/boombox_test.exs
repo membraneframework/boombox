@@ -752,4 +752,70 @@ defmodule BoomboxTest do
   defp get_kinds(@bbb_mp4), do: [:audio, :video]
   defp get_kinds(@bbb_mp4_a), do: [:audio]
   defp get_kinds(@bbb_mp4_v), do: [:video]
+
+  test "start_link/1 starts pipeline, returns pid, runs to completion", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    {:ok, pid} = Boombox.start_link(input: @bbb_mp4, output: output)
+    ref = Process.monitor(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 30_000
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  async_test "start_link/1 with rtmp input blocks until server socket is ready", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+    port = get_free_port()
+    url = "rtmp://localhost:#{port}/app/stream_key"
+
+    {:ok, pid} = Boombox.start_link(input: url, output: output)
+
+    p = send_rtmp(url)
+    ref = Process.monitor(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 30_000
+    Testing.Pipeline.terminate(p)
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  test "child_spec/1 returns correct spec" do
+    spec = Boombox.child_spec(input: "foo.mp4", output: "bar.mp4")
+    assert %{id: Boombox, restart: :temporary, start: {Boombox, :start_link, _}} = spec
+  end
+
+  test "child_spec/1 allows Boombox to run under a supervisor", %{tmp_dir: tmp} do
+    output = Path.join(tmp, "output.mp4")
+
+    {:ok, sup} =
+      Supervisor.start_link(
+        [{Boombox, input: @bbb_mp4, output: output}],
+        strategy: :one_for_one
+      )
+
+    on_exit(fn -> if Process.alive?(sup), do: Process.exit(sup, :normal) end)
+
+    [{Boombox, pid, _, _}] = Supervisor.which_children(sup)
+    ref = Process.monitor(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 30_000
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  test "start_link/1 links pipeline to calling process", %{tmp_dir: tmp} do
+    parent = self()
+    port = get_free_port()
+    url = "rtmp://localhost:#{port}/app/stream_key"
+    output = Path.join(tmp, "output.mp4")
+
+    caller =
+      spawn(fn ->
+        {:ok, boombox} = Boombox.start_link(input: url, output: output)
+        send(parent, {:started, boombox})
+        Process.sleep(:infinity)
+      end)
+
+    assert_receive {:started, boombox}
+    ref = Process.monitor(boombox)
+
+    Process.exit(caller, :kill)
+
+    # Due to the link, the pipeline should also exit when the caller dies
+    assert_receive {:DOWN, ^ref, :process, ^boombox, _}, 5_000
+  end
 end
