@@ -786,7 +786,7 @@ defmodule BoomboxTest do
 
   async_test "child_spec/1 returns correct spec" do
     spec = Boombox.child_spec(input: "foo.mp4", output: "bar.mp4")
-    assert %{id: Boombox, restart: :temporary, start: {Boombox, :start_link, _}} = spec
+    assert %{id: Boombox, restart: :temporary, start: {Boombox, :start_link, _opts}} = spec
   end
 
   async_test "child_spec/1 allows Boombox to run under a supervisor", %{tmp_dir: tmp} do
@@ -800,7 +800,7 @@ defmodule BoomboxTest do
 
     on_exit(fn -> if Process.alive?(sup), do: Process.exit(sup, :normal) end)
 
-    [{Boombox, pid, _, _}] = Supervisor.which_children(sup)
+    [{Boombox, pid, _type, _module}] = Supervisor.which_children(sup)
     ref = Process.monitor(pid)
     assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 30_000
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")

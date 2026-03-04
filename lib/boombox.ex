@@ -381,7 +381,7 @@ defmodule Boombox do
         procs = Pipeline.start_link(opts)
 
         case opts.input do
-          {protocol, _} when protocol in @protocols_with_external_resources ->
+          {protocol, _opts} when protocol in @protocols_with_external_resources ->
             await_external_resource_ready()
 
           _other ->
