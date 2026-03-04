@@ -761,13 +761,31 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
+  # 1ms of raw audio stream with 24_000 samples per second, one channel and 2 bytes per channel consists of 2*24 = 48 bytes
+  @audio_chunk_1ms <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>
   async_test "start_link/1 with :stream input starts pipeline, returns pid, runs to completion",
              %{tmp_dir: tmp} do
     output = Path.join(tmp, "output.mp4")
-    {:ok, pid} = Boombox.start_link(input: @bbb_mp4, output: output)
+
+    audio_packets =
+      Enum.map(1..100, fn i ->
+        %Boombox.Packet{
+          kind: :audio,
+          pts: Membrane.Time.milliseconds(i),
+          format: %{audio_format: :s16le, audio_channels: 1, audio_rate: 24_000},
+          payload: @audio_chunk_1ms
+        }
+      end)
+
+    {:ok, pid} =
+      Boombox.start_link(audio_packets,
+        input: {:stream, audio: :binary, video: false},
+        output: output
+      )
+
     ref = Process.monitor(pid)
     assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 30_000
-    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
   async_test "start_link/1 with rtmp input blocks until server socket is ready", %{tmp_dir: tmp} do
@@ -786,7 +804,12 @@ defmodule BoomboxTest do
 
   async_test "child_spec/1 returns correct spec" do
     spec = Boombox.child_spec(input: "foo.mp4", output: "bar.mp4")
-    assert %{id: Boombox, restart: :temporary, start: {Boombox, :start_link, _opts}} = spec
+
+    assert %{
+             id: Boombox,
+             restart: :temporary,
+             start: {Boombox, :start_link, [[input: "foo.mp4", output: "bar.mp4"]]}
+           } = spec
   end
 
   async_test "child_spec/1 allows Boombox to run under a supervisor", %{tmp_dir: tmp} do
@@ -795,6 +818,39 @@ defmodule BoomboxTest do
     {:ok, sup} =
       Supervisor.start_link(
         [{Boombox, input: @bbb_mp4, output: output}],
+        strategy: :one_for_one
+      )
+
+    on_exit(fn -> if Process.alive?(sup), do: Process.exit(sup, :normal) end)
+
+    [{Boombox, pid, _type, _module}] = Supervisor.which_children(sup)
+    ref = Process.monitor(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 30_000
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
+  end
+
+  @tag :sometag
+  async_test "child_spec/1 allows Boombox to run under a supervisor with stream input", %{
+    tmp_dir: tmp
+  } do
+    output = Path.join(tmp, "output.mp4")
+
+    audio_packets =
+      Enum.map(1..100, fn i ->
+        %Boombox.Packet{
+          kind: :audio,
+          pts: Membrane.Time.milliseconds(i),
+          format: %{audio_format: :s16le, audio_channels: 1, audio_rate: 24_000},
+          payload: @audio_chunk_1ms
+        }
+      end)
+
+    {:ok, sup} =
+      Supervisor.start_link(
+        [
+          {Boombox,
+           [audio_packets, input: {:stream, audio: :binary, video: false}, output: output]}
+        ],
         strategy: :one_for_one
       )
 

@@ -14,8 +14,9 @@ defmodule Boombox do
   alias Membrane.RTP
 
   @elixir_endpoints [:stream, :message, :writer, :reader]
-
   @protocols_with_external_resources [:rtmp, :rtmps, :rtp, :rtsp, :srt]
+  @endpoint_opts [:input, :output]
+
   defmodule Writer do
     @moduledoc """
     Defines a struct to be used when interacting with boombox when using `:writer` endpoint.
@@ -352,7 +353,7 @@ defmodule Boombox do
         ) ::
           {:ok, pid()} | {:error, term()} | Writer.t() | Reader.t() | pid()
   def start_link(stream \\ nil, opts) do
-    opts = Map.new(opts)
+    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
 
     if [:input, :output] -- Map.keys(opts) != [] do
       raise ArgumentError, "Both input and output are required."
@@ -369,13 +370,15 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = Pipeline.start_link(opts)
-        source = await_source_ready()
+        task =
+          Task.async(fn ->
+            procs = Pipeline.start_link(opts)
+            source = await_source_ready()
+            Process.monitor(procs.supervisor)
+            consume_stream(stream, source, procs)
+          end)
 
-        Task.async(fn ->
-          Process.monitor(procs.supervisor)
-          consume_stream(stream, source, procs)
-        end)
+        {:ok, task.pid}
 
       opts ->
         procs = Pipeline.start_link(opts)
@@ -488,7 +491,6 @@ defmodule Boombox do
     Boombox.Server.finish_producing(reader.server_reference)
   end
 
-  @endpoint_opts [:input, :output]
   defp validate_opts!(stream, opts) do
     opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
 
