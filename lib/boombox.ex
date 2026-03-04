@@ -369,15 +369,12 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        consumer =
-          spawn_link(fn ->
-            procs = Pipeline.start_link(opts)
-            source = await_source_ready()
-            Process.monitor(procs.supervisor)
-            consume_stream(stream, source, procs)
-          end)
-
-        {:ok, consumer}
+        Task.start_link(fn ->
+          procs = Pipeline.start_link(opts)
+          source = await_source_ready()
+          Process.monitor(procs.supervisor)
+          consume_stream(stream, source, procs)
+        end)
 
       opts ->
         procs = Pipeline.start_link(opts)
