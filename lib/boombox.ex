@@ -280,10 +280,9 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = Pipeline.start_link(opts)
-        source = await_source_ready()
-
         Task.async(fn ->
+          procs = Pipeline.start_link(opts)
+          source = await_source_ready()
           Process.monitor(procs.supervisor)
           consume_stream(stream, source, procs)
         end)
@@ -410,11 +409,19 @@ defmodule Boombox do
 
       Supervisor.start_link(children, strategy: :one_for_one)
   """
-  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  @spec child_spec(keyword() | [Enumerable.t() | keyword()]) :: Supervisor.child_spec()
   def child_spec(opts) do
+    start_args =
+      if Keyword.keyword?(opts) do
+        [opts]
+      else
+        [stream | rest] = opts
+        [stream, rest]
+      end
+
     %{
       id: __MODULE__,
-      start: {__MODULE__, :start_link, [opts]},
+      start: {__MODULE__, :start_link, start_args},
       restart: :temporary
     }
   end
