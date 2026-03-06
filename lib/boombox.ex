@@ -352,20 +352,7 @@ defmodule Boombox do
         ) ::
           {:ok, pid()} | {:error, term()} | Writer.t() | Reader.t() | pid()
   def start_link(stream \\ nil, opts) do
-    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
-
-    if [:input, :output] -- Map.keys(opts) != [] do
-      raise ArgumentError, "Both input and output are required."
-    end
-
-    if match?({type, _} when type in [:message, :reader], opts[:input]) or
-         match?({type, _} when type in [:stream, :message, :writer], opts[:output]) do
-      raise ArgumentError, """
-      Endpoints :message and :reader are not supported as input,
-      and :stream, :message and :writer are not supported as output
-      with start_link/1. Use run/1 or async/1 instead.
-      """
-    end
+    opts = validate_start_link_opts!(opts)
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
@@ -391,6 +378,40 @@ defmodule Boombox do
     end
   end
 
+  defp validate_start_link_opts!(opts) do
+    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
+
+    case opts[:input] do
+      nil ->
+        raise ArgumentError, "Input is required."
+
+      {type, _opts} when type in [:message, :reader] ->
+        raise ArgumentError, """
+        Endpoints :message and :reader are not supported
+        as input with start_link/1. Use run/1 or async/1 instead.
+        """
+
+      _other ->
+        :ok
+    end
+
+    case opts[:output] do
+      nil ->
+        raise ArgumentError, "Output is required."
+
+      {type, _opts} when type in [:message, :writer, :stream] ->
+        raise ArgumentError, """
+        Endpoints :message, :writer and stream are not supported
+        as output with start_link/1. Use run/1 or async/1 instead.
+        """
+
+      _other ->
+        :ok
+    end
+
+    opts
+  end
+
   @doc """
   Returns a child specification for running Boombox under a supervisor.
 
@@ -405,8 +426,26 @@ defmodule Boombox do
       ]
 
       Supervisor.start_link(children, strategy: :one_for_one)
+
+
+  ## Example with :stream input
+      audio_packets_stream = ...
+
+      children = [
+        {Boombox, [audio_packets_stream, input: {:stream, audio: :binary, video: false} output: "output.mp4"]}
+      ]
+
+      Supervisor.start_link(children, strategy: :one_for_one)
+
   """
-  @spec child_spec(keyword() | [Enumerable.t() | keyword()]) :: Supervisor.child_spec()
+
+  @spec child_spec(
+          [input: input() | elixir_input(), output: output() | elixir_output()]
+          | [
+              Enumerable.t()
+              | [input: input() | elixir_input(), output: output() | elixir_output()]
+            ]
+        ) :: Supervisor.child_spec()
   def child_spec(opts) do
     start_args =
       if Keyword.keyword?(opts) do
