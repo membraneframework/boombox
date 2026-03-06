@@ -333,6 +333,9 @@ defmodule Boombox do
   @doc """
   Starts Boombox and links it to the calling process.
 
+  This function is suitable for supervision tree integration — see `child_spec/1`. Otherwise,
+  use `run/1` or `async/1`.
+
   Returns `{:ok, pid}` once Boombox is ready to process media.
   For protocols that require a server socket (RTMP, RTSP, RTP, SRT), this
   function blocks until the server is bound and ready to accept connections.
@@ -342,9 +345,7 @@ defmodule Boombox do
   when processing finishes or if Boombox crashes.
 
   `:message` and `:reader` endpoints are not supported as input, and `:stream`, `:message`
-  and `:writer` endpoints are not supported as output — use `run/1` or `async/1` for those.
-
-  This is suitable for supervision tree integration — see `child_spec/1`.
+  and `:writer` endpoints are not supported as output — always use `run/1` or `async/1` for those.
   """
   @spec start_link(Enumerable.t() | nil,
           input: input() | {:stream, in_raw_data_opts()},
@@ -440,10 +441,10 @@ defmodule Boombox do
   """
 
   @spec child_spec(
-          [input: input() | elixir_input(), output: output() | elixir_output()]
+          [input: input(), output: output()]
           | [
               Enumerable.t()
-              | [input: input() | elixir_input(), output: output() | elixir_output()]
+              | [input: {:stream, in_raw_data_opts()}, output: output()]
             ]
         ) :: Supervisor.child_spec()
   def child_spec(opts) do
