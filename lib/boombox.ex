@@ -347,8 +347,8 @@ defmodule Boombox do
   This is suitable for supervision tree integration — see `child_spec/1`.
   """
   @spec start_link(Enumerable.t() | nil,
-          input: input() | elixir_input(),
-          output: output() | elixir_output()
+          input: input() | {:stream, in_raw_data_opts()},
+          output: output()
         ) ::
           {:ok, pid()} | {:error, term()} | Writer.t() | Reader.t() | pid()
   def start_link(stream \\ nil, opts) do
