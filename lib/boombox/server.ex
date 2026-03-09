@@ -414,7 +414,7 @@ defmodule Boombox.Server do
     %{supervisor: pipeline_supervisor, pipeline: pipeline} =
       boombox_opts
       |> Map.new()
-      |> Boombox.Pipeline.start()
+      |> Boombox.Pipeline.start_link()
 
     {:noreply,
      %State{

@@ -8,8 +8,8 @@ defmodule Boombox.Pipeline do
         }
   @type procs :: %{pipeline: pid(), supervisor: pid()}
 
-  @spec start(opts_map()) :: procs()
-  def start(opts) do
+  @spec start_link(opts_map()) :: procs()
+  def start_link(opts) do
     opts = Map.put(opts, :parent, self())
 
     {:ok, supervisor, pipeline} =

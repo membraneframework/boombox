@@ -14,6 +14,8 @@ defmodule Boombox do
   alias Membrane.RTP
 
   @elixir_endpoints [:stream, :message, :writer, :reader]
+  @endpoints_with_external_resources [:rtmp, :rtmps, :rtp, :rtsp, :srt]
+  @endpoint_opts [:input, :output]
 
   defmodule Writer do
     @moduledoc """
@@ -203,8 +205,6 @@ defmodule Boombox do
       - `{:boombox_finished, boombox_pid :: pid()}` - informs that boombox has finished producing
       packets and will begin terminating. No more messages will be sent.
 
-  ```
-  ```
   """
   @spec run(Enumerable.t() | nil,
           input: input() | elixir_input(),
@@ -215,12 +215,12 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
         source = await_source_ready()
         consume_stream(stream, source, procs)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
@@ -240,7 +240,7 @@ defmodule Boombox do
 
       opts ->
         opts
-        |> Pipeline.start()
+        |> Pipeline.start_link()
         |> await_pipeline()
     end
   end
@@ -280,16 +280,15 @@ defmodule Boombox do
 
     case opts do
       %{input: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
-        source = await_source_ready()
-
         Task.async(fn ->
+          procs = Pipeline.start_link(opts)
+          source = await_source_ready()
           Process.monitor(procs.supervisor)
           consume_stream(stream, source, procs)
         end)
 
       %{output: {:stream, _stream_opts}} ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
         sink = await_sink_ready()
         produce_stream(sink, procs)
 
@@ -309,8 +308,8 @@ defmodule Boombox do
 
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
-      %{input: {protocol, _opts}} when protocol in [:rtmp, :rtmps, :rtp, :rtsp, :srt] ->
-        procs = Pipeline.start(opts)
+      %{input: {protocol, _opts}} when protocol in @endpoints_with_external_resources ->
+        procs = Pipeline.start_link(opts)
 
         task =
           Task.async(fn ->
@@ -322,13 +321,146 @@ defmodule Boombox do
         task
 
       opts ->
-        procs = Pipeline.start(opts)
+        procs = Pipeline.start_link(opts)
 
         Task.async(fn ->
           Process.monitor(procs.supervisor)
           await_pipeline(procs)
         end)
     end
+  end
+
+  @doc """
+  Starts Boombox and links it to the calling process.
+
+  This function is suitable for supervision tree integration — see `child_spec/1`. Otherwise,
+  use `run/1` or `async/1`.
+
+  Returns `{:ok, pid}` once Boombox is ready to process media.
+  For protocols that require a server socket (RTMP, RTSP, RTP, SRT), this
+  function blocks until the server is bound and ready to accept connections.
+  For all other protocols it returns immediately after the pipeline starts.
+
+  The returned `pid` is the pipeline supervisor. You can monitor it to detect
+  when processing finishes or if Boombox crashes.
+
+  `:message` and `:reader` endpoints are not supported as input, and `:stream`, `:message`
+  and `:writer` endpoints are not supported as output — always use `run/1` or `async/1` for those.
+  """
+  @spec start_link(Enumerable.t() | nil,
+          input: input() | {:stream, in_raw_data_opts()},
+          output: output()
+        ) ::
+          {:ok, pid()} | {:error, term()}
+  def start_link(stream \\ nil, opts) do
+    opts = validate_start_link_opts!(opts)
+
+    case opts do
+      %{input: {:stream, _stream_opts}} ->
+        Task.start_link(fn ->
+          procs = Pipeline.start_link(opts)
+          source = await_source_ready()
+          Process.monitor(procs.supervisor)
+          consume_stream(stream, source, procs)
+        end)
+
+      opts ->
+        procs = Pipeline.start_link(opts)
+
+        case opts.input do
+          {protocol, _opts} when protocol in @endpoints_with_external_resources ->
+            await_external_resource_ready()
+
+          _other ->
+            :ok
+        end
+
+        {:ok, procs.supervisor}
+    end
+  end
+
+  defp validate_start_link_opts!(opts) do
+    opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
+
+    case opts[:input] do
+      nil ->
+        raise ArgumentError, "Input is required."
+
+      {type, _opts} when type in [:message, :reader] ->
+        raise ArgumentError, """
+        Endpoints :message and :reader are not supported
+        as input with start_link/1. Use run/1 or async/1 instead.
+        """
+
+      _other ->
+        :ok
+    end
+
+    case opts[:output] do
+      nil ->
+        raise ArgumentError, "Output is required."
+
+      {type, _opts} when type in [:message, :writer, :stream] ->
+        raise ArgumentError, """
+        Endpoints :message, :writer and stream are not supported
+        as output with start_link/1. Use run/1 or async/1 instead.
+        """
+
+      _other ->
+        :ok
+    end
+
+    opts
+  end
+
+  @doc """
+  Returns a child specification for running Boombox under a supervisor.
+
+  Boombox processes are one-shot: they process media and exit normally when
+  done. The `restart: :temporary` configuration means they will not be
+  restarted after finishing.
+
+  ## Example
+
+      children = [
+        {Boombox, input: "rtmp://localhost:5432", output: "output.mp4"}
+      ]
+
+      Supervisor.start_link(children, strategy: :one_for_one)
+
+
+  ## Example with :stream input
+      audio_packets_stream = ...
+
+      children = [
+        {Boombox, [audio_packets_stream, input: {:stream, audio: :binary, video: false} output: "output.mp4"]}
+      ]
+
+      Supervisor.start_link(children, strategy: :one_for_one)
+
+  """
+
+  @spec child_spec(
+          [input: input(), output: output()]
+          | [
+              Enumerable.t()
+              | [input: {:stream, in_raw_data_opts()}, output: output()]
+            ]
+        ) :: Supervisor.child_spec()
+  def child_spec(opts) do
+    start_args =
+      if Keyword.keyword?(opts) do
+        [opts]
+      else
+        [stream | rest] = opts
+        [stream, rest]
+      end
+
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, start_args},
+      restart: :temporary
+    }
   end
 
   @doc """
@@ -403,7 +535,6 @@ defmodule Boombox do
     Boombox.Server.finish_producing(reader.server_reference)
   end
 
-  @endpoint_opts [:input, :output]
   defp validate_opts!(stream, opts) do
     opts = opts |> Keyword.validate!(@endpoint_opts) |> Map.new()
 
@@ -430,7 +561,8 @@ defmodule Boombox do
 
   defp elixir_endpoint?(_io), do: false
 
-  @spec start_server(Pipeline.opts_map(), :messages | :calls) :: boombox_server()
+  @spec start_server(Pipeline.opts_map(), :messages | :calls) ::
+          boombox_server()
   defp start_server(opts, server_communication_medium) do
     {:ok, pid} =
       Boombox.Server.start(
