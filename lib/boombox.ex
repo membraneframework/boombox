@@ -14,7 +14,7 @@ defmodule Boombox do
   alias Membrane.RTP
 
   @elixir_endpoints [:stream, :message, :writer, :reader]
-  @protocols_with_external_resources [:rtmp, :rtmps, :rtp, :rtsp, :srt]
+  @endpoints_with_external_resources [:rtmp, :rtmps, :rtp, :rtsp, :srt]
   @endpoint_opts [:input, :output]
 
   defmodule Writer do
@@ -308,7 +308,7 @@ defmodule Boombox do
 
       # In case of rtmp, rtmps, rtp, rtsp, we need to wait for the tcp/udp server to be ready
       # before returning from async/2.
-      %{input: {protocol, _opts}} when protocol in @protocols_with_external_resources ->
+      %{input: {protocol, _opts}} when protocol in @endpoints_with_external_resources ->
         procs = Pipeline.start_link(opts)
 
         task =
@@ -351,7 +351,7 @@ defmodule Boombox do
           input: input() | {:stream, in_raw_data_opts()},
           output: output()
         ) ::
-          {:ok, pid()} | {:error, term()} | Writer.t() | Reader.t() | pid()
+          {:ok, pid()} | {:error, term()}
   def start_link(stream \\ nil, opts) do
     opts = validate_start_link_opts!(opts)
 
@@ -368,7 +368,7 @@ defmodule Boombox do
         procs = Pipeline.start_link(opts)
 
         case opts.input do
-          {protocol, _opts} when protocol in @protocols_with_external_resources ->
+          {protocol, _opts} when protocol in @endpoints_with_external_resources ->
             await_external_resource_ready()
 
           _other ->
@@ -561,18 +561,16 @@ defmodule Boombox do
 
   defp elixir_endpoint?(_io), do: false
 
-  @spec start_server(Pipeline.opts_map(), :messages | :calls, :start | :start_link) ::
+  @spec start_server(Pipeline.opts_map(), :messages | :calls) ::
           boombox_server()
-  defp start_server(opts, server_communication_medium, link_method \\ :start) do
+  defp start_server(opts, server_communication_medium) do
     {:ok, pid} =
-      apply(Boombox.Server, link_method, [
-        [
-          packet_serialization: false,
-          stop_application: false,
-          communication_medium: server_communication_medium,
-          parent_pid: self()
-        ]
-      ])
+      Boombox.Server.start(
+        packet_serialization: false,
+        stop_application: false,
+        communication_medium: server_communication_medium,
+        parent_pid: self()
+      )
 
     Boombox.Server.run(pid, Map.to_list(opts))
     pid
