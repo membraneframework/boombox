@@ -1,7 +1,7 @@
 defmodule Boombox.Mixfile do
   use Mix.Project
 
-  @version "0.2.9"
+  @version "0.2.10"
   @github_url "https://github.com/membraneframework/boombox"
 
   def project do
