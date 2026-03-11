@@ -68,7 +68,7 @@ defmodule Boombox.InternalBin.RTP do
 
   @type parsed_track_config :: parsed_input_track_config() | parsed_output_track_config()
 
-  @spec create_input(Boombox.in_rtp_opts()) :: Ready.t()
+  @spec create_input([Boombox.Endpoints.in_rtp_opt()]) :: Ready.t()
   def create_input(opts) do
     parsed_options = validate_and_parse_options(:input, opts)
     payload_type_mapping = get_payload_type_mapping(parsed_options.track_configs)
@@ -121,7 +121,7 @@ defmodule Boombox.InternalBin.RTP do
   end
 
   @spec link_output(
-          Boombox.out_rtp_opts(),
+          [Boombox.Endpoints.out_rtp_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           boolean()
@@ -190,8 +190,9 @@ defmodule Boombox.InternalBin.RTP do
     %Ready{actions: [spec: spec]}
   end
 
-  @spec validate_and_parse_options(:input, Boombox.in_rtp_opts()) :: parsed_in_opts()
-  @spec validate_and_parse_options(:output, Boombox.out_rtp_opts()) :: parsed_out_opts()
+  @spec validate_and_parse_options(:input, [Boombox.Endpoints.in_rtp_opt()]) :: parsed_in_opts()
+  @spec validate_and_parse_options(:output, [Boombox.Endpoints.out_rtp_opt()]) ::
+          parsed_out_opts()
   defp validate_and_parse_options(direction, opts) do
     transport_opts =
       case direction do
@@ -256,9 +257,11 @@ defmodule Boombox.InternalBin.RTP do
     end
   end
 
-  @spec validate_and_parse_track_config(:input, :video | :audio, Boombox.in_rtp_opts()) ::
+  @spec validate_and_parse_track_config(:input, :video | :audio, [Boombox.Endpoints.in_rtp_opt()]) ::
           parsed_input_track_config()
-  @spec validate_and_parse_track_config(:output, :video | :audio, Boombox.out_rtp_opts()) ::
+  @spec validate_and_parse_track_config(:output, :video | :audio, [
+          Boombox.Endpoints.out_rtp_opt()
+        ]) ::
           parsed_output_track_config()
   defp validate_and_parse_track_config(direction, media_type, opts) do
     {encoding_name, payload_type, clock_rate} =

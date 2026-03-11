@@ -7,7 +7,8 @@ defmodule Boombox.InternalBin.HLS do
   alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.{AAC, H264, HTTPAdaptiveStream, RemoteStream, Time, Transcoder}
 
-  @spec create_input(String.t(), [Boombox.hls_variant_selection_policy_opt()]) :: Wait.t()
+  @spec create_input(String.t(), [Boombox.Endpoints.hls_variant_selection_policy_opt()]) ::
+          Wait.t()
   def create_input(url, opts) do
     with {:ok, mode} <- Keyword.fetch(opts, :mode) do
       Logger.warning("""
@@ -54,7 +55,7 @@ defmodule Boombox.InternalBin.HLS do
 
   @spec link_output(
           Path.t(),
-          [Boombox.transcoding_policy_opt() | Boombox.hls_mode_opt()],
+          [Boombox.Endpoints.transcoding_policy_opt() | Boombox.Endpoints.hls_mode_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           boolean()

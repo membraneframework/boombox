@@ -12,13 +12,13 @@ defmodule Boombox.InternalBin do
   @elixir_endpoint_types [:stream, :message, :reader, :writer]
 
   @type input ::
-          Boombox.input()
-          | {:stream, pid(), Boombox.in_raw_data_opts()}
+          Boombox.Endpoints.input()
+          | {:stream, pid(), [Boombox.Endpoints.in_raw_data_opt()]}
           | :membrane_pad
 
   @type output ::
-          Boombox.output()
-          | {:stream, pid(), Boombox.out_raw_data_opts()}
+          Boombox.Endpoints.output()
+          | {:stream, pid(), [Boombox.Endpoints.out_raw_data_opt()]}
           | :membrane_pad
 
   @type track_builders :: %{
