@@ -135,7 +135,8 @@ defmodule Boombox do
   Boombox.play("rtmp://localhost:5432")
   ```
   """
-  @spec play(Enumerable.t() | nil, Boombox.Endpoints.input() | Boombox.Endpoints.elixir_input()) :: :ok
+  @spec play(Enumerable.t() | nil, Boombox.Endpoints.input() | Boombox.Endpoints.elixir_input()) ::
+          :ok
   def play(stream \\ nil, input) do
     stream |> run(input: input, output: :player)
   end

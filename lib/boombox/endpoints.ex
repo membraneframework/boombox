@@ -122,11 +122,11 @@ defmodule Boombox.Endpoints do
 
   When configuring a track for a media type (video or audio):
 
-  * `{:<media_type>_encoding, name}` - MUST be provided to configure a given
+  * `{:audio_encoding | :video_encoding, name}` - MUST be provided to configure a given
     media type. Some options are encoding-specific. Currently supported
     encodings are: AAC, Opus, H264, H265. The encoding name must match the
     `rtpmap` attribute of an SDP description.
-  * `{:<media_type>_payload_type, type}`, `{:<media_type>_clock_rate, rate}` -
+  * `{:audio_payload_type | :video_payload_type, type}`, `{:audio_clock_rate | :video_clock_rate, rate}` -
     MAY be provided. If not, an unofficial default will be used. Must match
     the `rtpmap` attribute of an SDP description.
   * `{:aac_bitrate_mode, mode}` - MUST be provided for AAC encoding. Defines
@@ -179,62 +179,110 @@ defmodule Boombox.Endpoints do
           | {:target, String.t()}
           | transcoding_policy_opt()
 
-  @typedoc "MP4 container input endpoint. `location` is a file path or HTTP URL."
+  @typedoc """
+  MP4 container input endpoint.
+
+  `location` is a file path or HTTP URL.
+  """
   @type mp4_input ::
           {:mp4, location :: String.t()}
           | {:mp4, location :: String.t(), [transport_opt()]}
 
-  @typedoc "MP4 container output endpoint. `location` is a file path."
+  @typedoc """
+  MP4 container output endpoint.
+
+  `location` is a file path.
+  """
   @type mp4_output ::
           {:mp4, location :: String.t()}
           | {:mp4, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
 
-  @typedoc "AAC audio codec input endpoint. `location` is a file path or HTTP URL."
+  @typedoc """
+  AAC audio codec input endpoint.
+
+  `location` is a file path or HTTP URL.
+  """
   @type aac_input ::
           {:aac, location :: String.t()}
           | {:aac, location :: String.t(), [transport_opt()]}
 
-  @typedoc "AAC audio codec output endpoint. `location` is a file path."
+  @typedoc """
+  AAC audio codec output endpoint.
+
+  `location` is a file path.
+  """
   @type aac_output ::
           {:aac, location :: String.t()}
           | {:aac, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
 
-  @typedoc "WAV audio format input endpoint. `location` is a file path or HTTP URL."
+  @typedoc """
+  WAV audio format input endpoint.
+
+  `location` is a file path or HTTP URL.
+  """
   @type wav_input ::
           {:wav, location :: String.t()}
           | {:wav, location :: String.t(), [transport_opt()]}
 
-  @typedoc "WAV audio format output endpoint. `location` is a file path."
+  @typedoc """
+  WAV audio format output endpoint.
+
+  `location` is a file path.
+  """
   @type wav_output ::
           {:wav, location :: String.t()}
           | {:wav, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
 
-  @typedoc "MP3 audio format input endpoint. `location` is a file path or HTTP URL."
+  @typedoc """
+  MP3 audio format input endpoint.
+
+  `location` is a file path or HTTP URL.
+  """
   @type mp3_input ::
           {:mp3, location :: String.t()}
           | {:mp3, location :: String.t(), [transport_opt()]}
 
-  @typedoc "MP3 audio format output endpoint. `location` is a file path."
+  @typedoc """
+  MP3 audio format output endpoint.
+
+  `location` is a file path.
+  """
   @type mp3_output ::
           {:mp3, location :: String.t()}
           | {:mp3, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
 
-  @typedoc "IVF container format input endpoint. `location` is a file path or HTTP URL."
+  @typedoc """
+  IVF container format input endpoint.
+
+  `location` is a file path or HTTP URL.
+  """
   @type ivf_input ::
           {:ivf, location :: String.t()}
           | {:ivf, location :: String.t(), [transport_opt()]}
 
-  @typedoc "IVF container format output endpoint. `location` is a file path."
+  @typedoc """
+  IVF container format output endpoint.
+
+  `location` is a file path.
+  """
   @type ivf_output ::
           {:ivf, location :: String.t()}
           | {:ivf, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
 
-  @typedoc "Ogg container format input endpoint. `location` is a file path or HTTP URL."
+  @typedoc """
+  Ogg container format input endpoint.
+
+  `location` is a file path or HTTP URL.
+  """
   @type ogg_input ::
           {:ogg, location :: String.t()}
           | {:ogg, location :: String.t(), [transport_opt()]}
 
-  @typedoc "Ogg container format output endpoint. `location` is a file path."
+  @typedoc """
+  Ogg container format output endpoint.
+
+  `location` is a file path.
+  """
   @type ogg_output ::
           {:ogg, location :: String.t()}
           | {:ogg, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
@@ -242,15 +290,18 @@ defmodule Boombox.Endpoints do
   @typedoc """
   H264 video codec input endpoint in Annex-B format.
 
-  `location` is a file path or HTTP URL. The `{:framerate, framerate}` option
-  defaults to `{30, 1}`.
+  `location` is a file path or HTTP URL. The `framerate` option defaults to `{30, 1}`.
   """
   @type h264_input ::
           {:h264, location :: String.t()}
           | {:h264, location :: String.t(),
              [transport_opt() | {:framerate, Membrane.H264.framerate()}]}
 
-  @typedoc "H264 video codec output endpoint in Annex-B format. `location` is a file path."
+  @typedoc """
+  H264 video codec output endpoint in Annex-B format.
+
+  `location` is a file path.
+  """
   @type h264_output ::
           {:h264, location :: String.t()}
           | {:h264, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
@@ -258,15 +309,18 @@ defmodule Boombox.Endpoints do
   @typedoc """
   H265 video codec input endpoint in Annex-B format.
 
-  `location` is a file path or HTTP URL. The `{:framerate, framerate}` option
-  defaults to `{30, 1}`.
+  `location` is a file path or HTTP URL. The `framerate` option defaults to `{30, 1}`.
   """
   @type h265_input ::
           {:h265, location :: String.t()}
           | {:h265, location :: String.t(),
              [transport_opt() | {:framerate, Membrane.H265.framerate_t()}]}
 
-  @typedoc "H265 video codec output endpoint in Annex-B format. `location` is a file path."
+  @typedoc """
+  H265 video codec output endpoint in Annex-B format.
+
+  `location` is a file path.
+  """
   @type h265_output ::
           {:h265, location :: String.t()}
           | {:h265, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
@@ -429,11 +483,11 @@ defmodule Boombox.Endpoints do
           | srt_input()
 
   @typedoc """
-  Defines an Elixir-native Boombox input endpoint for direct Elixir integration.
+  Defines an input endpoint for direct Elixir integration.
 
-  * `{:stream, opts}` - an `Enumerable` of `Boombox.Packet`s is expected as
-    the first argument to `Boombox.run/2`.
-  * `{:writer, opts}` - `Boombox.run/2` returns a `Boombox.Writer` struct for
+  * `{:stream, opts}` - an `Enumerable` of `t:Boombox.Packet.t/0`s is expected
+    as the first argument to `Boombox.run/2`.
+  * `{:writer, opts}` - `Boombox.run/2` returns a `t:Boombox.Writer.t/0` for
     writing packets via `Boombox.write/2` and finishing via `Boombox.close/1`.
   * `{:message, opts}` - `Boombox.run/2` returns a PID to communicate with.
     The process accepts:
@@ -483,14 +537,16 @@ defmodule Boombox.Endpoints do
           | player()
 
   @typedoc """
-  Defines an Elixir-native Boombox output endpoint for direct Elixir integration.
+  Defines an output endpoint for direct Elixir integration.
 
-  * `{:stream, opts}` - `Boombox.run/2` returns a `Stream` of `Boombox.Packet`s.
-  * `{:reader, opts}` - `Boombox.run/2` returns a `Boombox.Reader` struct for
+  * `{:stream, opts}` - `Boombox.run/2` returns a `Stream` of
+    `t:Boombox.Packet.t/0`s.
+  * `{:reader, opts}` - `Boombox.run/2` returns a `t:Boombox.Reader.t/0` for
     reading packets via `Boombox.read/1` and stopping via `Boombox.close/1`.
   * `{:message, opts}` - `Boombox.run/2` returns a PID to communicate with.
     The process sends:
-    * `{:boombox_packet, boombox_pid, packet}` - a packet produced by Boombox.
+    * `{:boombox_packet, boombox_pid, packet}` - a `t:Boombox.Packet.t/0`
+      produced by Boombox.
     * `{:boombox_finished, boombox_pid}` - Boombox has finished producing
       packets and will terminate. No more messages will be sent.
 
