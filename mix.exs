@@ -134,7 +134,6 @@ defmodule Boombox.Mixfile do
         {"#{Mix.Project.build_path()}/examples.livemd", title: "Examples"},
         {"LICENSE", title: "License"}
       ],
-      formatters: ["html"],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [Boombox]
     ]
