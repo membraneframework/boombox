@@ -123,8 +123,8 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
   end
 
   defp maybe_plug_realtimer(builder, _kind, _pace_control, _is_input_realtime), do: builder
-  @spec parse_options(Boombox.in_raw_data_opts(), :input) :: map()
-  @spec parse_options(Boombox.out_raw_data_opts(), :output) :: map()
+  @spec parse_options([Boombox.Endpoints.in_raw_data_opt()], :input) :: map()
+  @spec parse_options([Boombox.Endpoints.out_raw_data_opts()], :output) :: map()
   defp parse_options(options, direction) do
     audio = Keyword.get(options, :audio)
 

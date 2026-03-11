@@ -10,8 +10,6 @@ defmodule Boombox do
   require Membrane.Transcoder.{Audio, Video}
 
   alias Boombox.Pipeline
-  alias Membrane.HTTPAdaptiveStream
-  alias Membrane.RTP
 
   @elixir_endpoints [:stream, :message, :writer, :reader]
   @endpoints_with_external_resources [:rtmp, :rtmps, :rtp, :rtsp, :srt]
@@ -43,126 +41,6 @@ defmodule Boombox do
 
   @opaque boombox_server :: Boombox.Server.t()
 
-  @type transcoding_policy_opt :: {:transcoding_policy, :always | :if_needed | :never}
-  @typedoc """
-  If true the incoming streams will be passed to the output according to their
-  timestamps, if not they will be passed as fast as possible. True by default.
-  """
-  @type pace_control_opt :: {:pace_control, boolean()}
-  @type hls_mode_opt :: {:mode, :live | :vod}
-  @type hls_variant_selection_policy_opt ::
-          {:variant_selection_policy, HTTPAdaptiveStream.Source.variant_selection_policy()}
-
-  @type webrtc_signaling :: Membrane.WebRTC.Signaling.t() | String.t()
-  @type srt_auth_opts :: [
-          {:stream_id, String.t()}
-          | {:password, String.t()}
-        ]
-  @type in_raw_data_opts :: [
-          {:audio, :binary | boolean()}
-          | {:video, :image | boolean()}
-          | {:is_live, boolean()}
-        ]
-  @type out_raw_data_opts :: [
-          {:audio, :binary | boolean()}
-          | {:video, :image | boolean()}
-          | {:audio_format, Membrane.RawAudio.SampleFormat.t()}
-          | {:audio_rate, Membrane.RawAudio.sample_rate_t()}
-          | {:audio_channels, Membrane.RawAudio.channels_t()}
-          | {:video_width, non_neg_integer()}
-          | {:video_height, non_neg_integer()}
-          | pace_control_opt()
-        ]
-
-  @typedoc """
-  When configuring a track for a media type (video or audio), the following options are used:
-    * <media_type>_encoding - MUST be provided to configure given media type. Some options are encoding-specific. Currently supported encodings are: AAC, Opus, H264, H265.
-    * <media_type>_payload_type, <media_type>_clock rate - MAY be provided. If not, an unofficial default will be used.
-  The following encoding-specific parameters are available for both RTP input and output:
-    * aac_bitrate_mode - MUST be provided for AAC encoding. Defines which mode should be assumed/set when depayloading/payloading.
-  """
-  @type common_rtp_opt ::
-          {:video_encoding, RTP.encoding_name()}
-          | {:video_payload_type, RTP.payload_type()}
-          | {:video_clock_rate, RTP.clock_rate()}
-          | {:audio_encoding, RTP.encoding_name()}
-          | {:audio_payload_type, RTP.payload_type()}
-          | {:audio_clock_rate, RTP.clock_rate()}
-          | {:aac_bitrate_mode, RTP.AAC.Utils.mode()}
-
-  @typedoc """
-  In order to configure a RTP input a receiving port MUST be provided and the media that will be received
-  MUST be configured. Media configuration is explained further in `t:common_rtp_opt/0`.
-
-  The following encoding-specific parameters are available for RTP input:
-    * audio_specific_config - MUST be provided for AAC encoding. Contains crucial information about the stream and has to be obtained from a side channel.
-    * vps (H265 only), pps, sps - MAY be provided for H264 or H265 encodings. Parameter sets, could be obtained from a side channel. They contain information about the encoded stream.
-  """
-  @type in_rtp_opts :: [
-          common_rtp_opt()
-          | {:port, :inet.port_number()}
-          | {:audio_specific_config, binary()}
-          | {:vps, binary()}
-          | {:pps, binary()}
-          | {:sps, binary()}
-        ]
-
-  @typedoc """
-  In order to configure a RTP output the target port and address MUST be provided (can be provided in `:target` option as a `<address>:<port>` string)
-  and the media that will be sent MUST be configured. Media configuration is explained further in `t:common_rtp_opt/0`.
-  """
-  @type out_rtp_opts :: [
-          common_rtp_opt()
-          | {:address, :inet.ip_address() | String.t()}
-          | {:port, :inet.port_number()}
-          | {:target, String.t()}
-          | transcoding_policy_opt()
-        ]
-
-  @type input ::
-          (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(),
-             [hls_variant_selection_policy_opt()]
-             | [{:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}]}
-          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
-          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg, location :: String.t(),
-             transport: :file | :http}
-          | {:h264, location :: String.t(),
-             transport: :file | :http, framerate: Membrane.H264.framerate()}
-          | {:h265, location :: String.t(),
-             transport: :file | :http, framerate: Membrane.H265.framerate_t()}
-          | {:webrtc, webrtc_signaling()}
-          | {:whip, uri :: String.t(), token: String.t()}
-          | {:rtmp, (uri :: String.t()) | (client_handler :: pid)}
-          | {:rtsp, url :: String.t()}
-          | {:rtp, in_rtp_opts()}
-          | {:hls, url :: String.t()}
-          | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
-          | {:srt, url :: String.t()}
-          | {:srt, url :: String.t(), srt_auth_opts()}
-          | {:srt, server_awaiting_accept :: ExLibSRT.Server.t()}
-
-  @type elixir_input :: {:stream | :writer | :message, in_raw_data_opts()}
-
-  @type output ::
-          (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [transcoding_policy_opt() | hls_mode_opt()]}
-          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t()}
-          | {:mp4 | :aac | :wav | :mp3 | :ivf | :ogg | :h264 | :h265, location :: String.t(),
-             [transcoding_policy_opt()]}
-          | {:webrtc, webrtc_signaling()}
-          | {:webrtc, webrtc_signaling(), [transcoding_policy_opt()]}
-          | {:whip, uri :: String.t(),
-             [{:token, String.t()} | {bandit_option :: atom(), term()} | transcoding_policy_opt()]}
-          | {:hls, location :: String.t()}
-          | {:hls, location :: String.t(), [hls_mode_opt() | transcoding_policy_opt()]}
-          | {:rtp, out_rtp_opts()}
-          | {:srt, url :: String.t()}
-          | {:srt, url :: String.t(), srt_auth_opts()}
-          | :player
-
-  @type elixir_output :: {:stream | :reader | :message, out_raw_data_opts()}
-
   @doc """
   Runs boombox with given input and output.
 
@@ -177,8 +55,9 @@ defmodule Boombox do
   )
   ```
 
-  See `t:input/0` and `t:output/0` for available inputs and outputs and
-  [examples.livemd](examples.livemd) for examples.
+  See `t:Boombox.Endpoints.input/0` and `t:Boombox.Endpoints.output/0` for
+  available inputs and outputs and [examples.livemd](examples.livemd) for
+  examples.
 
   Calling this function results in it blocking until the media flow is finished and
   then returning `:ok`, except for when an endpoint with special behavior is used.
@@ -207,8 +86,8 @@ defmodule Boombox do
 
   """
   @spec run(Enumerable.t() | nil,
-          input: input() | elixir_input(),
-          output: output() | elixir_output()
+          input: Boombox.Endpoints.input() | Boombox.Endpoints.elixir_input(),
+          output: Boombox.Endpoints.output() | Boombox.Endpoints.elixir_output()
         ) :: :ok | Enumerable.t() | Writer.t() | Reader.t() | pid()
   def run(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
@@ -256,7 +135,7 @@ defmodule Boombox do
   Boombox.play("rtmp://localhost:5432")
   ```
   """
-  @spec play(Enumerable.t() | nil, input() | elixir_input()) :: :ok
+  @spec play(Enumerable.t() | nil, Boombox.Endpoints.input() | Boombox.Endpoints.elixir_input()) :: :ok
   def play(stream \\ nil, input) do
     stream |> run(input: input, output: :player)
   end
@@ -272,8 +151,8 @@ defmodule Boombox do
   is a `:writer` or `:message` endpoint, the behaviour is identical to `run/2`.
   """
   @spec async(Enumerable.t() | nil,
-          input: input(),
-          output: output()
+          input: Boombox.Endpoints.input() | Boombox.Endpoints.elixir_input(),
+          output: Boombox.Endpoints.output() | Boombox.Endpoints.elixir_output()
         ) :: Task.t() | Enumerable.t()
   def async(stream \\ nil, opts) do
     opts = validate_opts!(stream, opts)
@@ -348,8 +227,8 @@ defmodule Boombox do
   and `:writer` endpoints are not supported as output — always use `run/1` or `async/1` for those.
   """
   @spec start_link(Enumerable.t() | nil,
-          input: input() | {:stream, in_raw_data_opts()},
-          output: output()
+          input: Boombox.Endpoints.input() | {:stream, [Boombox.Endpoints.in_raw_data_opt()]},
+          output: Boombox.Endpoints.output()
         ) ::
           {:ok, pid()} | {:error, term()}
   def start_link(stream \\ nil, opts) do
@@ -441,10 +320,13 @@ defmodule Boombox do
   """
 
   @spec child_spec(
-          [input: input(), output: output()]
+          [input: Boombox.Endpoints.input(), output: Boombox.Endpoints.output()]
           | [
               Enumerable.t()
-              | [input: {:stream, in_raw_data_opts()}, output: output()]
+              | [
+                  input: {:stream, [Boombox.Endpoints.in_raw_data_opt()]},
+                  output: Boombox.Endpoints.output()
+                ]
             ]
         ) :: Supervisor.child_spec()
   def child_spec(opts) do
