@@ -18,7 +18,7 @@ defmodule Boombox.InternalBin.StorageEndpoints.Ogg do
 
   @spec link_output(
           String.t(),
-          [Boombox.transcoding_policy_opt()],
+          [Boombox.Endpoints.transcoding_policy_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t()
         ) :: Ready.t()

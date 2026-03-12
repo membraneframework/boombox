@@ -16,7 +16,8 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
 
   @type flow_control_mode :: :push | :pull
 
-  @spec create_input(pid(), Boombox.in_raw_data_opts(), flow_control_mode()) :: Ready.t()
+  @spec create_input(pid(), [Boombox.Endpoints.in_raw_data_opt()], flow_control_mode()) ::
+          Ready.t()
   def create_input(producer, options, flow_control_mode) do
     options = parse_options(options, :input)
 
@@ -53,7 +54,7 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
 
   @spec link_output(
           pid(),
-          Boombox.out_raw_data_opts(),
+          [Boombox.Endpoints.out_raw_data_opt()],
           flow_control_mode(),
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
@@ -123,8 +124,8 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
   end
 
   defp maybe_plug_realtimer(builder, _kind, _pace_control, _is_input_realtime), do: builder
-  @spec parse_options(Boombox.in_raw_data_opts(), :input) :: map()
-  @spec parse_options(Boombox.out_raw_data_opts(), :output) :: map()
+  @spec parse_options([Boombox.Endpoints.in_raw_data_opt()], :input) :: map()
+  @spec parse_options([Boombox.Endpoints.out_raw_data_opt()], :output) :: map()
   defp parse_options(options, direction) do
     audio = Keyword.get(options, :audio)
 

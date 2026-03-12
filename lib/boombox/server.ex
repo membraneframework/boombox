@@ -45,8 +45,12 @@ defmodule Boombox.Server do
         ]
 
   @type boombox_opts :: [
-          input: Boombox.input() | {:writer | :message, Boombox.in_raw_data_opts()},
-          output: Boombox.output() | {:reader | :message, Boombox.out_raw_data_opts()}
+          input:
+            Boombox.Endpoints.input()
+            | {:writer | :message, [Boombox.Endpoints.in_raw_data_opt()]},
+          output:
+            Boombox.Endpoints.output()
+            | {:reader | :message, [Boombox.Endpoints.out_raw_data_opt()]}
         ]
 
   @typedoc """
