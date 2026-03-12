@@ -39,7 +39,7 @@ defmodule Boombox.Endpoints do
   @typedoc """
   Explicitly specifies the transport for storage endpoints.
 
-  If not provided, transport is inferred from the location — file paths
+  If not provided, transport is inferred from the location - file paths
   resolve to `:file`, HTTP URLs to `:http`.
   """
   @type transport_opt :: {:transport, :file | :http}
@@ -125,10 +125,11 @@ defmodule Boombox.Endpoints do
   * `{:audio_encoding | :video_encoding, name}` - MUST be provided to configure a given
     media type. Some options are encoding-specific. Currently supported
     encodings are: AAC, Opus, H264, H265. The encoding name must match the
-    `rtpmap` attribute of an SDP description.
+    `rtpmap` attribute that could be part of an SDP description.
   * `{:audio_payload_type | :video_payload_type, type}`, `{:audio_clock_rate | :video_clock_rate, rate}` -
-    MAY be provided. If not, an unofficial default will be used. Must match
-    the `rtpmap` attribute of an SDP description.
+    MAY be provided. If not, an unofficial default will be used, which is registered for
+    the provided encoding by a `membrane_rtp_<encoding>_plugin` application. Must match
+    the `rtpmap` attribute that could be part of an SDP description.
   * `{:aac_bitrate_mode, mode}` - MUST be provided for AAC encoding. Defines
     which mode should be assumed/set when depayloading/payloading.
   """
@@ -195,7 +196,7 @@ defmodule Boombox.Endpoints do
   """
   @type mp4_output ::
           {:mp4, location :: String.t()}
-          | {:mp4, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
+          | {:mp4, location :: String.t(), [transcoding_policy_opt()]}
 
   @typedoc """
   AAC audio codec input endpoint.
@@ -213,7 +214,7 @@ defmodule Boombox.Endpoints do
   """
   @type aac_output ::
           {:aac, location :: String.t()}
-          | {:aac, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
+          | {:aac, location :: String.t(), [transcoding_policy_opt()]}
 
   @typedoc """
   WAV audio format input endpoint.
@@ -231,7 +232,7 @@ defmodule Boombox.Endpoints do
   """
   @type wav_output ::
           {:wav, location :: String.t()}
-          | {:wav, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
+          | {:wav, location :: String.t(), [transcoding_policy_opt()]}
 
   @typedoc """
   MP3 audio format input endpoint.
@@ -249,7 +250,7 @@ defmodule Boombox.Endpoints do
   """
   @type mp3_output ::
           {:mp3, location :: String.t()}
-          | {:mp3, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
+          | {:mp3, location :: String.t(), [transcoding_policy_opt()]}
 
   @typedoc """
   IVF container format input endpoint.
@@ -267,7 +268,7 @@ defmodule Boombox.Endpoints do
   """
   @type ivf_output ::
           {:ivf, location :: String.t()}
-          | {:ivf, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
+          | {:ivf, location :: String.t(), [transcoding_policy_opt()]}
 
   @typedoc """
   Ogg container format input endpoint.
@@ -285,7 +286,7 @@ defmodule Boombox.Endpoints do
   """
   @type ogg_output ::
           {:ogg, location :: String.t()}
-          | {:ogg, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
+          | {:ogg, location :: String.t(), [transcoding_policy_opt()]}
 
   @typedoc """
   H264 video codec input endpoint in Annex-B format.
@@ -304,7 +305,7 @@ defmodule Boombox.Endpoints do
   """
   @type h264_output ::
           {:h264, location :: String.t()}
-          | {:h264, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
+          | {:h264, location :: String.t(), [transcoding_policy_opt()]}
 
   @typedoc """
   H265 video codec input endpoint in Annex-B format.
@@ -323,7 +324,7 @@ defmodule Boombox.Endpoints do
   """
   @type h265_output ::
           {:h265, location :: String.t()}
-          | {:h265, location :: String.t(), [transport_opt() | transcoding_policy_opt()]}
+          | {:h265, location :: String.t(), [transcoding_policy_opt()]}
 
   @typedoc """
   WebRTC input endpoint.
@@ -344,27 +345,31 @@ defmodule Boombox.Endpoints do
   @typedoc """
   WHIP (WebRTC-HTTP Ingestion Protocol) input endpoint.
 
-  `uri` is an HTTP URL for the WHIP server. The `token` is used for
+  `url` is an HTTP URL of the WHIP server. The `token` is used for
   authentication and authorization.
   """
-  @type whip_input :: {:whip, uri :: String.t(), [token: String.t()]}
+  @type whip_input :: {:whip, url :: String.t(), [token: String.t()]}
 
   @typedoc """
   WHIP (WebRTC-HTTP Ingestion Protocol) output endpoint.
 
-  `uri` is an HTTP URL for the WHIP server. The `token` is used for
+  `url` is an HTTP URL for the WHIP server. The `token` is used for
   authentication and authorization. Custom Bandit server options can
   also be provided.
   """
   @type whip_output ::
-          {:whip, uri :: String.t(),
+          {:whip, url :: String.t(),
            [
              {:token, String.t()}
              | {bandit_option :: atom(), term()}
              | transcoding_policy_opt()
            ]}
 
-  @typedoc "HLS (HTTP Live Streaming) input endpoint. `url` points to the HLS stream."
+  @typedoc """
+  HLS (HTTP Live Streaming) input endpoint.
+
+  `url` is the location of the HLS playlist.
+  """
   @type hls_input ::
           {:hls, url :: String.t()}
           | {:hls, url :: String.t(), [hls_variant_selection_policy_opt()]}
@@ -374,8 +379,8 @@ defmodule Boombox.Endpoints do
 
   `location` is the path where the HLS playlist will be created. If it's a
   directory, an `index.m3u8` manifest and segment files will be created there.
-  If it's a `.m3u8` path, the manifest will be created at that location and
-  other files in the same directory.
+  If a `.m3u8` path is provided, the manifest will be created at that location,
+  and all associated HLS files will be stored in the same directory.
   """
   @type hls_output ::
           {:hls, location :: String.t()}
@@ -384,16 +389,17 @@ defmodule Boombox.Endpoints do
   @typedoc """
   RTMP (Real-Time Messaging Protocol) input endpoint.
 
-  Currently Boombox supports only client-side functionality — receiving
-  streams from a RTMP server. `uri` can be a URL string or a PID of an
-  existing RTMP client handler process.
+  Currently Boombox supports only client-side functionality - receiving
+  streams from a RTMP server. Behavior of this endpoint can be specified
+  in two different ways - by providing a URL of the server or a PID of an
+  already existing RTMP client handler process.
   """
-  @type rtmp :: {:rtmp, (uri :: String.t()) | (client_handler :: pid())}
+  @type rtmp :: {:rtmp, (url :: String.t()) | (client_handler :: pid())}
 
   @typedoc """
   RTSP (Real-Time Streaming Protocol) input endpoint.
 
-  Currently Boombox supports only client-side functionality — receiving
+  Currently Boombox supports only client-side functionality - receiving
   media from a RTSP server.
   """
   @type rtsp :: {:rtsp, url :: String.t()}
@@ -441,27 +447,13 @@ defmodule Boombox.Endpoints do
   @typedoc """
   Defines a Boombox input endpoint.
 
-  Available inputs:
-
-  * `path_or_uri` - a path or URI string. The format is detected automatically
-    based on the file extension or URI scheme.
-  * `{path_or_uri, opts}` - a path or URI string with additional options:
-    `t:hls_variant_selection_policy_opt/0` or `{:framerate, framerate}` for
-    H264/H265.
-  * `t:mp4_input/0`, `t:aac_input/0`, `t:wav_input/0`, `t:mp3_input/0`,
-    `t:ivf_input/0`, `t:ogg_input/0` - file/HTTP storage endpoints.
-  * `t:h264_input/0`, `t:h265_input/0` - raw video codec storage endpoints.
-  * `t:webrtc_input/0` - WebRTC endpoint.
-  * `t:whip_input/0` - WHIP endpoint.
-  * `t:rtmp/0` - RTMP endpoint.
-  * `t:rtsp/0` - RTSP endpoint.
-  * `t:rtp_input/0` - RTP endpoint.
-  * `t:hls_input/0` - HLS endpoint.
-  * `t:srt_input/0` - SRT endpoint.
+  Endpoint can be specified explicitly by providing a tuple with the first element
+  being an atom determining the endpoint type, or implicitly, by providing a string
+  which Boombox will try to interpret based on extension or scheme.
   """
   @type input ::
-          (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(),
+          (path_or_url :: String.t())
+          | {path_or_url :: String.t(),
              [
                hls_variant_selection_policy_opt()
                | {:framerate, Membrane.H264.framerate() | Membrane.H265.framerate_t()}
@@ -502,25 +494,13 @@ defmodule Boombox.Endpoints do
   @typedoc """
   Defines a Boombox output endpoint.
 
-  Available outputs:
-
-  * `path_or_uri` - a path or URI string. The format is detected automatically
-    based on the file extension or URI scheme.
-  * `{path_or_uri, opts}` - a path or URI string with additional options:
-    `t:transcoding_policy_opt/0` or `t:hls_mode_opt/0` for HLS.
-  * `t:mp4_output/0`, `t:aac_output/0`, `t:wav_output/0`, `t:mp3_output/0`,
-    `t:ivf_output/0`, `t:ogg_output/0` - file storage endpoints.
-  * `t:h264_output/0`, `t:h265_output/0` - raw video codec storage endpoints.
-  * `t:webrtc_output/0` - WebRTC endpoint.
-  * `t:whip_output/0` - WHIP endpoint.
-  * `t:hls_output/0` - HLS endpoint.
-  * `t:rtp_output/0` - RTP endpoint.
-  * `t:srt_output/0` - SRT endpoint.
-  * `t:player/0` - plays the stream with the local media player.
+  Endpoint can be specified explicitly by providing a tuple with the first element
+  being an atom determining the endpoint type, or implicitly, by providing a string
+  which Boombox will try to interpret based on extension or scheme.
   """
   @type output ::
-          (path_or_uri :: String.t())
-          | {path_or_uri :: String.t(), [transcoding_policy_opt() | hls_mode_opt()]}
+          (path_or_url :: String.t())
+          | {path_or_url :: String.t(), [transcoding_policy_opt() | hls_mode_opt()]}
           | mp4_output()
           | aac_output()
           | wav_output()
