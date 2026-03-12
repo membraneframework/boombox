@@ -128,8 +128,10 @@ defmodule Boombox.Endpoints do
     `rtpmap` attribute that could be part of an SDP description.
   * `{:audio_payload_type | :video_payload_type, type}`, `{:audio_clock_rate | :video_clock_rate, rate}` -
     MAY be provided. If not, an unofficial default will be used, which is registered for
-    the provided encoding by a `membrane_rtp_<encoding>_plugin` application. Must match
-    the `rtpmap` attribute that could be part of an SDP description.
+    the provided encoding by a `membrane_rtp_<encoding>_plugin` application:
+    - **AAC** - payload_type: 127, clock_rate: 48_000
+    - **Opus** - payload_type: 120, clock_rate: 48_000
+    - **H264** - payload_type: 96, clock_rate: 90_000
   * `{:aac_bitrate_mode, mode}` - MUST be provided for AAC encoding. Defines
     which mode should be assumed/set when depayloading/payloading.
   """
