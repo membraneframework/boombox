@@ -33,7 +33,8 @@ defmodule Boombox.Utils.CLI do
   ]
 
   @spec parse_argv([String.t()]) ::
-          {:args, input: Boombox.input(), output: Boombox.output()} | {:script, String.t()}
+          {:args, input: Boombox.Endpoints.input(), output: Boombox.Endpoints.output()}
+          | {:script, String.t()}
   def parse_argv(argv) do
     OptionParser.parse(argv, strict: [script: :string], aliases: [s: :script, S: :script])
     |> case do
@@ -85,7 +86,8 @@ defmodule Boombox.Utils.CLI do
     end
   end
 
-  @spec resolve_endpoint(Keyword.t()) :: {:input, Boombox.input()} | {:output, Boombox.output()}
+  @spec resolve_endpoint(Keyword.t()) ::
+          {:input, Boombox.Endpoints.input()} | {:output, Boombox.Endpoints.output()}
   defp resolve_endpoint(parsed) do
     case parsed do
       [{direction, true}, {endpoint, true}] ->

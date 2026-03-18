@@ -3,8 +3,8 @@ defmodule Boombox.Pipeline do
   use Membrane.Pipeline
 
   @type opts_map :: %{
-          input: Boombox.input() | Boombox.elixir_input(),
-          output: Boombox.output() | Boombox.elixir_output()
+          input: Boombox.Endpoints.input() | Boombox.Endpoints.elixir_input(),
+          output: Boombox.Endpoints.output() | Boombox.Endpoints.elixir_output()
         }
   @type procs :: %{pipeline: pid(), supervisor: pid()}
 

@@ -324,7 +324,7 @@ class WHIP(BoomboxEndpoint):
     Attributes
     ----------
     url : str
-        HTTP url for the WHIP server.
+        HTTP url of the WHIP server.
     token : str
         Token used for authentication and authorization.
     """
@@ -346,9 +346,8 @@ class HLS(BoomboxEndpoint):
         the HLS stream. If set for output it's a path to the location where
         the HLS playlist will be created. If the path is to a directory, then
         an "index.m3u8" manifest file and the other files will be created
-        there. If it's a path to ".m3u8" file, the file will be created in
-        provided location and all the other files will be created in the
-        same directory.
+        If a `.m3u8` path is provided, the manifest will be created at that location,
+        and all associated HLS files will be stored in the same directory.
     mode : {"vod", "live"}, optional
         If set for output then it determines if the session is live or a VOD
         type of broadcast. It can influence type of metadata inserted into the

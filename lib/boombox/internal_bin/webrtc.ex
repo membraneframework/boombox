@@ -14,8 +14,12 @@ defmodule Boombox.InternalBin.WebRTC do
   defguardp has_webrtc_input(state) when is_webrtc(state.input)
   defguardp has_webrtc_output(state) when is_webrtc(state.output)
 
-  @spec create_input(Boombox.webrtc_signaling(), Boombox.output(), CallbackContext.t(), State.t()) ::
-          Wait.t()
+  @spec create_input(
+          Boombox.Endpoints.webrtc_signaling(),
+          Boombox.Endpoints.output(),
+          CallbackContext.t(),
+          State.t()
+        ) :: Wait.t()
   def create_input(signaling, output, ctx, state) do
     signaling = resolve_signaling(signaling, :input, ctx.utility_supervisor)
 
@@ -61,7 +65,7 @@ defmodule Boombox.InternalBin.WebRTC do
     %Ready{track_builders: track_builders}
   end
 
-  @spec create_output(Boombox.webrtc_signaling(), CallbackContext.t(), State.t()) ::
+  @spec create_output(Boombox.Endpoints.webrtc_signaling(), CallbackContext.t(), State.t()) ::
           {Ready.t() | Wait.t(), State.t()}
   def create_output(signaling, ctx, state) do
     signaling = resolve_signaling(signaling, :output, ctx.utility_supervisor)
@@ -100,7 +104,7 @@ defmodule Boombox.InternalBin.WebRTC do
   end
 
   @spec link_output(
-          [Boombox.transcoding_policy_opt()],
+          [Boombox.Endpoints.transcoding_policy_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
@@ -117,7 +121,7 @@ defmodule Boombox.InternalBin.WebRTC do
   end
 
   @spec handle_output_tracks_negotiated(
-          [Boombox.transcoding_policy_opt()],
+          [Boombox.Endpoints.transcoding_policy_opt()],
           Boombox.InternalBin.track_builders(),
           Membrane.ChildrenSpec.t(),
           webrtc_sink_new_tracks(),
