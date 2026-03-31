@@ -26,7 +26,7 @@ executors:
   macos_arm_executor:
     macos:
       xcode: 16.4.0
-    resource_class: macos.m1.medium.gen1
+    resource_class: m4pro.medium
 
 commands:
   mix_release_server:
