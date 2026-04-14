@@ -24,23 +24,10 @@ jobs:
     uses: membraneframework/membrane_actions/.github/workflows/lint.yml@main
 
   test:
-    runs-on: ubuntu-latest
-    env:
-      MIX_ENV: test
-    container:
-      image: membraneframeworklabs/docker_membrane:latest
-      env:
-        ASDF_DATA_DIR: /root/.asdf
-    steps:
-      - uses: actions/checkout@v4
-      - name: Ensure priv dir exists
-        run: mkdir -p priv
-      - uses: membraneframework/membrane_actions/actions/get-mix-deps@main
-      - uses: membraneframework/membrane_actions/actions/use-build-cache@main
-        with:
-          env: test
-      - run: mix deps.compile
-      - run: mix test --exclude browser
+    uses: membraneframework/membrane_actions/.github/workflows/test.yml@main
+    with:
+      test-flags: "--exclude browser"
+      shards: 4
 
   compare_versions:
     runs-on: ubuntu-latest
