@@ -142,7 +142,7 @@ jobs:
         working-directory: python
     steps:
       - uses: actions/checkout@v4
-      - run: pip3 install cibuildwheel twine
+      - run: pipx install cibuildwheel && pipx install twine
       - run: CIBW_PLATFORM=macos CIBW_ARCHS=arm64 cibuildwheel --output-dir wheelhouse
       - if: ${{ inputs.dry_run == false }}
         run: twine upload --verbose --username __token__ --password ${{ secrets.PYPI_API_KEY }} wheelhouse/*
