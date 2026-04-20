@@ -1,7 +1,7 @@
 defmodule Boombox.Mixfile do
   use Mix.Project
 
-  @version "0.2.10"
+  @version "0.2.11"
   @github_url "https://github.com/membraneframework/boombox"
 
   def project do
@@ -17,7 +17,7 @@ defmodule Boombox.Mixfile do
       aliases: aliases(),
 
       # hex
-      description: "Boombox",
+      description: "High-level Membrane wrapper for media streaming and conversion.",
       package: package(),
 
       # docs
@@ -77,7 +77,7 @@ defmodule Boombox.Mixfile do
       {:playwright, "~> 1.49.1-alpha.2", only: :test},
       {:cowlib, "~> 2.16", override: true, only: :test},
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false}
     ]
