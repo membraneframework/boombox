@@ -57,6 +57,27 @@ defmodule Boombox.InternalBin.RTSP do
 
           {spec, Map.put(track_builders, :video, video_spec)}
 
+        %{rtpmap: %{encoding: "H265"}} = track, {spec, track_builders} ->
+          {vpss, spss, ppss} =
+            case track.fmtp do
+              nil ->
+                {[], [], []}
+
+              fmtp ->
+                {List.wrap(fmtp.sprop_vps), List.wrap(fmtp.sprop_sps), List.wrap(fmtp.sprop_pps)}
+            end
+
+          video_spec =
+            get_child(:rtsp_source)
+            |> via_out(Membrane.Pad.ref(:output, track.control_path))
+            |> child(:rtsp_in_h265_parser, %Membrane.H265.Parser{
+              vpss: vpss,
+              spss: spss,
+              ppss: ppss
+            })
+
+          {spec, Map.put(track_builders, :video, video_spec)}
+
         %{rtpmap: %{encoding: "mpeg4-generic"}, type: :audio} = track, {spec, track_builders} ->
           audio_spec =
             get_child(:rtsp_source)
