@@ -138,16 +138,14 @@ defmodule Boombox.Mixfile do
   end
 
   defp docs do
+    example_extras =
+      Enum.map(examples(), fn {filename, title} ->
+        {"#{Mix.Project.build_path()}/#{filename}", title: title}
+      end)
+
     [
       main: "readme",
-      extras:
-        [
-          "README.md"
-        ] ++
-          Enum.map(examples(), fn {filename, title} ->
-            {"#{Mix.Project.build_path()}/#{filename}", title: title}
-          end) ++
-          [{"LICENSE", title: "License"}],
+      extras: ["README.md"] ++ example_extras ++ [{"LICENSE", title: "License"}],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [Boombox]
     ]
