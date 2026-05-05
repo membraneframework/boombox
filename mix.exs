@@ -142,7 +142,8 @@ defmodule Boombox.Mixfile do
         "README.md",
         {"#{Mix.Project.build_path()}/basic.livemd", title: "Basic Examples"},
         {"#{Mix.Project.build_path()}/streaming.livemd", title: "Streaming Examples"},
-        {"#{Mix.Project.build_path()}/stream_processing.livemd", title: "Stream Processing Examples"},
+        {"#{Mix.Project.build_path()}/stream_processing.livemd",
+         title: "Stream Processing Examples"},
         {"#{Mix.Project.build_path()}/ai.livemd", title: "AI Examples"},
         {"LICENSE", title: "License"}
       ],
