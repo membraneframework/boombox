@@ -115,15 +115,24 @@ defmodule Boombox.Mixfile do
   defp generate_docs_examples(_) do
     docs_install_config = "boombox = :boombox"
 
-    modified_livebook =
-      File.read!("examples.livemd")
-      |> String.replace(
-        ~r/# MIX_INSTALL_CONFIG_BEGIN\n(.|\n)*# MIX_INSTALL_CONFIG_END\n/U,
-        docs_install_config,
-        global: false
-      )
+    examples = [
+      {"basic.livemd", "Basic Examples"},
+      {"streaming.livemd", "Streaming Examples"},
+      {"stream_processing.livemd", "Stream Processing Examples"},
+      {"ai.livemd", "AI Examples"}
+    ]
 
-    File.write!("#{Mix.Project.build_path()}/examples.livemd", modified_livebook)
+    for {filename, _title} <- examples do
+      modified_livebook =
+        File.read!("examples/#{filename}")
+        |> String.replace(
+          ~r/# MIX_INSTALL_CONFIG_BEGIN\n(.|\n)*# MIX_INSTALL_CONFIG_END\n/U,
+          docs_install_config,
+          global: false
+        )
+
+      File.write!("#{Mix.Project.build_path()}/#{filename}", modified_livebook)
+    end
   end
 
   defp docs do
@@ -131,7 +140,10 @@ defmodule Boombox.Mixfile do
       main: "readme",
       extras: [
         "README.md",
-        {"#{Mix.Project.build_path()}/examples.livemd", title: "Examples"},
+        {"#{Mix.Project.build_path()}/basic.livemd", title: "Basic Examples"},
+        {"#{Mix.Project.build_path()}/streaming.livemd", title: "Streaming Examples"},
+        {"#{Mix.Project.build_path()}/stream_processing.livemd", title: "Stream Processing Examples"},
+        {"#{Mix.Project.build_path()}/ai.livemd", title: "AI Examples"},
         {"LICENSE", title: "License"}
       ],
       source_ref: "v#{@version}",

@@ -2,7 +2,7 @@ defmodule Boombox do
   @moduledoc """
   Boombox is a tool for audio and video streaming.
 
-  See `run/1` for details and [examples.livemd](examples.livemd) for examples.
+  See `run/1` for details and the [Basic](basic.livemd), [Streaming](streaming.livemd), [Stream Processing](stream_processing.livemd) and [AI](ai.livemd) livebooks for usage examples.
   """
 
   require Logger
@@ -56,8 +56,8 @@ defmodule Boombox do
   ```
 
   See `t:Boombox.Endpoints.input/0` and `t:Boombox.Endpoints.output/0` for
-  available inputs and outputs and [examples.livemd](examples.livemd) for
-  examples.
+  available inputs and outputs and the [Basic](basic.livemd), [Streaming](streaming.livemd),
+  [Stream Processing](stream_processing.livemd) and [AI](ai.livemd) livebooks for usage examples.
 
   Calling this function results in it blocking until the media flow is finished and
   then returning `:ok`, except for when an endpoint with special behavior is used.
