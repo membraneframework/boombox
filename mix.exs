@@ -112,17 +112,19 @@ defmodule Boombox.Mixfile do
     [docs: [&generate_docs_examples/1, "docs"]]
   end
 
-  defp generate_docs_examples(_) do
-    docs_install_config = "boombox = :boombox"
-
-    examples = [
+  defp examples do
+    [
       {"basic.livemd", "Basic Examples"},
       {"streaming.livemd", "Streaming Examples"},
       {"stream_processing.livemd", "Stream Processing Examples"},
       {"ai.livemd", "AI Examples"}
     ]
+  end
 
-    for {filename, _title} <- examples do
+  defp generate_docs_examples(_) do
+    docs_install_config = "boombox = :boombox"
+
+    for {filename, _title} <- examples() do
       modified_livebook =
         File.read!("examples/#{filename}")
         |> String.replace(
@@ -138,15 +140,14 @@ defmodule Boombox.Mixfile do
   defp docs do
     [
       main: "readme",
-      extras: [
-        "README.md",
-        {"#{Mix.Project.build_path()}/basic.livemd", title: "Basic Examples"},
-        {"#{Mix.Project.build_path()}/streaming.livemd", title: "Streaming Examples"},
-        {"#{Mix.Project.build_path()}/stream_processing.livemd",
-         title: "Stream Processing Examples"},
-        {"#{Mix.Project.build_path()}/ai.livemd", title: "AI Examples"},
-        {"LICENSE", title: "License"}
-      ],
+      extras:
+        [
+          "README.md"
+        ] ++
+          Enum.map(examples(), fn {filename, title} ->
+            {"#{Mix.Project.build_path()}/#{filename}", title: title}
+          end) ++
+          [{"LICENSE", title: "License"}],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [Boombox]
     ]
