@@ -1,0 +1,172 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Phase 1 — CI checks
+
+  build_test:
+    uses: membraneframework/membrane_actions/.github/workflows/build-test.yml@main
+
+  lint:
+    uses: membraneframework/membrane_actions/.github/workflows/lint.yml@main
+
+  test:
+    uses: membraneframework/membrane_actions/.github/workflows/test.yml@main
+    with:
+      test-flags: "--exclude browser"
+      shards: 4
+
+  compare_versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare versions in mix.exs and python/pyproject.toml
+        run: |
+          python_ver=$(grep "^version =" python/pyproject.toml | awk '{print $3}' | tr -d ' "')
+          elixir_ver=$(grep "^  @version" mix.exs | awk '{print $2}' | tr -d ' "')
+          if [ "$python_ver" != "$elixir_ver" ]; then
+            echo "package versions don't match - python: $python_ver, elixir: $elixir_ver"
+            exit 1
+          fi
+
+  # Phase 2 — Server release builds
+
+  mix_release_server_macos_arm:
+    runs-on: macos-latest
+    needs: [build_test, lint, test, compare_versions]
+    env:
+      MIX_ENV: prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.3"
+      - run: mix local.hex --force && mix local.rebar --force
+      - uses: membraneframework/membrane_actions/actions/get-mix-deps@main
+      - run: mix release server
+      - run: |
+          mkdir -p artifacts
+          tar -czvf artifacts/boombox-server-macos-arm.tar.gz -C _build/prod/rel/server .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boombox-server-macos-arm
+          path: artifacts/boombox-server-macos-arm.tar.gz
+
+  mix_release_server_linux_x86:
+    runs-on: ubuntu-latest
+    needs: [build_test, lint, test, compare_versions]
+    env:
+      MIX_ENV: prod
+    container:
+      image: membraneframeworklabs/docker_membrane:latest
+      env:
+        ASDF_DATA_DIR: /root/.asdf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: membraneframework/membrane_actions/actions/get-mix-deps@main
+      - run: mix release server
+      - run: |
+          mkdir -p artifacts
+          tar -czvf artifacts/boombox-server-linux-x86.tar.gz -C _build/prod/rel/server .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boombox-server-linux-x86
+          path: artifacts/boombox-server-linux-x86.tar.gz
+
+  mix_release_server_linux_arm:
+    runs-on: ubuntu-24.04-arm
+    needs: [build_test, lint, test, compare_versions]
+    env:
+      MIX_ENV: prod
+    container:
+      image: membraneframeworklabs/docker_membrane:latest
+      env:
+        ASDF_DATA_DIR: /root/.asdf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: membraneframework/membrane_actions/actions/get-mix-deps@main
+      - run: mix release server
+      - run: |
+          mkdir -p artifacts
+          tar -czvf artifacts/boombox-server-linux-arm.tar.gz -C _build/prod/rel/server .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boombox-server-linux-arm
+          path: artifacts/boombox-server-linux-arm.tar.gz
+
+  # Phase 3 — Publish GitHub release
+
+  publish_github_release:
+    runs-on: ubuntu-latest
+    needs: [mix_release_server_macos_arm, mix_release_server_linux_x86, mix_release_server_linux_arm]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: boombox-server-*
+          path: artifacts
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" artifacts/*.tar.gz --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Phase 4 — Publish packages
+
+  hex_publish:
+    needs: [publish_github_release]
+    uses: membraneframework/membrane_actions/.github/workflows/hex-publish.yml@main
+    secrets:
+      HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+
+  publish_python_package_macos_arm:
+    runs-on: macos-latest
+    needs: [mix_release_server_macos_arm, mix_release_server_linux_x86, mix_release_server_linux_arm]
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install cibuildwheel && pipx install twine
+      - run: CIBW_PLATFORM=macos CIBW_ARCHS=arm64 cibuildwheel --output-dir wheelhouse
+      - run: twine upload --verbose --username __token__ --password ${{ secrets.PYPI_API_KEY }} wheelhouse/*
+
+  publish_python_package_linux_x86:
+    runs-on: ubuntu-latest
+    needs: [mix_release_server_macos_arm, mix_release_server_linux_x86, mix_release_server_linux_arm]
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install cibuildwheel
+      - run: CIBW_ARCHS=x86_64 CIBW_SKIP="*musllinux*" cibuildwheel --output-dir wheelhouse
+      - run: pip install twine && twine upload --username __token__ --password ${{ secrets.PYPI_API_KEY }} wheelhouse/*
+
+  publish_python_package_linux_arm:
+    runs-on: ubuntu-24.04-arm
+    needs: [mix_release_server_macos_arm, mix_release_server_linux_x86, mix_release_server_linux_arm]
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install cibuildwheel
+      - run: CIBW_ARCHS=aarch64 CIBW_SKIP="*musllinux*" cibuildwheel --output-dir wheelhouse
+      - run: pip install twine && twine upload --username __token__ --password ${{ secrets.PYPI_API_KEY }} wheelhouse/*
+
+  # Phase 5 — Docs
+
+  build_python_docs:
+    runs-on: ubuntu-latest
+    needs: [publish_python_package_macos_arm, publish_python_package_linux_x86, publish_python_package_linux_arm]
+    steps:
+      - run: curl -X POST -d "token=${{ secrets.READTHEDOCS_WEBHOOK_TOKEN }}" "${{ secrets.READTHEDOCS_WEBHOOK_URL }}"
