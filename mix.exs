@@ -139,7 +139,8 @@ defmodule Boombox.Mixfile do
 
   defp docs do
     example_extras =
-      Enum.map(examples(), fn {filename, title} ->
+      examples()
+      |> Enum.map(fn {filename, title} ->
         {"#{Mix.Project.build_path()}/#{filename}", title: title}
       end)
 
