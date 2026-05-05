@@ -14,7 +14,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 boombox = {:boombox, github: "membraneframework/boombox"}
 
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
-# can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
+# can be found on https://hexdocs.pm/boombox/streaming.html or in the latest github release.
 # MIX_INSTALL_CONFIG_END
 
 Mix.install([
@@ -57,7 +57,7 @@ end
 
 ## Setup
 
-👋 Here are some streaming examples of using Boombox, covering broadcasting, relaying, and multi-protocol forwarding. Some of them use [ffmpeg](https://www.ffmpeg.org/) to generate a stream. Some use [ffplay](https://www.ffmpeg.org/ffplay.html) to playback generated videos, but you can use any other player, for example VLC.
+👋 Here are some streaming examples of using Boombox, covering broadcasting, relaying, and multi-protocol forwarding. Some of them use [ffmpeg](https://www.ffmpeg.org/) to generate a stream.
 
 The cell below downloads assets to be used in the examples. The setup cell started an HTTP server on port `1234` that will serve static HTML files for sending/receiving the stream in the browser.
 

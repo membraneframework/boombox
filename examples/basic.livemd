@@ -14,7 +14,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 boombox = {:boombox, github: "membraneframework/boombox"}
 
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
-# can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
+# can be found on https://hexdocs.pm/boombox/basic.html or in the latest github release.
 # MIX_INSTALL_CONFIG_END
 
 Mix.install([
@@ -78,7 +78,7 @@ end
 assets_url =
   "https://raw.githubusercontent.com/membraneframework/boombox/master/boombox_examples_data"
 
-for asset <- ["webrtc_from_browser", "webrtc_to_browser"],
+for asset <- ["webrtc_from_browser", "webrtc_to_browser", "whip"],
     path = "#{data_dir}/#{asset}.html",
     not File.exists?(path) do
   %{status: 200, body: data} = Req.get!("#{assets_url}/#{asset}.html")

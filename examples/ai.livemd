@@ -3,9 +3,6 @@
 ```elixir
 Logger.configure(level: :info)
 
-# For ffmpeg and ffplay commands to work on Mac Livebook Desktop
-System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
-
 # In case of problems installing Nx/EXLA/Bumblebee,
 # you can remove them and the Nx backend config below.
 # Examples that don't mention them should still work.
@@ -14,7 +11,7 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 boombox = {:boombox, github: "membraneframework/boombox"}
 
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
-# can be found on https://hexdocs.pm/boombox/examples.html or in the latest github release.
+# can be found on https://hexdocs.pm/boombox/ai.html or in the latest github release.
 # MIX_INSTALL_CONFIG_END
 
 Mix.install([
@@ -53,7 +50,7 @@ end
 
 ## Setup
 
-👋 Here are some AI examples of using Boombox, covering LLM voice interfaces, speech transcription, and ML-driven video processing. Some of them use [ffmpeg](https://www.ffmpeg.org/) to generate a stream. Some use [ffplay](https://www.ffmpeg.org/ffplay.html) to playback generated videos, but you can use any other player, for example VLC.
+👋 Here are some AI examples of using Boombox, covering LLM voice interfaces, speech transcription, and ML-driven video processing.
 
 The cell below downloads assets to be used in the examples. The setup cell started an HTTP server on port `1234` that will serve static HTML files for sending/receiving the stream in the browser.
 
