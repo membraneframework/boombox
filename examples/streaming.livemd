@@ -44,15 +44,18 @@ case :inets.start() do
   err -> raise "Unexpected value returned by :inets.start/0: #{inspect(err)}"
 end
 
-{:ok, _server} =
-  :inets.start(:httpd,
-    bind_address: ~c"localhost",
-    port: 1234,
-    document_root: ~c"#{data_dir}",
-    server_name: ~c"assets_server",
-    server_root: ~c"/tmp",
-    erl_script_nocache: true
-  )
+case :inets.start(:httpd,
+  bind_address: ~c"localhost",
+  port: 1234,
+  document_root: ~c"#{data_dir}",
+  server_name: ~c"assets_server",
+  server_root: ~c"/tmp",
+  erl_script_nocache: true
+) do
+  {:ok, _server} -> :ok
+  # port already in use — server likely started from another livebook
+  {:error, _} -> :ok
+end
 ```
 
 ## Setup
@@ -75,7 +78,7 @@ for {filename, remote} <- [
 end
 
 assets_url =
-  "https://raw.githubusercontent.com/membraneframework/boombox/master/boombox_examples_data"
+  "https://raw.githubusercontent.com/membraneframework/boombox/master/examples/data"
 
 for asset <- ["hls", "webrtc_from_browser", "webrtc_to_browser"],
     path = "#{data_dir}/#{asset}.html",
@@ -273,4 +276,3 @@ end)
 
 :ok
 ```
-

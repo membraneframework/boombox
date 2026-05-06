@@ -11,7 +11,8 @@ System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
 # Examples that don't mention them should still work.
 
 # MIX_INSTALL_CONFIG_BEGIN
-boombox = {:boombox, github: "membraneframework/boombox"}
+# boombox = {:boombox, github: "membraneframework/boombox"}
+boombox = {:boombox, path: "/Users/feliks/membrane/boombox"}
 
 # This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
 # can be found on https://hexdocs.pm/boombox/basic.html or in the latest github release.
@@ -44,15 +45,18 @@ case :inets.start() do
   err -> raise "Unexpected value returned by :inets.start/0: #{inspect(err)}"
 end
 
-{:ok, _server} =
-  :inets.start(:httpd,
-    bind_address: ~c"localhost",
-    port: 1234,
-    document_root: ~c"#{data_dir}",
-    server_name: ~c"assets_server",
-    server_root: ~c"/tmp",
-    erl_script_nocache: true
-  )
+case :inets.start(:httpd,
+  bind_address: ~c"localhost",
+  port: 1234,
+  document_root: ~c"#{data_dir}",
+  server_name: ~c"assets_server",
+  server_root: ~c"/tmp",
+  erl_script_nocache: true
+) do
+  {:ok, _server} -> :ok
+  # port already in use — server likely started from another livebook
+  {:error, _} -> :ok
+end
 ```
 
 ## Setup
@@ -76,7 +80,7 @@ for {filename, remote} <- [
 end
 
 assets_url =
-  "https://raw.githubusercontent.com/membraneframework/boombox/master/boombox_examples_data"
+  "https://raw.githubusercontent.com/membraneframework/boombox/master/examples/data"
 
 for asset <- ["webrtc_from_browser", "webrtc_to_browser", "whip"],
     path = "#{data_dir}/#{asset}.html",
@@ -101,7 +105,7 @@ Boombox.play("#{input_dir}/bun.mp4")
 
 ```elixir
 Boombox.run(
-  input: {:h264, "#{input_dir}/ffmpeg-testsrc.h264", framerate: {30, 1}},
+  input: {:h264, "#{input_dir}/ffmpeg-testsrc.h264"},
   output: "#{out_dir}/ffmpeg-testsrc.ivf"
 )
 ```

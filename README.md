@@ -70,10 +70,10 @@ end)
 ```
 
 To receive WebRTC/HLS from boombox in a browser or send WebRTC from a browser to boombox
-you can use simple HTML examples in the `boombox_examples_data` folder, for example
+you can use simple HTML examples in the `examples/data` folder, for example
 
 ```sh
-wget https://raw.githubusercontent.com/membraneframework/boombox/v0.1.0/boombox_examples_data/webrtc_to_browser.html
+wget https://raw.githubusercontent.com/membraneframework/boombox/v0.1.0/examples/data/webrtc_to_browser.html
 open webrtc_to_browser.html
 ```
 
