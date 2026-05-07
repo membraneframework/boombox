@@ -112,28 +112,41 @@ defmodule Boombox.Mixfile do
     [docs: [&generate_docs_examples/1, "docs"]]
   end
 
+  defp examples do
+    [
+      {"basic.livemd", "Basic Examples"},
+      {"streaming.livemd", "Streaming Examples"},
+      {"stream_processing.livemd", "Stream Processing Examples"},
+      {"ai.livemd", "AI Examples"}
+    ]
+  end
+
   defp generate_docs_examples(_) do
     docs_install_config = "boombox = :boombox"
 
-    modified_livebook =
-      File.read!("examples.livemd")
-      |> String.replace(
-        ~r/# MIX_INSTALL_CONFIG_BEGIN\n(.|\n)*# MIX_INSTALL_CONFIG_END\n/U,
-        docs_install_config,
-        global: false
-      )
+    for {filename, _title} <- examples() do
+      modified_livebook =
+        File.read!("examples/#{filename}")
+        |> String.replace(
+          ~r/# MIX_INSTALL_CONFIG_BEGIN\n(.|\n)*# MIX_INSTALL_CONFIG_END\n/U,
+          docs_install_config,
+          global: false
+        )
 
-    File.write!("#{Mix.Project.build_path()}/examples.livemd", modified_livebook)
+      File.write!("#{Mix.Project.build_path()}/#{filename}", modified_livebook)
+    end
   end
 
   defp docs do
+    example_extras =
+      examples()
+      |> Enum.map(fn {filename, title} ->
+        {"#{Mix.Project.build_path()}/#{filename}", title: title}
+      end)
+
     [
       main: "readme",
-      extras: [
-        "README.md",
-        {"#{Mix.Project.build_path()}/examples.livemd", title: "Examples"},
-        {"LICENSE", title: "License"}
-      ],
+      extras: ["README.md"] ++ example_extras ++ [{"LICENSE", title: "License"}],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [Boombox]
     ]

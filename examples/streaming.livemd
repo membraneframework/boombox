@@ -1,0 +1,278 @@
+# Boombox streaming examples
+
+```elixir
+Logger.configure(level: :info)
+
+# For ffmpeg and ffplay commands to work on Mac Livebook Desktop
+System.put_env("PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}")
+
+# In case of problems installing Nx/EXLA/Bumblebee,
+# you can remove them and the Nx backend config below.
+# Examples that don't mention them should still work.
+
+# MIX_INSTALL_CONFIG_BEGIN
+boombox = {:boombox, github: "membraneframework/boombox"}
+
+# This livebook uses boombox from the master branch. If any examples happen to not work, the latest stable version of this livebook
+# can be found on https://hexdocs.pm/boombox/streaming.html or in the latest github release.
+# MIX_INSTALL_CONFIG_END
+
+Mix.install([
+  boombox,
+  :kino,
+  :nx,
+  :exla,
+  :bumblebee,
+  :websockex,
+  :membrane_simple_rtsp_server,
+  {:coerce, ">= 1.0.2"}
+])
+
+Nx.global_default_backend(EXLA.Backend)
+
+# HTTP server for assets
+data_dir = "/tmp/boombox_examples_data"
+input_dir = "#{data_dir}/input"
+File.mkdir_p!(input_dir)
+out_dir = "#{data_dir}/output"
+File.mkdir_p!(out_dir)
+
+# match in case a dependency already started :inets
+case :inets.start() do
+  :ok -> :ok
+  {:error, {:already_started, :inets}} -> :ok
+  err -> raise "Unexpected value returned by :inets.start/0: #{inspect(err)}"
+end
+
+case :inets.start(:httpd,
+  bind_address: ~c"localhost",
+  port: 1234,
+  document_root: ~c"#{data_dir}",
+  server_name: ~c"assets_server",
+  server_root: ~c"/tmp",
+  erl_script_nocache: true
+) do
+  {:ok, _server} -> :ok
+  # port already in use — server likely started from another livebook
+  {:error, _} -> :ok
+end
+```
+
+## Setup
+
+👋 Here are some streaming examples of using Boombox, covering broadcasting, relaying, and multi-protocol forwarding. Some of them use [ffmpeg](https://www.ffmpeg.org/) to generate a stream.
+
+The cell below downloads assets to be used in the examples. The setup cell started an HTTP server on port `1234` that will serve static HTML files for sending/receiving the stream in the browser.
+
+```elixir
+samples_url = "https://raw.githubusercontent.com/membraneframework/static/gh-pages/samples"
+
+for {filename, remote} <- [
+      {"bun.mp4", "big-buck-bunny/bun33s.mp4"},
+      {"bun.mkv", "big-buck-bunny/bun33s.mkv"}
+    ],
+    path = "#{input_dir}/#{filename}",
+    not File.exists?(path) do
+  %{status: 200, body: data} = Req.get!("#{samples_url}/#{remote}")
+  File.write!(path, data)
+end
+
+assets_url =
+  "https://raw.githubusercontent.com/membraneframework/boombox/master/examples/data"
+
+for asset <- ["hls", "webrtc_from_browser", "webrtc_to_browser"],
+    path = "#{data_dir}/#{asset}.html",
+    not File.exists?(path) do
+  %{status: 200, body: data} = Req.get!("#{assets_url}/#{asset}.html")
+  File.write!(path, data)
+end
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Broadcast MP4 via HLS
+
+To receive the stream, visit http://localhost:1234/hls.html after running the cell below
+
+```elixir
+Boombox.run(input: "#{input_dir}/bun.mp4", output: {:hls, "#{out_dir}/index.m3u8"})
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Stream MP4 via WebRTC
+
+To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below.
+
+**Note**: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
+
+```elixir
+Boombox.run(input: "#{input_dir}/bun.mp4", output: {:webrtc, "ws://localhost:8830"})
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Broadcast WebRTC via HLS
+
+Visit http://localhost:1234/webrtc_from_browser.html to send the stream and http://localhost:1234/hls.html to receive it
+
+```elixir
+Boombox.run(input: {:webrtc, "ws://localhost:8829"}, output: {:hls, "#{out_dir}/index.m3u8"})
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Stream MP4 via HTTP, forward it via WebRTC
+
+To receive the stream, visit http://localhost:1234/webrtc_to_browser.html after running the cell below.
+
+**Note**: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
+
+```elixir
+Boombox.run(
+  input: "#{samples_url}/big-buck-bunny/bun33s.mp4",
+  output: {:webrtc, "ws://localhost:8830"}
+)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Receive RTSP, broadcast via HLS
+
+To receive the stream, visit http://localhost:1234/hls.html after running the cell below
+
+```elixir
+rtsp_port = 8554
+Membrane.SimpleRTSPServer.start_link("#{input_dir}/bun.mp4", port: rtsp_port)
+Boombox.run(input: "rtsp://localhost:#{rtsp_port}/", output: "#{out_dir}/index.m3u8")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Broadcast RTMP via HLS
+
+To receive the stream, visit http://localhost:1234/hls.html after running the cell below
+
+```elixir
+uri = "rtmp://localhost:5432"
+
+t =
+  Task.async(fn ->
+    Boombox.run(input: uri, output: "#{out_dir}/index.m3u8")
+  end)
+
+{_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Forward RTMP via WebRTC
+
+To receive the stream, visit http://localhost:1234/webrtc_to_browser.html
+
+**Note**: due to a bug in Chrome, it may not work there unless launched with `--enable-features=WebRtcEncodedTransformDirectCallback`. See https://issues.chromium.org/issues/351275970.
+
+```elixir
+uri = "rtmp://localhost:5434"
+
+t =
+  Task.async(fn ->
+    Boombox.run(input: uri, output: {:webrtc, "ws://localhost:8830"})
+  end)
+
+{_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
+Task.await(t)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Receive RTP, broadcast via HLS
+
+To receive the stream, visit http://localhost:1234/hls.html after running the cell below
+
+```elixir
+rtp_port = 50001
+
+t =
+  Task.async(fn ->
+    Boombox.run(
+      input: {:rtp, port: rtp_port, audio_encoding: :OPUS, video_encoding: :H264},
+      output: "#{out_dir}/index.m3u8"
+    )
+  end)
+
+{_output, 0} =
+  System.shell("""
+  ffmpeg -re -i #{input_dir}/bun.mkv \
+  -map 0:v:0 -c:v copy -payload_type 96 -f rtp rtp://127.0.0.1:#{rtp_port} \
+  -map 0:a:0 -c:a copy -payload_type 120 -f rtp rtp://127.0.0.1:#{rtp_port}
+  """)
+
+Process.sleep(200)
+
+Task.shutdown(t)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Stream content of MP4 via SRT with basic authentication mechanism and broadcast it with HLS
+
+Run the cell below and visit http://localhost:1234/hls.html.
+
+Then, start streaming from OBS to the following URI:
+
+* `srt://127.0.0.1:9710?streamid=some_stream_id&passphrase=some_password`
+
+For more information on how to configure OBS to stream via SRT, take a look [here](https://github.com/membraneframework/membrane_srt_plugin?tab=readme-ov-file#obs-configuration).
+
+```elixir
+hls_output = "#{out_dir}/index.m3u8"
+
+uri = "srt://127.0.0.1:9710"
+stream_id = "some_stream_id"
+password = "some_password"
+
+Boombox.run(input: {:srt, uri, stream_id: stream_id, password: password}, output: hls_output)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Micro Twitch clone
+
+```elixir
+Kino.start_child!({
+  Membrane.RTMPServer,
+  handler: %Membrane.RTMP.Source.ClientHandlerImpl{controlling_process: self()},
+  port: 5001,
+  use_ssl?: false,
+  handle_new_client: fn client_ref, app, stream_key ->
+    hls_dir = "#{out_dir}/#{stream_key}"
+    File.mkdir_p!(hls_dir)
+
+    Task.start(fn ->
+      Boombox.run(input: {:rtmp, client_ref}, output: "#{hls_dir}/index.m3u8")
+    end)
+
+    Kino.Markdown.new("""
+    New streamer connects with app #{app} and stream_key #{stream_key},
+    stream will be available at http://localhost:1234/hls.html?src=output/#{stream_key}/index.m3u8.
+    It may take a few seconds before the stream is playable.
+    """)
+    |> Kino.render()
+  end,
+  client_timeout: 1_000
+})
+
+button = Kino.Control.button("Connect streamer")
+Kino.render(button)
+
+button
+|> Stream.filter(fn event -> event.type == :click end)
+|> Kino.async_listen(fn _event ->
+  key = Base.encode16(:crypto.strong_rand_bytes(4))
+  uri = "rtmp://localhost:5001/streamer/#{key}"
+  {_output, 0} = System.shell("ffmpeg -re -i #{input_dir}/bun.mp4 -c copy -f flv #{uri}")
+end)
+
+:ok
+```

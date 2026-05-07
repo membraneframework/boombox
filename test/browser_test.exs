@@ -31,7 +31,7 @@ defmodule Boombox.BrowserTest do
       :inets.start(:httpd,
         bind_address: ~c"localhost",
         port: @port,
-        document_root: ~c"boombox_examples_data",
+        document_root: ~c"examples/data",
         server_name: ~c"assets_server",
         server_root: ~c"/tmp",
         erl_script_nocache: true

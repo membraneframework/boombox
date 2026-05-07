@@ -12,7 +12,7 @@ You can also use it as a bridge between Elixir and external media, allowing for 
 integration with AI pipelines and other projects that interact with raw media streams
 directly.
 
-See [examples.livemd](examples.livemd) for examples.
+For examples, see the [basic](examples/basic.livemd), [streaming](examples/streaming.livemd), [stream processing](examples/stream_processing.livemd), and [AI](examples/ai.livemd) livebooks.
 
 We also maintain a Python package `boomboxlib` that allows for using Boombox in
 Python projects directly. For more details see the [python directory](https://github.com/membraneframework/boombox/tree/master/python).
@@ -70,14 +70,14 @@ end)
 ```
 
 To receive WebRTC/HLS from boombox in a browser or send WebRTC from a browser to boombox
-you can use simple HTML examples in the `boombox_examples_data` folder, for example
+you can use simple HTML examples in the `examples/data` folder, for example
 
 ```sh
-wget https://raw.githubusercontent.com/membraneframework/boombox/v0.1.0/boombox_examples_data/webrtc_to_browser.html
+wget https://raw.githubusercontent.com/membraneframework/boombox/v0.1.0/examples/data/webrtc_to_browser.html
 open webrtc_to_browser.html
 ```
 
-For more examples, see [examples.livemd](examples.livemd).
+For more examples, see the [basic](examples/basic.livemd), [streaming](examples/streaming.livemd), [stream processing](examples/stream_processing.livemd), and [AI](examples/ai.livemd) livebooks.
 
 ## Supported formats & protocols
 
