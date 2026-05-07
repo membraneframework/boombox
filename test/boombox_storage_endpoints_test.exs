@@ -41,7 +41,9 @@ defmodule BoomboxStorageEndpointsTest do
       ref_file = Path.join(fixtures_dir, "bun10s.mp4")
       output_path = Path.join(tmp, "output")
 
-      input = resolve_input(unquote(Macro.escape(input_spec)), fixtures_dir)
+      input =
+        unquote(Macro.escape(input_spec))
+        |> resolve_input(fixtures_dir)
 
       Boombox.run(input: input, output: {unquote(output_type), output_path})
 
