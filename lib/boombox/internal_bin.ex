@@ -775,8 +775,10 @@ defmodule Boombox.InternalBin do
 
       {endpoint_type, location, opts}
       when endpoint_type in [:h264, :h265] and is_binary(location) and direction == :input ->
+        {framerate, transport_opts} = Keyword.pop(opts, :framerate, {30, 1})
+
         {endpoint_type, location,
-         transport: resolve_transport(location, opts), framerate: opts[:framerate] || {30, 1}}
+         transport: resolve_transport(location, transport_opts), framerate: framerate}
 
       {endpoint_type, location, opts}
       when is_binary(location) and direction == :input and

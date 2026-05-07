@@ -10,7 +10,9 @@ defmodule BoomboxStorageEndpointsTest do
     {"bun10s.wav", [:audio]},
     {"bun10s.ivf", [:video]},
     {"bun10s.h264", [:video]},
+    {{:h264, "bun10s.h264", framerate: {30, 1}}, [:video]},
     {"bun10s.h265", [:video]},
+    {{:h265, "bun10s.h265", framerate: {30, 1}}, [:video]},
     {"bun10s.mp4", [:audio, :video]}
   ]
 
@@ -25,33 +27,40 @@ defmodule BoomboxStorageEndpointsTest do
     {:mp4, [:audio, :video]}
   ]
 
-  @test_cases for {input_path, input_kinds} <- @inputs,
+  @test_cases for {input_spec, input_kinds} <- @inputs,
                   {output_type, output_kinds} <- @outputs,
                   kinds = Enum.filter(input_kinds, &(&1 in output_kinds)),
                   not Enum.empty?(kinds),
-                  do: {input_path, output_type, kinds}
+                  do: {input_spec, output_type, kinds}
 
   @moduletag :tmp_dir
 
-  Enum.each(@test_cases, fn {input_path, output_type, kinds} ->
-    async_test "#{inspect(input_path)} file -> #{inspect(output_type)} file", %{tmp_dir: tmp} do
+  Enum.each(@test_cases, fn {input_spec, output_type, kinds} ->
+    async_test "#{inspect(input_spec)} -> #{inspect(output_type)} file", %{tmp_dir: tmp} do
       fixtures_dir = "test/fixtures/storage_endpoints/"
       ref_file = Path.join(fixtures_dir, "bun10s.mp4")
       output_path = Path.join(tmp, "output")
 
-      Boombox.run(
-        input: Path.join(fixtures_dir, unquote(input_path)),
-        output: {unquote(output_type), output_path}
-      )
+      input =
+        unquote(Macro.escape(input_spec))
+        |> resolve_input(fixtures_dir)
 
+      middle_storage_endpoint = {unquote(output_type), output_path}
       output_mp4_path = Path.join(tmp, "output.mp4")
 
+      Boombox.run(input: input, output: middle_storage_endpoint)
+
       Boombox.run(
-        input: {unquote(output_type), output_path},
+        input: middle_storage_endpoint,
         output: output_mp4_path
       )
 
       Compare.compare(output_mp4_path, ref_file, kinds: unquote(kinds))
     end
   end)
+
+  defp resolve_input(path, fixtures_dir) when is_binary(path), do: Path.join(fixtures_dir, path)
+
+  defp resolve_input({type, file, opts}, fixtures_dir),
+    do: {type, Path.join(fixtures_dir, file), opts}
 end
