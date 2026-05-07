@@ -876,7 +876,6 @@ defmodule Boombox.InternalBin do
 
   @spec resolve_transport(String.t(), [{:transport, :file | :http}]) :: :file | :http
   defp resolve_transport(location, opts) do
-    # opts = opts |> Keyword.validate!(:framerate, transport: nil, transcoding_policy: :if_needed)
     opts = opts |> Keyword.validate!(transport: nil, transcoding_policy: :if_needed)
 
     case opts[:transport] do
