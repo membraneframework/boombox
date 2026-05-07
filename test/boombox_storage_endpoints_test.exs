@@ -45,12 +45,13 @@ defmodule BoomboxStorageEndpointsTest do
         unquote(Macro.escape(input_spec))
         |> resolve_input(fixtures_dir)
 
-      Boombox.run(input: input, output: {unquote(output_type), output_path})
-
+      middle_storage_endpoint = {unquote(output_type), output_path}
       output_mp4_path = Path.join(tmp, "output.mp4")
 
+      Boombox.run(input: input, output: middle_storage_endpoint)
+
       Boombox.run(
-        input: {unquote(output_type), output_path},
+        input: middle_storage_endpoint,
         output: output_mp4_path
       )
 
