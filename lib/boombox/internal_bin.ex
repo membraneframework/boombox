@@ -450,6 +450,10 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.RTSP.create_input(uri)
   end
 
+  defp create_input({:rtsp, uri, opts}, _ctx, _state) do
+    Boombox.InternalBin.RTSP.create_input(uri, opts)
+  end
+
   defp create_input({type, process, params}, _ctx, _state) when type in @elixir_endpoint_types do
     Boombox.InternalBin.ElixirEndpoints.create_input(
       process,
@@ -840,6 +844,10 @@ defmodule Boombox.InternalBin do
         value
 
       {:rtsp, location} when direction == :input and is_binary(location) ->
+        value
+
+      {:rtsp, location, opts}
+      when direction == :input and is_binary(location) and is_list(opts) ->
         value
 
       {:rtp, opts} ->

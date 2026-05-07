@@ -8,14 +8,17 @@ defmodule Boombox.InternalBin.RTSP do
   alias Boombox.InternalBin.{Ready, State, Wait}
   alias Membrane.RTSP
 
-  @spec create_input(URI.t()) :: Wait.t()
-  def create_input(uri) do
+  @default_allowed_media_types [:video, :audio]
+
+  @spec create_input(URI.t(), [Boombox.Endpoints.rtsp_input_opt()]) :: Wait.t()
+  def create_input(uri, opts \\ []) do
     port = Enum.random(5_000..65_000)
+    allowed_media_types = Keyword.get(opts, :allowed_media_types, @default_allowed_media_types)
 
     spec =
       child(:rtsp_source, %RTSP.Source{
         transport: {:udp, port, port + 20},
-        allowed_media_types: [:video, :audio],
+        allowed_media_types: allowed_media_types,
         stream_uri: uri,
         on_connection_closed: :send_eos
       })
@@ -51,6 +54,27 @@ defmodule Boombox.InternalBin.RTSP do
             get_child(:rtsp_source)
             |> via_out(Membrane.Pad.ref(:output, track.control_path))
             |> child(:rtsp_in_h264_parser, %Membrane.H264.Parser{spss: spss, ppss: ppss})
+
+          {spec, Map.put(track_builders, :video, video_spec)}
+
+        %{rtpmap: %{encoding: "H265"}} = track, {spec, track_builders} ->
+          {vpss, spss, ppss} =
+            case track.fmtp do
+              nil ->
+                {[], [], []}
+
+              fmtp ->
+                {List.wrap(fmtp.sprop_vps), List.wrap(fmtp.sprop_sps), List.wrap(fmtp.sprop_pps)}
+            end
+
+          video_spec =
+            get_child(:rtsp_source)
+            |> via_out(Membrane.Pad.ref(:output, track.control_path))
+            |> child(:rtsp_in_h265_parser, %Membrane.H265.Parser{
+              vpss: vpss,
+              spss: spss,
+              ppss: ppss
+            })
 
           {spec, Map.put(track_builders, :video, video_spec)}
 
