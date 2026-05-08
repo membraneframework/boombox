@@ -11,7 +11,7 @@ defmodule Boombox.InternalBin.RTSP do
   @default_allowed_media_types [:video, :audio]
 
   @spec create_input(URI.t(), [Boombox.Endpoints.rtsp_input_opt()]) :: Wait.t()
-  def create_input(uri, opts \\ []) do
+  def create_input(uri, opts) do
     port = Enum.random(5_000..65_000)
     allowed_media_types = Keyword.get(opts, :allowed_media_types, @default_allowed_media_types)
 

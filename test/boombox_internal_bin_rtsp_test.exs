@@ -7,8 +7,8 @@ defmodule Boombox.InternalBin.RTSPTest do
   @uri URI.parse("rtsp://example.org/stream")
 
   describe "create_input/2" do
-    test "defaults to video + audio when no options are given" do
-      assert %Wait{actions: [spec: spec]} = RTSP.create_input(@uri)
+    test "defaults to video + audio when an empty keyword list is given" do
+      assert %Wait{actions: [spec: spec]} = RTSP.create_input(@uri, [])
       assert allowed_media_types(spec) == [:video, :audio]
     end
 
@@ -17,11 +17,6 @@ defmodule Boombox.InternalBin.RTSPTest do
                RTSP.create_input(@uri, allowed_media_types: [:video])
 
       assert allowed_media_types(spec) == [:video]
-    end
-
-    test "accepts an empty keyword list" do
-      assert %Wait{actions: [spec: spec]} = RTSP.create_input(@uri, [])
-      assert allowed_media_types(spec) == [:video, :audio]
     end
   end
 
