@@ -170,3 +170,7 @@ jobs:
     needs: [publish_python_package_macos_arm, publish_python_package_linux_x86, publish_python_package_linux_arm]
     steps:
       - run: curl -X POST -d "token=${{ secrets.READTHEDOCS_WEBHOOK_TOKEN }}" "${{ secrets.READTHEDOCS_WEBHOOK_URL }}"
+
+  gh_release:
+    needs: [hex_publish]
+    uses: membraneframework/membrane_actions/.github/workflows/github-release.yml@main
