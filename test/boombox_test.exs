@@ -425,6 +425,23 @@ defmodule BoomboxTest do
     Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4")
   end
 
+  @tag :flaky
+  @tag :rtsp_mp4_video_only
+  async_test "rtsp -> mp4 (video only via allowed_media_types)", %{tmp_dir: tmp} do
+    rtsp_port = get_free_port()
+    output = Path.join(tmp, "output.mp4")
+
+    {:ok, server} = Membrane.SimpleRTSPServer.start_link(@bbb_mp4, port: rtsp_port)
+    on_exit(fn -> Process.exit(server, :normal) end)
+
+    Boombox.run(
+      input: {:rtsp, "rtsp://localhost:#{rtsp_port}/", allowed_media_types: [:video]},
+      output: output
+    )
+
+    Compare.compare(output, "test/fixtures/ref_bun10s_aac.mp4", kinds: [:video])
+  end
+
   @tag :rtsp_hls
   async_test "rtsp -> hls", %{tmp_dir: tmp} do
     rtsp_port = get_free_port()

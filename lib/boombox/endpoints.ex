@@ -399,12 +399,24 @@ defmodule Boombox.Endpoints do
   @type rtmp :: {:rtmp, (url :: String.t()) | (client_handler :: pid())}
 
   @typedoc """
+  Options for the RTSP input endpoint.
+
+  * `:allowed_media_types` — which media kinds to request from the server.
+    Defaults to `[:video, :audio]`. Pass `[:video]` to skip audio entirely,
+    which is useful for surveillance cameras that publish unsupported audio
+    codecs (e.g. PCMA/PCMU).
+  """
+  @type rtsp_input_opt :: {:allowed_media_types, [:video | :audio | :application]}
+
+  @typedoc """
   RTSP (Real-Time Streaming Protocol) input endpoint.
 
   Currently Boombox supports only client-side functionality - receiving
   media from a RTSP server.
   """
-  @type rtsp :: {:rtsp, url :: String.t()}
+  @type rtsp ::
+          {:rtsp, url :: String.t()}
+          | {:rtsp, url :: String.t(), [rtsp_input_opt()]}
 
   @typedoc """
   RTP (Real-time Transport Protocol) input endpoint.

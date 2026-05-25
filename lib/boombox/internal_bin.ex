@@ -446,8 +446,8 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.StorageEndpoints.MP4.create_input(location, opts)
   end
 
-  defp create_input({:rtsp, uri}, _ctx, _state) do
-    Boombox.InternalBin.RTSP.create_input(uri)
+  defp create_input({:rtsp, uri, opts}, _ctx, _state) do
+    Boombox.InternalBin.RTSP.create_input(uri, opts)
   end
 
   defp create_input({type, process, params}, _ctx, _state) when type in @elixir_endpoint_types do
@@ -840,6 +840,10 @@ defmodule Boombox.InternalBin do
         value
 
       {:rtsp, location} when direction == :input and is_binary(location) ->
+        {:rtsp, location, []}
+
+      {:rtsp, location, opts}
+      when direction == :input and is_binary(location) and is_list(opts) ->
         value
 
       {:rtp, opts} ->
