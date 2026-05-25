@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  # Phase 1 — CI checks
+  # CI checks
 
   build_test:
     uses: membraneframework/membrane_actions/.github/workflows/build-test.yml@main
@@ -37,7 +37,7 @@ jobs:
             exit 1
           fi
 
-  # Phase 2 — Server release builds
+  # Build releases
 
   mix_release_server_macos_arm:
     runs-on: macos-latest
@@ -103,7 +103,7 @@ jobs:
           name: boombox-server-linux-arm
           path: artifacts/boombox-server-linux-arm.tar.gz
 
-  # Phase 3 — Publish GitHub release
+  # Publish GitHub release
 
   publish_github_release:
     runs-on: ubuntu-latest
@@ -119,7 +119,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Phase 4 — Publish packages
+  # Publish package on hex
 
   hex_publish:
     needs: [publish_github_release]
@@ -127,33 +127,27 @@ jobs:
     secrets:
       HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
 
-  publish_python_package_macos_arm:
-    runs-on: macos-latest
-    needs: [mix_release_server_macos_arm, mix_release_server_linux_x86, mix_release_server_linux_arm]
-    defaults:
-      run:
-        working-directory: python
-    steps:
-      - uses: actions/checkout@v4
-      - run: pipx install cibuildwheel && pipx install twine
-      - run: CIBW_PLATFORM=macos CIBW_ARCHS=arm64 cibuildwheel --output-dir wheelhouse
-      - run: twine upload --verbose --username __token__ --password ${{ secrets.PYPI_API_KEY }} wheelhouse/*
+  # Build python packages
 
-  publish_python_package_linux_x86:
-    runs-on: ubuntu-latest
-    needs: [mix_release_server_macos_arm, mix_release_server_linux_x86, mix_release_server_linux_arm]
-    defaults:
-      run:
-        working-directory: python
-    steps:
-      - uses: actions/checkout@v4
-      - run: pip install cibuildwheel
-      - run: CIBW_ARCHS=x86_64 CIBW_SKIP="*musllinux*" cibuildwheel --output-dir wheelhouse
-      - run: pip install twine && twine upload --username __token__ --password ${{ secrets.PYPI_API_KEY }} wheelhouse/*
+  build_python_package_linux_x86:
+      runs-on: ubuntu-latest
+      needs: [build_test, lint, test, compare_versions]
+      defaults:
+        run:
+          working-directory: python
+      steps:
+        - uses: actions/checkout@v4
+        - run: pip install cibuildwheel
+        - run: CIBW_ARCHS=x86_64 CIBW_SKIP="*musllinux*" cibuildwheel --output-dir wheelhouse
 
-  publish_python_package_linux_arm:
+        - uses: actions/upload-artifact@v4
+          with:
+            name: wheels-linux-x86
+            path: python/wheelhouse/*
+
+  build_python_package_linux_arm:
     runs-on: ubuntu-24.04-arm
-    needs: [mix_release_server_macos_arm, mix_release_server_linux_x86, mix_release_server_linux_arm]
+    needs: [build_test, lint, test, compare_versions]
     defaults:
       run:
         working-directory: python
@@ -161,16 +155,56 @@ jobs:
       - uses: actions/checkout@v4
       - run: pip install cibuildwheel
       - run: CIBW_ARCHS=aarch64 CIBW_SKIP="*musllinux*" cibuildwheel --output-dir wheelhouse
-      - run: pip install twine && twine upload --username __token__ --password ${{ secrets.PYPI_API_KEY }} wheelhouse/*
 
-  # Phase 5 — Docs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-arm
+          path: python/wheelhouse/*
+
+  build_python_package_macos_arm:
+    runs-on: macos-latest
+    needs: [build_test, lint, test, compare_versions]
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install cibuildwheel
+      - run: CIBW_ARCHS=arm64 cibuildwheel --output-dir wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-arm
+          path: python/wheelhouse/*
+
+  # Upload to PyPI
+
+  upload_to_pypi:
+    runs-on: ubuntu-latest
+    needs: [
+      publish_github_release,
+      build_python_package_linux_x86,
+      build_python_package_linux_arm,
+      build_python_package_macos_arm
+    ]
+    steps:
+      - name: Download all built wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish package to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_KEY }}
+          packages-dir: dist/
+
+  # Build python docs
 
   build_python_docs:
     runs-on: ubuntu-latest
-    needs: [publish_python_package_macos_arm, publish_python_package_linux_x86, publish_python_package_linux_arm]
+    needs: [upload_to_pypi]
     steps:
       - run: curl -X POST -d "token=${{ secrets.READTHEDOCS_WEBHOOK_TOKEN }}" "${{ secrets.READTHEDOCS_WEBHOOK_URL }}"
-
-  gh_release:
-    needs: [hex_publish]
-    uses: membraneframework/membrane_actions/.github/workflows/github-release.yml@main
