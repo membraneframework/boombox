@@ -44,16 +44,9 @@ defmodule Boombox.InternalBin.RTSP do
           {[spec | dropping_spec], track_builders}
 
         %{rtpmap: %{encoding: "H264"}} = track, {spec, track_builders} ->
-          {spss, ppss} =
-            case track.fmtp.sprop_parameter_sets do
-              nil -> {[], []}
-              parameter_sets -> {parameter_sets.sps, parameter_sets.pps}
-            end
-
           video_spec =
             get_child(:rtsp_source)
             |> via_out(Membrane.Pad.ref(:output, track.control_path))
-            |> child(:rtsp_in_h264_parser, %Membrane.H264.Parser{spss: spss, ppss: ppss})
 
           {spec, Map.put(track_builders, :video, video_spec)}
 
@@ -61,7 +54,6 @@ defmodule Boombox.InternalBin.RTSP do
           audio_spec =
             get_child(:rtsp_source)
             |> via_out(Membrane.Pad.ref(:output, track.control_path))
-            |> child(:rtsp_in_aac_parser, Membrane.AAC.Parser)
 
           {spec, Map.put(track_builders, :audio, audio_spec)}
 
