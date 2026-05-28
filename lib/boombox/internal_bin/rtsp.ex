@@ -43,7 +43,8 @@ defmodule Boombox.InternalBin.RTSP do
 
           {[spec | dropping_spec], track_builders}
 
-        %{rtpmap: %{encoding: "H264"}} = track, {spec, track_builders} ->
+        %{rtpmap: %{encoding: encoding}} = track, {spec, track_builders}
+        when encoding in ["H264", "H265"] ->
           video_spec =
             get_child(:rtsp_source)
             |> via_out(Membrane.Pad.ref(:output, track.control_path))
