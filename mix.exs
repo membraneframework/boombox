@@ -1,7 +1,7 @@
 defmodule Boombox.Mixfile do
   use Mix.Project
 
-  @version "0.2.12"
+  @version "0.2.13"
   @github_url "https://github.com/membraneframework/boombox"
 
   def project do
@@ -77,7 +77,7 @@ defmodule Boombox.Mixfile do
       {:playwright, "~> 1.49.1-alpha.2", only: :test},
       {:cowlib, "~> 2.16", override: true, only: :test},
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:ex_doc, ">= 0.40.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false}
     ]
@@ -110,7 +110,7 @@ defmodule Boombox.Mixfile do
   end
 
   defp aliases do
-    [docs: [&generate_docs_examples/1, "docs"]]
+    [docs: [&generate_docs_examples/1, "docs", &append_llms_links/1]]
   end
 
   defp examples do
@@ -135,6 +135,28 @@ defmodule Boombox.Mixfile do
         )
 
       File.write!("#{Mix.Project.build_path()}/#{filename}", modified_livebook)
+    end
+  end
+
+  defp append_llms_links(_args) do
+    output_dir = docs()[:output] || "doc"
+    path = Path.join(output_dir, "llms.txt")
+
+    if File.exists?(path) do
+      existing = File.read!(path)
+
+      footer = """
+
+
+      ## See Also
+
+      - [Membrane Framework AI Skill](https://hexdocs.pm/membrane_core/skill.md)
+      - [Membrane Core](https://hexdocs.pm/membrane_core/llms.txt)
+      """
+
+      File.write!(path, String.trim_trailing(existing) <> footer)
+    else
+      IO.warn("#{path} not found — llms.txt was not generated, check your ex_doc configuration")
     end
   end
 
