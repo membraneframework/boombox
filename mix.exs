@@ -110,7 +110,7 @@ defmodule Boombox.Mixfile do
   end
 
   defp aliases do
-    [docs: [&generate_docs_examples/1, "docs", &prepend_llms_links/1]]
+    [docs: [&generate_docs_examples/1, "docs", &append_llms_links/1]]
   end
 
   defp examples do
@@ -138,7 +138,7 @@ defmodule Boombox.Mixfile do
     end
   end
 
-  defp prepend_llms_links(_) do
+  defp append_llms_links(_args) do
     output_dir = docs()[:output] || "doc"
     path = Path.join(output_dir, "llms.txt")
 
