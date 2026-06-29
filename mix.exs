@@ -110,7 +110,7 @@ defmodule Boombox.Mixfile do
   end
 
   defp aliases do
-    [docs: [&generate_docs_examples/1, "docs"]]
+    [docs: [&generate_docs_examples/1, "docs", &prepend_llms_links/1]]
   end
 
   defp examples do
@@ -135,6 +135,28 @@ defmodule Boombox.Mixfile do
         )
 
       File.write!("#{Mix.Project.build_path()}/#{filename}", modified_livebook)
+    end
+  end
+
+  defp prepend_llms_links(_) do
+    output_dir = docs()[:output] || "doc"
+    path = Path.join(output_dir, "llms.txt")
+
+    if File.exists?(path) do
+      existing = File.read!(path)
+
+      footer = """
+
+
+      ## See Also
+
+      - [Membrane Framework AI Skill](https://hexdocs.pm/membrane_core/skill.md)
+      - [Membrane Core](https://hexdocs.pm/membrane_core/llms.txt)
+      """
+
+      File.write!(path, String.trim_trailing(existing) <> footer)
+    else
+      IO.warn("#{path} not found — llms.txt was not generated, check your ex_doc configuration")
     end
   end
 
