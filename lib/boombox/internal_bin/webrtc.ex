@@ -232,8 +232,11 @@ defmodule Boombox.InternalBin.WebRTC do
     # if we have to perform transcoding one way or another, we always choose H264 if it is possilbe,
     # because H264 Encoder comsumes less CPU than VP8 Encoder
     cond do
-      h264_negotiated? -> %Transcoder.OutputFormat.H264{alignment: :nalu, stream_structure: :annexb}
-      vp8_negotiated? -> Transcoder.OutputFormat.VP8
+      h264_negotiated? ->
+        %Transcoder.OutputFormat.H264{alignment: :nalu, stream_structure: :annexb}
+
+      vp8_negotiated? ->
+        Transcoder.OutputFormat.VP8
     end
   end
 

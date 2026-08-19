@@ -191,7 +191,10 @@ defmodule Boombox.InternalBin.Pad do
         do: input_codec,
         else: List.first(pad_codecs)
 
-    Transcoder.OutputFormat.from_input_format(codec)
+    codec
+    |> Module.split()
+    |> List.last()
+    |> then(&Module.concat(Transcoder.OutputFormat, &1))
   end
 
   defp validate_pads_and_tracks!(ctx, track_builders) do
