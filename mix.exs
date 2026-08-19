@@ -47,7 +47,11 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.2"},
-      {:membrane_transcoder_plugin, "~> 0.3.2"},
+      # {:membrane_transcoder_plugin, "~> 0.3.2"},
+      {:membrane_transcoder_plugin,
+       github: "membraneframework/membrane_transcoder_plugin",
+       branch: "transcoder-api-rework",
+       override: true},
       {:membrane_webrtc_plugin, "~> 0.26.1"},
       {:membrane_mp4_plugin, "~> 0.36.0"},
       {:membrane_realtimer_plugin, "~> 0.11.0"},
@@ -79,7 +83,7 @@ defmodule Boombox.Mixfile do
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
       {:ex_doc, ">= 0.40.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
-      {:credo, ">= 0.0.0", only: :dev, runtime: false}
+      {:credo, ">= 0.0.0", runtime: false}
     ]
   end
 

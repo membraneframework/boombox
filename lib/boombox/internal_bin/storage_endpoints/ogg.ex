@@ -2,10 +2,9 @@ defmodule Boombox.InternalBin.StorageEndpoints.Ogg do
   @moduledoc false
   import Membrane.ChildrenSpec
 
-  require Logger
-
   alias Boombox.InternalBin.Ready
   alias Boombox.InternalBin.StorageEndpoints
+  alias Membrane.Transcoder
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
   def create_input(location, opts) do
@@ -27,10 +26,12 @@ defmodule Boombox.InternalBin.StorageEndpoints.Ogg do
 
     pipeline_tail = fn builder ->
       builder
-      |> child(:ogg_audio_transcoder, %Membrane.Transcoder{
-        output_stream_format: Membrane.Opus,
+      |> child(:ogg_audio_transcoder, %Transcoder{
         transcoding_policy: transcoding_policy
       })
+      |> via_out(:output,
+        options: [output_stream_format: Transcoder.OutputFormat.Opus]
+      )
       |> child(:parser, %Membrane.Opus.Parser{
         generate_best_effort_timestamps?: true,
         delimitation: :undelimit,

@@ -7,7 +7,7 @@ defmodule Boombox.InternalBin.Pad do
 
   alias Boombox.InternalBin.{Ready, Wait}
   alias Membrane.Bin.{Action, CallbackContext}
-  alias Membrane.Connector
+  alias Membrane.{Connector, Transcoder}
 
   @type new_tracks_notification_status ::
           :not_resolved
@@ -162,10 +162,14 @@ defmodule Boombox.InternalBin.Pad do
           end)
 
         builder
-        |> child(%Membrane.Transcoder{
-          output_stream_format: &resolve_stream_format(&1, pad_options, state),
+        |> child(%Transcoder{
           transcoding_policy: pad_options.transcoding_policy
         })
+        |> via_out(:output,
+          options: [
+            output_stream_format: &resolve_stream_format(&1, pad_options, state)
+          ]
+        )
         |> get_child({:pad_connector, :output, kind})
       end)
 
@@ -182,9 +186,12 @@ defmodule Boombox.InternalBin.Pad do
 
     pad_codecs = Bunch.listify(pad_codec || default_codec)
 
-    if input_codec in pad_codecs,
-      do: input_codec,
-      else: List.first(pad_codecs)
+    codec =
+      if input_codec in pad_codecs,
+        do: input_codec,
+        else: List.first(pad_codecs)
+
+    Transcoder.OutputFormat.from_input_format(codec)
   end
 
   defp validate_pads_and_tracks!(ctx, track_builders) do

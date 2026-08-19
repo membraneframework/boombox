@@ -3,7 +3,7 @@ defmodule Boombox.InternalBin.StorageEndpoints.H265 do
   import Membrane.ChildrenSpec
   alias Boombox.InternalBin.Ready
   alias Boombox.InternalBin.StorageEndpoints
-  alias Membrane.H265
+  alias Membrane.{H265, Transcoder}
 
   @spec create_input(String.t(), transport: :file | :http, framerate: H265.framerate_t()) ::
           Ready.t()
@@ -30,10 +30,14 @@ defmodule Boombox.InternalBin.StorageEndpoints.H265 do
 
     pipeline_tail = fn builder ->
       builder
-      |> child(:h265_video_transcoder, %Membrane.Transcoder{
-        output_stream_format: %H265{stream_structure: :annexb},
+      |> child(:h265_video_transcoder, %Transcoder{
         transcoding_policy: transcoding_policy
       })
+      |> via_out(:output,
+        options: [
+          output_stream_format: %Transcoder.OutputFormat.H265{stream_structure: :annexb}
+        ]
+      )
       |> child(:file_sink, %Membrane.File.Sink{location: location})
     end
 

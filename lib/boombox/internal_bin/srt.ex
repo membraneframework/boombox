@@ -91,9 +91,10 @@ defmodule Boombox.InternalBin.SRT do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:srt_mpeg_ts_audio_transcoder, %Transcoder{
-              output_stream_format: AAC
-            })
+            |> child(:srt_mpeg_ts_audio_transcoder, Transcoder)
+            |> via_out(:output,
+              options: [output_stream_format: %Transcoder.OutputFormat.AAC{encapsulation: :ADTS}]
+            )
             |> then(
               &if is_input_realtime,
                 do: &1,
@@ -104,9 +105,12 @@ defmodule Boombox.InternalBin.SRT do
 
           {:video, builder} ->
             builder
-            |> child(:srt_mpeg_ts_video_transcoder, %Transcoder{
-              output_stream_format: %H264{stream_structure: :annexb}
-            })
+            |> child(:srt_mpeg_ts_video_transcoder, Transcoder)
+            |> via_out(:output,
+              options: [
+                output_stream_format: %Transcoder.OutputFormat.H264{stream_structure: :annexb}
+              ]
+            )
             |> then(
               &if is_input_realtime,
                 do: &1,
