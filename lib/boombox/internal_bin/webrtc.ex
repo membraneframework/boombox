@@ -5,7 +5,7 @@ defmodule Boombox.InternalBin.WebRTC do
   require Membrane.Pad, as: Pad
   alias Boombox.InternalBin.{Ready, State, Wait}
   alias Membrane.Bin.CallbackContext
-  alias Membrane.{H264, RemoteStream, VP8, WebRTC}
+  alias Membrane.{H264, RemoteStream, Transcoder, VP8, WebRTC}
 
   @type output_webrtc_state :: %{negotiated_video_codecs: [:vp8 | :h264] | nil}
   @type webrtc_sink_new_tracks :: [%{id: term, kind: :audio | :video}]
@@ -154,10 +154,10 @@ defmodule Boombox.InternalBin.WebRTC do
       Enum.map(track_builders, fn
         {:audio, builder} ->
           builder
-          |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
-            output_stream_format: Membrane.Opus,
+          |> child(:mp4_audio_transcoder, %Transcoder{
             transcoding_policy: transcoding_policy
           })
+          |> via_out(:output, options: [output_stream_format: Transcoder.OutputFormat.Opus])
           |> then(
             &if is_input_realtime,
               do: &1,
@@ -175,17 +175,21 @@ defmodule Boombox.InternalBin.WebRTC do
               do: &1,
               else: child(&1, :webrtc_video_realtimer, Membrane.Realtimer)
           )
-          |> child(:webrtc_video_transcoder, %Membrane.Transcoder{
-            output_stream_format: fn input_format ->
-              resolve_output_video_stream_format(
-                input_format,
-                :vp8 in negotiated_codecs,
-                :h264 in negotiated_codecs,
-                transcoding_policy
-              )
-            end,
+          |> child(:webrtc_video_transcoder, %Transcoder{
             transcoding_policy: transcoding_policy
           })
+          |> via_out(:output,
+            options: [
+              output_stream_format: fn input_format ->
+                resolve_output_video_stream_format(
+                  input_format,
+                  :vp8 in negotiated_codecs,
+                  :h264 in negotiated_codecs,
+                  transcoding_policy
+                )
+              end
+            ]
+          )
           |> via_in(Pad.ref(:input, tracks.video), options: [kind: :video])
           |> get_child(:webrtc_output)
       end)
@@ -202,21 +206,20 @@ defmodule Boombox.InternalBin.WebRTC do
        )
        when transcoding_policy in [:if_needed, :never] do
     case input_stream_format do
-      %H264{} = h264 when h264_negotiated? ->
-        %H264{h264 | alignment: :nalu, stream_structure: :annexb}
+      %H264{} when h264_negotiated? ->
+        %Transcoder.OutputFormat.H264{alignment: :nalu, stream_structure: :annexb}
 
-      %VP8{} = vp8 when vp8_negotiated? ->
-        vp8
+      %VP8{} when vp8_negotiated? ->
+        Transcoder.OutputFormat.VP8
 
-      %RemoteStream{content_format: VP8, type: :packetized} = remote_stream
-      when vp8_negotiated? ->
-        remote_stream
+      %RemoteStream{content_format: VP8, type: :packetized} when vp8_negotiated? ->
+        Transcoder.OutputFormat.VP8
 
       _format when h264_negotiated? ->
-        %H264{alignment: :nalu, stream_structure: :annexb}
+        %Transcoder.OutputFormat.H264{alignment: :nalu, stream_structure: :annexb}
 
       _format when vp8_negotiated? ->
-        VP8
+        Transcoder.OutputFormat.VP8
     end
   end
 
@@ -229,8 +232,11 @@ defmodule Boombox.InternalBin.WebRTC do
     # if we have to perform transcoding one way or another, we always choose H264 if it is possilbe,
     # because H264 Encoder comsumes less CPU than VP8 Encoder
     cond do
-      h264_negotiated? -> %H264{alignment: :nalu, stream_structure: :annexb}
-      vp8_negotiated? -> VP8
+      h264_negotiated? ->
+        %Transcoder.OutputFormat.H264{alignment: :nalu, stream_structure: :annexb}
+
+      vp8_negotiated? ->
+        Transcoder.OutputFormat.VP8
     end
   end
 

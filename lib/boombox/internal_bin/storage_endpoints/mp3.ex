@@ -3,6 +3,7 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP3 do
   import Membrane.ChildrenSpec
   alias Boombox.InternalBin.Ready
   alias Boombox.InternalBin.StorageEndpoints
+  alias Membrane.Transcoder
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
   def create_input(location, opts) do
@@ -10,12 +11,14 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP3 do
       StorageEndpoints.get_source(location, opts[:transport])
       # transcoder is used just to ensure that a proper MPEGAudio stream format is resolved
       # as there is no MP3 parser that could do it
-      |> child(:mp3_stream_format_overrider, %Membrane.Transcoder{
-        output_stream_format: Membrane.MPEGAudio,
-        assumed_input_stream_format: %Membrane.RemoteStream{
-          content_format: Membrane.MPEGAudio
-        }
+      |> child(:mp3_stream_format_overrider, %Transcoder{
+        assumed_input_stream_format: %Membrane.RemoteStream{content_format: Membrane.MPEGAudio}
       })
+      |> via_out(:output,
+        options: [
+          output_stream_format: Transcoder.OutputFormat.MPEGAudio
+        ]
+      )
 
     %Ready{track_builders: %{audio: spec}}
   end
@@ -31,10 +34,12 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP3 do
 
     pipeline_tail = fn builder ->
       builder
-      |> child(:mp3_audio_transcoder, %Membrane.Transcoder{
-        output_stream_format: Membrane.MPEGAudio,
+      |> child(:mp3_audio_transcoder, %Transcoder{
         transcoding_policy: transcoding_policy
       })
+      |> via_out(:output,
+        options: [output_stream_format: Transcoder.OutputFormat.MPEGAudio]
+      )
       |> child(:file_sink, %Membrane.File.Sink{location: location})
     end
 

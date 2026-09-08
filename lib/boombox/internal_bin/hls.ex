@@ -5,7 +5,7 @@ defmodule Boombox.InternalBin.HLS do
   require Logger
   require Membrane.Pad, as: Pad
   alias Boombox.InternalBin.{Ready, Wait}
-  alias Membrane.{AAC, H264, HTTPAdaptiveStream, RemoteStream, Time, Transcoder}
+  alias Membrane.{AAC, HTTPAdaptiveStream, RemoteStream, Time, Transcoder}
 
   @spec create_input(String.t(), [Boombox.Endpoints.hls_variant_selection_policy_opt()]) ::
           Wait.t()
@@ -101,9 +101,13 @@ defmodule Boombox.InternalBin.HLS do
           {:audio, builder} ->
             builder
             |> child(:hls_audio_transcoder, %Transcoder{
-              output_stream_format: AAC,
               transcoding_policy: transcoding_policy
             })
+            |> via_out(:output,
+              options: [
+                output_stream_format: Transcoder.OutputFormat.AAC
+              ]
+            )
             |> then(
               &if mode == :live and not is_input_realtime,
                 do: child(&1, :hls_audio_realtimer, Membrane.Realtimer),
@@ -117,9 +121,16 @@ defmodule Boombox.InternalBin.HLS do
           {:video, builder} ->
             builder
             |> child(:hls_video_transcoder, %Transcoder{
-              output_stream_format: %H264{alignment: :au, stream_structure: :avc3},
               transcoding_policy: transcoding_policy
             })
+            |> via_out(:output,
+              options: [
+                output_stream_format: %Transcoder.OutputFormat.H264{
+                  alignment: :au,
+                  stream_structure: :avc3
+                }
+              ]
+            )
             |> then(
               &if mode == :live and not is_input_realtime,
                 do: child(&1, :hls_video_realtimer, Membrane.Realtimer),

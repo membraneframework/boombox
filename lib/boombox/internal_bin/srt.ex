@@ -9,9 +9,14 @@ defmodule Boombox.InternalBin.SRT do
 
   @type srt_auth_opts :: [stream_id: String.t(), password: String.t()]
 
-  @spec create_input(pid()) :: Wait.t()
-  def create_input(server_awaiting_accept) when is_pid(server_awaiting_accept) do
-    handle_connection(server_awaiting_accept)
+  @spec create_input(ExLibSRT.Server.t(), ExLibSRT.Server.connection_id()) :: Wait.t()
+  def create_input(server, conn_id) when is_pid(server) and is_integer(conn_id) do
+    spec = [
+      child(:srt_source, %SRT.Source{server: server, conn_id: conn_id})
+      |> child(:srt_mpeg_ts_demuxer, Membrane.MPEG.TS.Demuxer)
+    ]
+
+    %Wait{actions: [spec: spec]}
   end
 
   @spec create_input(String.t(), srt_auth_opts()) :: Wait.t()
@@ -23,16 +28,6 @@ defmodule Boombox.InternalBin.SRT do
 
     spec = [
       child(:srt_source, %SRT.Source{ip: ip, port: port, stream_id: stream_id, password: password})
-      |> child(:srt_mpeg_ts_demuxer, Membrane.MPEG.TS.Demuxer)
-    ]
-
-    %Wait{actions: [spec: spec]}
-  end
-
-  @spec handle_connection(pid()) :: Wait.t()
-  def handle_connection(server_awaiting_accept) do
-    spec = [
-      child(:srt_source, %SRT.Source{server_awaiting_accept: server_awaiting_accept})
       |> child(:srt_mpeg_ts_demuxer, Membrane.MPEG.TS.Demuxer)
     ]
 
@@ -91,9 +86,10 @@ defmodule Boombox.InternalBin.SRT do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:srt_mpeg_ts_audio_transcoder, %Transcoder{
-              output_stream_format: AAC
-            })
+            |> child(:srt_mpeg_ts_audio_transcoder, Transcoder)
+            |> via_out(:output,
+              options: [output_stream_format: %Transcoder.OutputFormat.AAC{encapsulation: :ADTS}]
+            )
             |> then(
               &if is_input_realtime,
                 do: &1,
@@ -104,9 +100,12 @@ defmodule Boombox.InternalBin.SRT do
 
           {:video, builder} ->
             builder
-            |> child(:srt_mpeg_ts_video_transcoder, %Transcoder{
-              output_stream_format: %H264{stream_structure: :annexb}
-            })
+            |> child(:srt_mpeg_ts_video_transcoder, Transcoder)
+            |> via_out(:output,
+              options: [
+                output_stream_format: %Transcoder.OutputFormat.H264{stream_structure: :annexb}
+              ]
+            )
             |> then(
               &if is_input_realtime,
                 do: &1,

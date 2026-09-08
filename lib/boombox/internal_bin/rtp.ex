@@ -2,10 +2,9 @@ defmodule Boombox.InternalBin.RTP do
   @moduledoc false
   import Membrane.ChildrenSpec
 
-  require Membrane.Pad
-
   alias Boombox.InternalBin.Ready
   alias Membrane.RTP
+  alias Membrane.Transcoder
 
   @supported_encodings [audio: [:AAC, :Opus], video: [:H264, :H265]]
 
@@ -142,12 +141,12 @@ defmodule Boombox.InternalBin.RTP do
         {output_stream_format, parser, payloader} =
           case track_config.encoding_name do
             :H264 ->
-              {%Membrane.H264{stream_structure: :annexb, alignment: :nalu},
+              {%Transcoder.OutputFormat.H264{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H264.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
                Membrane.RTP.H264.Payloader}
 
             :AAC ->
-              {%Membrane.AAC{encapsulation: :none},
+              {%Transcoder.OutputFormat.AAC{encapsulation: :none},
                %Membrane.AAC.Parser{out_encapsulation: :none},
                %Membrane.RTP.AAC.Payloader{
                  mode: track_config.encoding_specific_params.aac_bitrate_mode,
@@ -155,20 +154,20 @@ defmodule Boombox.InternalBin.RTP do
                }}
 
             :OPUS ->
-              {Membrane.Opus, %Membrane.Opus.Parser{delimitation: :undelimit},
+              {Transcoder.OutputFormat.Opus, %Membrane.Opus.Parser{delimitation: :undelimit},
                Membrane.RTP.Opus.Payloader}
 
             :H265 ->
-              {%Membrane.H265{stream_structure: :annexb, alignment: :nalu},
+              {%Transcoder.OutputFormat.H265{stream_structure: :annexb, alignment: :nalu},
                %Membrane.H265.Parser{output_stream_structure: :annexb, output_alignment: :nalu},
                Membrane.RTP.H265.Payloader}
           end
 
         builder
-        |> child({:rtp_transcoder, media_type}, %Membrane.Transcoder{
-          output_stream_format: output_stream_format,
+        |> child({:rtp_transcoder, media_type}, %Transcoder{
           transcoding_policy: opts.transcoding_policy
         })
+        |> via_out(:output, options: [output_stream_format: output_stream_format])
         |> child({:rtp_out_parser, media_type}, parser)
         |> child({:rtp_payloader, media_type}, payloader)
         |> then(

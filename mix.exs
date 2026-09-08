@@ -47,7 +47,11 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.2"},
-      {:membrane_transcoder_plugin, "~> 0.3.2"},
+      # {:membrane_transcoder_plugin, "~> 0.3.2"},
+      {:membrane_transcoder_plugin,
+       github: "membraneframework/membrane_transcoder_plugin",
+       branch: "rework-audio-pipelines",
+       override: true},
       {:membrane_webrtc_plugin, "~> 0.26.1"},
       {:membrane_mp4_plugin, "~> 0.36.0"},
       {:membrane_realtimer_plugin, "~> 0.11.0"},
@@ -61,14 +65,14 @@ defmodule Boombox.Mixfile do
       {:membrane_rtp_opus_plugin, "~> 0.10.0"},
       {:membrane_rtp_h265_plugin, "~> 0.5.2"},
       {:membrane_vpx_plugin, "~> 0.4.2"},
-      {:membrane_ffmpeg_swresample_plugin, "~> 0.20.0"},
+      {:membrane_ffmpeg_swresample_plugin, "~> 0.21.0"},
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
       {:membrane_wav_plugin, "~> 0.10.1"},
-      {:membrane_ivf_plugin, "~> 0.8.0"},
+      {:membrane_ivf_plugin, "~> 0.9.0"},
       {:membrane_ogg_plugin, "~> 0.5.0"},
       {:membrane_stream_plugin, "~> 0.4.0"},
-      {:membrane_srt_plugin, "~> 0.1.1"},
+      {:membrane_srt_plugin, "~> 0.2.2"},
       {:membrane_portaudio_plugin, "~> 0.19.2"},
       {:membrane_sdl_plugin, "~> 0.18.5"},
       {:membrane_simple_rtsp_server, "~> 0.1.7", only: :test},
@@ -79,7 +83,7 @@ defmodule Boombox.Mixfile do
       {:burrito, "~> 1.0", runtime: burrito?(), optional: true},
       {:ex_doc, ">= 0.40.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
-      {:credo, ">= 0.0.0", only: :dev, runtime: false}
+      {:credo, ">= 0.0.0", runtime: false}
     ]
   end
 
