@@ -69,7 +69,7 @@ defmodule Boombox.Mixfile do
       {:membrane_hackney_plugin, "~> 0.11.0"},
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16.2"},
       {:membrane_wav_plugin, "~> 0.10.1"},
-      {:membrane_ivf_plugin, "~> 0.8.0"},
+      {:membrane_ivf_plugin, "~> 0.9.0"},
       {:membrane_ogg_plugin, "~> 0.5.0"},
       {:membrane_stream_plugin, "~> 0.4.0"},
       {:membrane_srt_plugin, "~> 0.2.2"},
