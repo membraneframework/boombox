@@ -439,11 +439,17 @@ defmodule Boombox.Endpoints do
 
   Boombox acts as an SRT server and expects connections from clients at the
   provided address. `url` is an address in the form of `<ip>:<port>`.
-  Alternatively, an existing `ExLibSRT.Server.t()` can be passed directly.
+
+  Alternatively, an existing `ExLibSRT.Server.t()` can be passed along with
+  the `conn_id` of an accepted connection, received in the
+  `{:srt_server_conn, conn_id, stream_id}` message from that server. Boombox
+  must be started right after receiving this message, as the connection is
+  dropped if it is not bound within 1 second.
   """
   @type srt_input ::
-          {:srt, (url :: String.t()) | (server_awaiting_accept :: ExLibSRT.Server.t())}
+          {:srt, url :: String.t()}
           | {:srt, url :: String.t(), [srt_auth_opt()]}
+          | {:srt, server :: ExLibSRT.Server.t(), [conn_id: ExLibSRT.Server.connection_id()]}
 
   @typedoc """
   SRT (Secure Reliable Transport) output endpoint.

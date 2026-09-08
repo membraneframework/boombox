@@ -610,11 +610,17 @@ defmodule BoomboxTest do
       port = get_free_port()
       stream_id = "some_stream_id"
       password = "some_password"
-      {:ok, server} = ExLibSRT.Server.start_link(ip, port, password)
+
+      {:ok, server} =
+        ExLibSRT.Server.start_link(ip, port,
+          password: password,
+          accept_mode: {:whitelist, [stream_id]}
+        )
+
       p = send_srt(ip, port, stream_id, password, input)
 
-      assert_receive {:srt_server_connect_request, _address, ^stream_id}
-      t = Boombox.async(input: {:srt, server}, output: output)
+      assert_receive {:srt_server_conn, conn_id, ^stream_id}
+      t = Boombox.async(input: {:srt, server, conn_id: conn_id}, output: output)
       Task.await(t, 30_000)
       Testing.Pipeline.terminate(p)
 
