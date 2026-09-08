@@ -72,7 +72,7 @@ defmodule Boombox.Mixfile do
       {:membrane_ivf_plugin, "~> 0.8.0"},
       {:membrane_ogg_plugin, "~> 0.5.0"},
       {:membrane_stream_plugin, "~> 0.4.0"},
-      {:membrane_srt_plugin, "~> 0.1.1"},
+      {:membrane_srt_plugin, "~> 0.2.2"},
       {:membrane_portaudio_plugin, "~> 0.19.2"},
       {:membrane_sdl_plugin, "~> 0.18.5"},
       {:membrane_simple_rtsp_server, "~> 0.1.7", only: :test},
