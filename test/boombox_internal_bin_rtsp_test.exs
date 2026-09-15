@@ -93,7 +93,9 @@ defmodule Boombox.InternalBin.RTSPTest do
   end
 
   defp transport(%Membrane.ChildrenSpec.Builder{} = spec) do
-    [{:rtsp_source, %Membrane.RTSP.Source{transport: transport}, _opts}] = spec.children
+    {_name, %Membrane.RTSP.Source{transport: transport}, _opts} =
+      find_child(spec, :rtsp_source)
+
     transport
   end
 
