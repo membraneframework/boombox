@@ -47,11 +47,7 @@ defmodule Boombox.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.2"},
-      # {:membrane_transcoder_plugin, "~> 0.3.2"},
-      {:membrane_transcoder_plugin,
-       github: "membraneframework/membrane_transcoder_plugin",
-       branch: "rework-audio-pipelines",
-       override: true},
+      {:membrane_transcoder_plugin, "~> 0.5.0"},
       {:membrane_webrtc_plugin, "~> 0.26.1"},
       {:membrane_mp4_plugin, "~> 0.36.0"},
       {:membrane_realtimer_plugin, "~> 0.11.0"},
