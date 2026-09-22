@@ -2,8 +2,6 @@ defmodule Boombox.InternalBin.RTP do
   @moduledoc false
   import Membrane.ChildrenSpec
 
-  require Membrane.Pad
-
   alias Boombox.InternalBin.Ready
   alias Membrane.RTP
 

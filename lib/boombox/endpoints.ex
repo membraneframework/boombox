@@ -405,8 +405,18 @@ defmodule Boombox.Endpoints do
     Defaults to `[:video, :audio]`. Pass `[:video]` to skip audio entirely,
     which is useful for surveillance cameras that publish unsupported audio
     codecs (e.g. PCMA/PCMU).
+
+  * `:transport` — how the server should send the media. Defaults to a UDP
+    port range, which `Membrane.RTSP.Source` reads as
+    `{:udp, port_range_start, port_range_end}`. Pass `:tcp` to interleave the
+    media on the control connection instead, which some NVRs need and some
+    networks require. Note that `Membrane.RTSP.Source`'s own default is
+    `:tcp`; Boombox defaults to UDP because for live video a lost datagram
+    costs one frame, while TCP's head-of-line blocking costs latency.
   """
-  @type rtsp_input_opt :: {:allowed_media_types, [:video | :audio | :application]}
+  @type rtsp_input_opt ::
+          {:allowed_media_types, [:video | :audio | :application]}
+          | {:transport, Membrane.RTSP.Source.transport()}
 
   @typedoc """
   RTSP (Real-Time Streaming Protocol) input endpoint.

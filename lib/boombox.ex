@@ -5,9 +5,7 @@ defmodule Boombox do
   See `run/1` for details and the [Basic](basic.livemd), [Streaming](streaming.livemd), [Stream Processing](stream_processing.livemd) and [AI](ai.livemd) livebooks for usage examples.
   """
 
-  require Logger
   require Membrane.Time
-  require Membrane.Transcoder.{Audio, Video}
 
   alias Boombox.Pipeline
 
