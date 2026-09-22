@@ -19,6 +19,17 @@ defmodule Boombox.InternalBin.RTSPTest do
 
       assert allowed_media_types(spec) == [:video]
     end
+
+    test "defaults to a UDP port range when no transport is given" do
+      assert %Wait{actions: [spec: spec]} = RTSP.create_input(@uri, [])
+      assert {:udp, from, to} = transport(spec)
+      assert to == from + 20
+    end
+
+    test "threads transport through to the RTSP source" do
+      assert %Wait{actions: [spec: spec]} = RTSP.create_input(@uri, transport: :tcp)
+      assert transport(spec) == :tcp
+    end
   end
 
   describe "handle_set_up_tracks/2" do
@@ -79,6 +90,13 @@ defmodule Boombox.InternalBin.RTSPTest do
   defp allowed_media_types(%Membrane.ChildrenSpec.Builder{} = spec) do
     [{:rtsp_source, %Membrane.RTSP.Source{allowed_media_types: types}, _opts}] = spec.children
     types
+  end
+
+  defp transport(%Membrane.ChildrenSpec.Builder{} = spec) do
+    {_name, %Membrane.RTSP.Source{transport: transport}, _opts} =
+      find_child(spec, :rtsp_source)
+
+    transport
   end
 
   defp find_child(spec, name) do

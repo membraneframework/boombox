@@ -14,10 +14,11 @@ defmodule Boombox.InternalBin.RTSP do
   def create_input(uri, opts) do
     port = Enum.random(5_000..65_000)
     allowed_media_types = Keyword.get(opts, :allowed_media_types, @default_allowed_media_types)
+    transport = Keyword.get(opts, :transport, {:udp, port, port + 20})
 
     spec =
       child(:rtsp_source, %RTSP.Source{
-        transport: {:udp, port, port + 20},
+        transport: transport,
         allowed_media_types: allowed_media_types,
         stream_uri: uri,
         on_connection_closed: :send_eos
