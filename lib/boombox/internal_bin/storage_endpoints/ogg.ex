@@ -2,8 +2,6 @@ defmodule Boombox.InternalBin.StorageEndpoints.Ogg do
   @moduledoc false
   import Membrane.ChildrenSpec
 
-  require Logger
-
   alias Boombox.InternalBin.Ready
   alias Boombox.InternalBin.StorageEndpoints
 
