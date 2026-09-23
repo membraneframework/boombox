@@ -131,6 +131,16 @@ defmodule Boombox.BinTest do
   defp audio_fixture(Opus), do: "test/fixtures/ref_bun10s_opus_aac.mp4"
   defp audio_fixture(_format), do: "test/fixtures/ref_bun10s_aac.mp4"
 
+  defp to_output_format(%H264{stream_structure: stream_structure, alignment: alignment}) do
+    %Transcoder.OutputFormat.H264{stream_structure: stream_structure, alignment: alignment}
+  end
+
+  defp to_output_format(RawVideo), do: Transcoder.OutputFormat.RawVideo
+  defp to_output_format(VP8), do: Transcoder.OutputFormat.VP8
+  defp to_output_format(AAC), do: Transcoder.OutputFormat.AAC
+  defp to_output_format(Opus), do: Transcoder.OutputFormat.Opus
+  defp to_output_format(RawAudio), do: Transcoder.OutputFormat.RawAudio
+
   defp spec_branch(_kind, nil), do: []
 
   defp spec_branch(kind, transcoding_format) do
@@ -140,7 +150,8 @@ defmodule Boombox.BinTest do
       child(%Membrane.File.Source{location: @bbb_mp4})
       |> child({:mp4_demuxer, kind}, Membrane.MP4.Demuxer.ISOM)
       |> via_out(:output, options: [kind: kind])
-      |> child(%Transcoder{output_stream_format: transcoding_format})
+      |> child(Transcoder)
+      |> via_out(:output, options: [output_stream_format: to_output_format(transcoding_format)])
       |> via_in(:input, options: [kind: kind])
       |> get_child(:boombox),
       get_child({:mp4_demuxer, kind})

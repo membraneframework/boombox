@@ -7,6 +7,7 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP4 do
   alias Boombox.InternalBin.StorageEndpoints
   alias Membrane.H264
   alias Membrane.H265
+  alias Membrane.Transcoder
 
   defguardp is_h26x(format) when is_struct(format) and format.__struct__ in [H264, H265]
 
@@ -60,10 +61,12 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP4 do
       Enum.map(track_builders, fn
         {:audio, audio_builder} ->
           audio_builder
-          |> child(:mp4_audio_transcoder, %Membrane.Transcoder{
-            output_stream_format: Membrane.AAC,
+          |> child(:mp4_audio_transcoder, %Transcoder{
             transcoding_policy: transcoding_policy
           })
+          |> via_out(:output,
+            options: [output_stream_format: Transcoder.OutputFormat.AAC]
+          )
           |> child(:mp4_out_aac_parser, %Membrane.AAC.Parser{
             out_encapsulation: :none,
             output_config: :esds
@@ -73,22 +76,29 @@ defmodule Boombox.InternalBin.StorageEndpoints.MP4 do
 
         {:video, video_builder} ->
           video_builder
-          |> child(:mp4_video_transcoder, %Membrane.Transcoder{
-            output_stream_format: fn
-              %H264{stream_structure: :annexb} = h264 ->
-                %H264{h264 | stream_structure: :avc3, alignment: :au}
-
-              %H265{stream_structure: :annexb} = h265 ->
-                %H265{h265 | stream_structure: :hev1, alignment: :au}
-
-              h26x when is_h26x(h26x) ->
-                %{h26x | alignment: :au}
-
-              _not_h26x ->
-                %H264{stream_structure: :avc3, alignment: :au}
-            end,
+          |> child(:mp4_video_transcoder, %Transcoder{
             transcoding_policy: transcoding_policy
           })
+          |> via_out(:output,
+            options: [
+              output_stream_format: fn
+                %H264{stream_structure: :annexb} ->
+                  %Transcoder.OutputFormat.H264{stream_structure: :avc3, alignment: :au}
+
+                %H265{stream_structure: :annexb} ->
+                  %Transcoder.OutputFormat.H265{stream_structure: :hev1, alignment: :au}
+
+                %H264{stream_structure: {structure, _dcr}} ->
+                  %Transcoder.OutputFormat.H264{stream_structure: structure, alignment: :au}
+
+                %H265{stream_structure: {structure, _dcr}} ->
+                  %Transcoder.OutputFormat.H265{stream_structure: structure, alignment: :au}
+
+                _not_h26x ->
+                  %Transcoder.OutputFormat.H264{stream_structure: :avc3, alignment: :au}
+              end
+            ]
+          )
           |> via_in(Pad.ref(:input, :video))
           |> get_child(:mp4_muxer)
       end)

@@ -4,8 +4,7 @@ defmodule Boombox.InternalBin.Player do
   import Membrane.ChildrenSpec
 
   alias Boombox.InternalBin.Ready
-  alias Membrane.FFmpeg.SWScale
-  alias Membrane.{RawAudio, RawVideo}
+  alias Membrane.Transcoder
 
   # the size of the toilet capacity is supposed to handle more or less
   # the burst of packets from one segment of Live HLS stream
@@ -26,9 +25,12 @@ defmodule Boombox.InternalBin.Player do
         {:audio, builder}, state ->
           spec =
             builder
-            |> child(:player_audio_transcoder, %Membrane.Transcoder{
-              output_stream_format: RawAudio
-            })
+            |> child(:player_audio_transcoder, Transcoder)
+            |> via_out(:output,
+              options: [
+                output_stream_format: Transcoder.OutputFormat.RawAudio
+              ]
+            )
             |> maybe_plug_realtimer(:audio, is_input_realtime)
             |> child(:player_audio_sink, Membrane.PortAudio.Sink)
 
@@ -41,10 +43,14 @@ defmodule Boombox.InternalBin.Player do
         {:video, builder}, state ->
           spec =
             builder
-            |> child(:player_video_transcoder, %Membrane.Transcoder{
-              output_stream_format: RawVideo
-            })
-            |> child(:player_video_swscale_converter, %SWScale.Converter{format: :I420})
+            |> child(:player_video_transcoder, Transcoder)
+            |> via_out(:output,
+              options: [
+                output_stream_format: %Transcoder.OutputFormat.RawVideo{
+                  pixel_format: :I420
+                }
+              ]
+            )
             |> maybe_plug_realtimer(:video, is_input_realtime)
             |> child(:player_video_sink, Membrane.SDL.Player)
 

@@ -502,9 +502,8 @@ defmodule Boombox.InternalBin do
     Boombox.InternalBin.Pad.create_input(ctx)
   end
 
-  defp create_input({:srt, server_awaiting_accept}, _ctx, _state)
-       when is_pid(server_awaiting_accept) do
-    Boombox.InternalBin.SRT.create_input(server_awaiting_accept)
+  defp create_input({:srt, server, conn_id: conn_id}, _ctx, _state) when is_pid(server) do
+    Boombox.InternalBin.SRT.create_input(server, conn_id)
   end
 
   defp create_input({:srt, url, opts}, _ctx, _state) when is_binary(url) do
@@ -853,9 +852,9 @@ defmodule Boombox.InternalBin do
       when elixir_endpoint in @elixir_endpoint_types ->
         if Keyword.keyword?(opts), do: {elixir_endpoint, parent, opts}
 
-      {:srt, server_awaiting_accept}
-      when direction == :input and is_pid(server_awaiting_accept) ->
-        {:srt, server_awaiting_accept}
+      {:srt, server, conn_id: conn_id}
+      when direction == :input and is_pid(server) and is_integer(conn_id) ->
+        {:srt, server, conn_id: conn_id}
 
       {:srt, url} when is_binary(url) ->
         {:srt, url, []}

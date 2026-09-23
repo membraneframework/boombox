@@ -7,6 +7,7 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
   alias __MODULE__.{PullSink, PushSink, PullSource, PushSource}
   alias Boombox.InternalBin.Ready
   alias Membrane.FFmpeg.SWScale
+  alias Membrane.Transcoder
 
   @options_audio_keys [:audio_format, :audio_rate, :audio_channels]
 
@@ -87,19 +88,20 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
         Enum.map(track_builders, fn
           {:audio, builder} ->
             builder
-            |> child(:elixir_audio_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.RawAudio
-            })
-            |> maybe_plug_resampler(options)
+            |> child(:elixir_audio_transcoder, Transcoder)
+            |> via_out(:output,
+              options: [output_stream_format: audio_output_format(options)]
+            )
             |> maybe_plug_realtimer(:audio, pace_control, is_input_realtime)
             |> via_in(Pad.ref(:input, :audio))
             |> get_child(:elixir_sink)
 
           {:video, builder} ->
             builder
-            |> child(:elixir_video_transcoder, %Membrane.Transcoder{
-              output_stream_format: Membrane.RawVideo
-            })
+            |> child(:elixir_video_transcoder, Transcoder)
+            |> via_out(:output,
+              options: [output_stream_format: Transcoder.OutputFormat.RawVideo]
+            )
             |> child(:elixir_rgb_converter, %SWScale.Converter{
               format: :RGB,
               output_width: options[:video_width],
@@ -149,20 +151,13 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
     options
   end
 
-  defp maybe_plug_resampler(builder, %{
-         audio_format: format,
-         audio_rate: rate,
-         audio_channels: channels
-       }) do
-    format = %Membrane.RawAudio{sample_format: format, sample_rate: rate, channels: channels}
-
-    builder
-    |> child(:elixir_stream_resampler, %Membrane.FFmpeg.SWResample.Converter{
-      output_stream_format: format
-    })
+  defp audio_output_format(%{audio_format: format, audio_rate: rate, audio_channels: channels}) do
+    %Transcoder.OutputFormat.RawAudio{
+      sample_format: format,
+      sample_rate: rate,
+      channels: channels
+    }
   end
 
-  defp maybe_plug_resampler(builder, _options) do
-    builder
-  end
+  defp audio_output_format(_options), do: Transcoder.OutputFormat.RawAudio
 end

@@ -3,6 +3,7 @@ defmodule Boombox.InternalBin.StorageEndpoints.WAV do
   import Membrane.ChildrenSpec
   alias Boombox.InternalBin.Ready
   alias Boombox.InternalBin.StorageEndpoints
+  alias Membrane.Transcoder
 
   @spec create_input(String.t(), transport: :file | :http) :: Ready.t()
   def create_input(location, opts) do
@@ -24,10 +25,12 @@ defmodule Boombox.InternalBin.StorageEndpoints.WAV do
 
     pipeline_tail = fn builder ->
       builder
-      |> child(:wav_transcoder, %Membrane.Transcoder{
-        output_stream_format: Membrane.RawAudio,
+      |> child(:wav_transcoder, %Transcoder{
         transcoding_policy: transcoding_policy
       })
+      |> via_out(:output,
+        options: [output_stream_format: Transcoder.OutputFormat.RawAudio]
+      )
       |> child(:wav_output_parser, Membrane.WAV.Serializer)
       |> child(:file_sink, %Membrane.File.Sink{location: location})
     end
