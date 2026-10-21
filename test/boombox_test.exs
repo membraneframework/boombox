@@ -631,6 +631,36 @@ defmodule BoomboxTest do
     end
   end)
 
+  # The :message output takes push flow and needs pace control, which would
+  # make this test run in real time.
+  [:stream, :reader]
+  |> Enum.each(fn output ->
+    @tag :mp4_elixir_video_framerate
+    async_test "mp4 -> #{output} with video_framerate drops frames over the rate" do
+      all = video_timestamps(unquote(output), [])
+      limited = video_timestamps(unquote(output), video_framerate: 5)
+
+      assert length(all) > 100
+      # 10 seconds of video at 5 frames per second
+      assert length(limited) in 49..51
+      assert hd(limited) == hd(all)
+      assert Enum.all?(limited, &(&1 in all))
+
+      limited
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.each(fn [a, b] -> assert b - a >= Membrane.Time.milliseconds(150) end)
+    end
+  end)
+
+  defp video_timestamps(output, opts) do
+    produce_packet_stream(
+      input: @bbb_mp4_v,
+      output: {output, [video: :image, audio: false, pace_control: false] ++ opts}
+    )
+    |> Enum.filter(&(&1.kind == :video))
+    |> Enum.map(& &1.pts)
+  end
+
   @spec produce_packet_stream(input: Boombox.input(), output: Boombox.elixir_output()) ::
           Enumerable.t()
   defp produce_packet_stream([input: _input, output: {:stream, _opts}] = opts) do
