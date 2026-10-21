@@ -4,7 +4,7 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
   import Membrane.ChildrenSpec
   require Membrane.Pad, as: Pad
 
-  alias __MODULE__.{PullSink, PushSink, PullSource, PushSource}
+  alias __MODULE__.{FrameDropper, PullSink, PushSink, PullSource, PushSource}
   alias Boombox.InternalBin.Ready
   alias Membrane.FFmpeg.SWScale
   alias Membrane.Transcoder
@@ -102,6 +102,7 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
             |> via_out(:output,
               options: [output_stream_format: Transcoder.OutputFormat.RawVideo]
             )
+            |> maybe_drop_frames(options[:video_framerate])
             |> child(:elixir_rgb_converter, %SWScale.Converter{
               format: :RGB,
               output_width: options[:video_width],
@@ -116,6 +117,18 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
 
     %Ready{actions: [spec: spec], eos_info: Map.keys(track_builders)}
   end
+
+  defp maybe_drop_frames(builder, nil), do: builder
+
+  defp maybe_drop_frames(builder, framerate) when is_number(framerate) and framerate > 0,
+    do: builder |> child(:elixir_frame_dropper, %FrameDropper{framerate: framerate})
+
+  defp maybe_drop_frames(_builder, framerate),
+    do:
+      raise(
+        ArgumentError,
+        "video_framerate must be a positive number, got: #{inspect(framerate)}"
+      )
 
   defp maybe_plug_realtimer(builder, kind, pace_control, is_input_realtime)
 
@@ -140,7 +153,8 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
     options =
       options
       |> Keyword.validate!(
-        [:video, :audio, :video_width, :video_height, :pace_control, :is_live] ++ audio_keys
+        [:video, :audio, :video_width, :video_height, :video_framerate, :pace_control, :is_live] ++
+          audio_keys
       )
       |> Map.new()
 
