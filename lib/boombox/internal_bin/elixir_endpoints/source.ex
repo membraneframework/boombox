@@ -22,6 +22,15 @@
                   description: """
                   PID of a process from which to demand and receive packets.
                   """
+                ],
+                keep_newest_video: [
+                  spec: boolean(),
+                  default: false,
+                  description: """
+                  If `true`, a video packet is converted only when no newer one
+                  is already waiting, so frames the output cannot keep up with are
+                  dropped instead of queued.
+                  """
                 ]
 
     defmodule State do
@@ -35,7 +44,8 @@
                   audio_channels: pos_integer()
                 }
                 | nil,
-              video_dims: %{width: pos_integer(), height: pos_integer()} | nil
+              video_dims: %{width: pos_integer(), height: pos_integer()} | nil,
+              keep_newest_video: boolean()
             }
 
       @enforce_keys [:producer]
@@ -43,13 +53,14 @@
       defstruct @enforce_keys ++
                   [
                     audio_format: nil,
-                    video_dims: nil
+                    video_dims: nil,
+                    keep_newest_video: false
                   ]
     end
 
     @impl true
     def handle_init(_ctx, opts) do
-      {[], %State{producer: opts.producer}}
+      {[], %State{producer: opts.producer, keep_newest_video: opts.keep_newest_video}}
     end
 
     @impl true
@@ -72,6 +83,7 @@
           _ctx,
           %{producer: producer} = state
         ) do
+      packet = if state.keep_newest_video, do: newest_video(packet, producer), else: packet
       image = packet.payload |> Image.flatten!() |> Image.to_colorspace!(:srgb)
       video_dims = %{width: Image.width(image), height: Image.height(image)}
       {:ok, payload} = Vix.Vips.Image.write_to_binary(image)
@@ -129,6 +141,32 @@
     def handle_info({:boombox_eos, producer}, ctx, %{producer: producer} = state) do
       actions = Enum.map(ctx.pads, fn {ref, _data} -> {:end_of_stream, ref} end)
       {actions, state}
+    end
+
+    # The newest video packet already waiting, and the older ones dropped.
+    # Each packet the producer sent spent one of its demand, so in pull mode
+    # the dropped ones are demanded again; otherwise the producer would wait
+    # for demand the output already believes it gave.
+    defp newest_video(packet, producer) do
+      {newest, dropped} = drain_video(packet, producer, 0)
+      demand_again(producer, dropped)
+      newest
+    end
+
+    if flow_control == :manual do
+      defp demand_again(producer, dropped) when dropped > 0,
+        do: send(producer, {:boombox_demand, self(), :video, dropped})
+    end
+
+    defp demand_again(_producer, _dropped), do: :ok
+
+    defp drain_video(packet, producer, dropped) do
+      receive do
+        {:boombox_packet, ^producer, %Boombox.Packet{kind: :video} = newer} ->
+          drain_video(newer, producer, dropped + 1)
+      after
+        0 -> {packet, dropped}
+      end
     end
   end
 end)

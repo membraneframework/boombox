@@ -79,11 +79,18 @@ defmodule Boombox.Endpoints do
   * `{:is_live, value}` - If `true`, Boombox assumes that packets are provided
     in realtime and won't control their pace when passing them to the output.
     `false` by default.
+  * `{:keep_newest_video, value}` - If `true`, a video frame that arrives while
+    an older one is still waiting to be converted replaces it, so at most one
+    frame waits and the output plays the newest. Use it for a live source the
+    encoder cannot always keep up with: without it every frame the encoder is
+    behind on queues in memory, and the output falls further behind the
+    source. `false` by default, which passes every frame.
   """
   @type in_raw_data_opt ::
           {:audio, :binary | boolean()}
           | {:video, :image | boolean()}
           | {:is_live, boolean()}
+          | {:keep_newest_video, boolean()}
 
   @typedoc """
   An option for the raw data output endpoints (`:stream`, `:reader`, `:message`).

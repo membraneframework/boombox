@@ -42,10 +42,12 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
            |> via_out(Pad.ref(:output, :audio))}
       end)
 
+    keep_newest_video = Map.get(options, :keep_newest_video, false)
+
     source_definition =
       case flow_control_mode do
-        :push -> %PushSource{producer: producer}
-        :pull -> %PullSource{producer: producer}
+        :push -> %PushSource{producer: producer, keep_newest_video: keep_newest_video}
+        :pull -> %PullSource{producer: producer, keep_newest_video: keep_newest_video}
       end
 
     spec_builder = child(:elixir_source, source_definition)
@@ -140,7 +142,15 @@ defmodule Boombox.InternalBin.ElixirEndpoints do
     options =
       options
       |> Keyword.validate!(
-        [:video, :audio, :video_width, :video_height, :pace_control, :is_live] ++ audio_keys
+        [
+          :video,
+          :audio,
+          :video_width,
+          :video_height,
+          :pace_control,
+          :is_live,
+          :keep_newest_video
+        ] ++ audio_keys
       )
       |> Map.new()
 
