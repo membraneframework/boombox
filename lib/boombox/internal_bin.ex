@@ -940,7 +940,7 @@ defmodule Boombox.InternalBin do
       when endpoint_type in [:webrtc, :rtp, :rtsp, :rtmp, :srt] ->
         true
 
-      {:stream, opts} ->
+      {:stream, _parent, opts} ->
         Keyword.get(opts, :is_live, false)
 
       _other ->
